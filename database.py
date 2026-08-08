@@ -12,8 +12,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_connection():
-    """Returns a connection to the PostgreSQL database with DictCursor factory."""
+from psycopg2.pool import ThreadedConnectionPool
+
+@st.cache_resource
+def _get_db_pool():
+    """Initializes and caches a ThreadedConnectionPool for PostgreSQL."""
     if "postgres" not in st.secrets:
         raise ConnectionError(
             "PostgreSQL credentials not found in Streamlit Secrets! "
@@ -22,22 +25,46 @@ def get_connection():
         )
     
     pg_secrets = st.secrets["postgres"]
+    url = pg_secrets.get("url") or pg_secrets.get("uri")
     
-    # Try using connection URL/URI first, otherwise use key-value fields
-    if "url" in pg_secrets:
-        conn = psycopg2.connect(pg_secrets["url"])
-    elif "uri" in pg_secrets:
-        conn = psycopg2.connect(pg_secrets["uri"])
+    if url:
+        return ThreadedConnectionPool(1, 15, dsn=url)
     else:
-        conn = psycopg2.connect(
+        return ThreadedConnectionPool(
+            1, 15,
             host=pg_secrets.get("host"),
             database=pg_secrets.get("database"),
             user=pg_secrets.get("user"),
             password=pg_secrets.get("password"),
-            port=pg_secrets.get("port", 5432)
+            port=int(pg_secrets.get("port", 5432))
         )
-    
-    return conn
+
+
+class PooledConnectionWrapper:
+    """Wraps a pooled psycopg2 connection so calling conn.close() puts it back in the pool."""
+    def __init__(self, pool, conn):
+        self._pool = pool
+        self._conn = conn
+
+    def close(self):
+        try:
+            if self._conn and self._conn.closed == 0:
+                self._pool.putconn(self._conn)
+        except Exception:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def get_connection():
+    """Returns a high-speed pooled connection to PostgreSQL."""
+    pool = _get_db_pool()
+    conn = pool.getconn()
+    if conn.closed != 0:
+        pool.putconn(conn, close=True)
+        conn = pool.getconn()
+    return PooledConnectionWrapper(pool, conn)
 
 
 def init_db():

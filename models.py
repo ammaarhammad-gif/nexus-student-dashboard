@@ -6,6 +6,7 @@ Includes user authentication and isolates data by user_id.
 import bcrypt
 import psycopg2
 import psycopg2.extras
+import streamlit as st
 from database import get_connection
 
 # ══════════════════════════════════════════════
@@ -51,7 +52,7 @@ def verify_user(username: str, password: str) -> dict:
 
             # Verify bcrypt hash
             if bcrypt.checkpw(password.encode('utf-8'), user["password_hash"].encode('utf-8')):
-                return {"id": user["id"], "username": user["username"]}
+                return dict(user)
             return None
     finally:
         conn.close()
@@ -61,6 +62,7 @@ def verify_user(username: str, password: str) -> dict:
 # SETTINGS & USER PROFILE
 # ══════════════════════════════════════════════
 
+@st.cache_data(ttl=15, show_spinner=False)
 def get_setting(user_id: int, key: str, default=None):
     """Read a single setting value for a user."""
     conn = get_connection()
@@ -83,6 +85,7 @@ def set_setting(user_id: int, key: str, value: str):
                 ON CONFLICT(user_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
             """, (user_id, key, str(value)))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -102,8 +105,10 @@ def save_user_profile(user_id: int, name: str, academic_year: str, board: str, c
     set_setting(user_id, "board", board)
     set_setting(user_id, "class_name", class_name)
     set_setting(user_id, "is_setup_completed", "1")
+    st.cache_data.clear()
 
 
+@st.cache_data(ttl=15, show_spinner=False)
 def get_user_profile(user_id: int) -> dict:
     """Retrieve user profile as a dictionary."""
     return {
