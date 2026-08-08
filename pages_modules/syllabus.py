@@ -12,8 +12,9 @@ from models import (
     move_chapter,
     get_topics_for_chapter, add_topic, rename_topic, delete_topic,
     get_subtopics_for_topic, add_subtopic, rename_subtopic, delete_subtopic,
-    get_progress, save_progress
+    get_progress, save_progress, get_user_profile
 )
+from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header
 
 STATUS_OPTIONS = ["Not Started", "In Progress", "Completed", "Revision Done"]
@@ -64,8 +65,29 @@ def render_syllabus_page(user_id: int):
                         st.success(f"✅ Subject '{new_sub_name.strip()}' created!")
                         st.rerun()
 
+        st.markdown("---")
+        profile = get_user_profile(user_id)
+        board = profile.get("board", "CBSE")
+        class_name = profile.get("class_name", "Class 10")
+        if st.button(f"⚡ Auto-Fill Full Official {board} ({class_name}) Syllabus", use_container_width=True):
+            loaded = preload_standard_syllabus(user_id, board, class_name)
+            if loaded:
+                st.success(f"✅ Loaded official {board} syllabus for {class_name}!")
+                st.rerun()
+
     if not subjects:
-        st.info("📝 No subjects yet. Use the form above to add your first subject!")
+        st.info("📝 No subjects yet. You can add subjects manually above, or click below to load the official syllabus automatically!")
+        profile = get_user_profile(user_id)
+        board = profile.get("board", "CBSE")
+        class_name = profile.get("class_name", "Class 10")
+        
+        if st.button(f"⚡ Auto-Load Official {board} ({class_name}) Syllabus", type="primary", use_container_width=True):
+            loaded = preload_standard_syllabus(user_id, board, class_name)
+            if loaded:
+                st.success(f"✅ Loaded official {board} syllabus for {class_name}!")
+                st.rerun()
+            else:
+                st.error("Could not load syllabus for your selected board/class.")
         return
 
     st.markdown("---")

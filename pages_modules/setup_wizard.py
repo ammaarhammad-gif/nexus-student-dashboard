@@ -8,6 +8,7 @@ Shown only once; all values can be edited later in Settings.
 import streamlit as st
 import datetime
 from models import save_user_profile, add_term, clear_all_terms
+from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header
 
 STATE_BOARDS = [
@@ -177,5 +178,8 @@ def render_setup_wizard(user_id: int):
             if t_name.strip():
                 add_term(user_id=user_id, name=t_name.strip(), exam_date=t_date_str, display_order=idx + 1)
 
-        st.success("✅ Setup complete! Loading your dashboard...")
+        # Pre-load official CBSE/ICSE syllabus automatically
+        preload_standard_syllabus(user_id=user_id, board=final_board, class_name=class_name)
+
+        st.success("✅ Setup complete & official syllabus loaded! Loading your dashboard...")
         st.rerun()
