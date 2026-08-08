@@ -150,9 +150,13 @@ def main():
             del st.session_state["username"]
             st.rerun()
             
-        st.markdown("---")
-        st.caption("🌐 Cloud PostgreSQL Storage Enabled")
-        st.caption("v1.1.0 • Active")
+        st.markdown("""
+            <div style="margin-top: 15px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+                <p style="font-family: 'Caveat', cursive; color: #94A3B8; font-size: 1.1rem; margin: 0;">Crafted with ❤️ by</p>
+                <h3 style="font-family: 'Dancing Script', cursive; color: #FDE047; font-size: 1.7rem; margin: 2px 0 6px 0; text-shadow: 0 0 8px rgba(253,224,71,0.5);">Ammaar Akhtar</h3>
+                <span style="font-family: 'Caveat', cursive; color: #38BDF8; font-size: 1.1rem;">🌐 Cloud Sync Active • v1.2.0</span>
+            </div>
+        """, unsafe_allow_html=True)
 
     # Page Router
     if page == "🏠 Dashboard":
