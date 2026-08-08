@@ -13,7 +13,7 @@ def apply_custom_css():
     st.markdown("""
         <style>
         /* ═══════ Google Fonts ═══════ */
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&family=Caveat:wght@600;700&display=swap');
 
         html, body, [class*="css"] {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -100,10 +100,74 @@ def apply_custom_css():
             border-radius: 10px;
         }
 
-        /* ═══════ Sidebar ═══════ */
+        /* ═══════ Sidebar High-Visibility & Cursive Typography ═══════ */
         section[data-testid="stSidebar"] {
-            background-color: #0F172A;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            background: linear-gradient(180deg, #090D16 0%, #0F172A 100%) !important;
+            border-right: 1px solid rgba(56, 189, 248, 0.25) !important;
+        }
+
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 {
+            font-family: 'Dancing Script', cursive !important;
+            font-size: 2rem !important;
+            color: #38BDF8 !important;
+            text-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+            letter-spacing: 1px;
+            margin-top: 10px;
+            margin-bottom: 12px;
+        }
+
+        /* Sidebar Radio Options Container */
+        section[data-testid="stSidebar"] [data-baseweb="radio"] {
+            background: rgba(30, 41, 59, 0.6) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-radius: 12px !important;
+            padding: 8px 14px !important;
+            margin-bottom: 8px !important;
+            transition: all 0.25s ease-in-out !important;
+        }
+
+        section[data-testid="stSidebar"] [data-baseweb="radio"]:hover {
+            background: rgba(56, 189, 248, 0.2) !important;
+            border-color: #38BDF8 !important;
+            transform: translateX(4px);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+        }
+
+        /* Sidebar Radio Label Text */
+        section[data-testid="stSidebar"] [data-baseweb="radio"] div,
+        section[data-testid="stSidebar"] [data-baseweb="radio"] p,
+        section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+            font-family: 'Caveat', cursive !important;
+            font-size: 1.45rem !important;
+            font-weight: 700 !important;
+            color: #FFFFFF !important;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Active Selected Radio Item */
+        section[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:checked) {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.8) 0%, rgba(168, 85, 247, 0.8) 100%) !important;
+            border: 1px solid #F43F5E !important;
+            box-shadow: 0 0 18px rgba(244, 63, 94, 0.5) !important;
+        }
+
+        section[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:checked) p {
+            color: #FDE047 !important;
+            font-size: 1.55rem !important;
+            text-shadow: 0 0 8px rgba(253, 224, 71, 0.8) !important;
+        }
+
+        /* Sidebar Captions & Small Text */
+        section[data-testid="stSidebar"] .stCaption,
+        section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+            color: #7DD3FC !important;
+            font-family: 'Caveat', cursive !important;
+            font-size: 1.25rem !important;
+            font-weight: 600 !important;
+            opacity: 0.95 !important;
         }
 
         /* ═══════ Buttons ═══════ */

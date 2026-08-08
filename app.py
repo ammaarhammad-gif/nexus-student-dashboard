@@ -121,12 +121,12 @@ def main():
     # Sidebar Navigation Menu
     with st.sidebar:
         st.markdown(f"""
-            <div style="text-align: center; padding: 10px 0 20px 0;">
-                <h2 style="color: #6366F1; margin-bottom: 2px;">⚡ NEXUS</h2>
-                <p style="color: #94A3B8; font-size: 0.85rem; margin: 0;">Syllabus & Exam Manager</p>
-                <div style="margin-top: 10px; background: rgba(99, 102, 241, 0.1); padding: 8px 12px; border-radius: 8px;">
-                    <strong style="color: #F8FAFC;">{profile.get('name', 'Student')}</strong><br>
-                    <span style="color: #CBD5E1; font-size: 0.8rem;">{profile.get('class_name', '')} • {profile.get('board', '')}</span>
+            <div style="text-align: center; padding: 10px 0 15px 0;">
+                <h2 style="font-family: 'Dancing Script', cursive; color: #38BDF8; font-size: 2.2rem; margin-bottom: 2px; text-shadow: 0 0 10px rgba(56,189,248,0.5);">⚡ NEXUS</h2>
+                <p style="font-family: 'Caveat', cursive; color: #93C5FD; font-size: 1.2rem; margin: 0;">Syllabus & Exam Manager</p>
+                <div style="margin-top: 12px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.2)); border: 1px solid rgba(56, 189, 248, 0.4); padding: 10px 14px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                    <strong style="font-family: 'Dancing Script', cursive; color: #FDE047; font-size: 1.6rem; text-shadow: 0 0 8px rgba(253,224,71,0.5);">{profile.get('name', 'Student')}</strong><br>
+                    <span style="font-family: 'Inter', sans-serif; color: #E0F2FE; font-size: 0.85rem; font-weight: 500;">{profile.get('class_name', '')} • {profile.get('board', '')}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
