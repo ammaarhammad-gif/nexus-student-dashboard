@@ -3,7 +3,7 @@ models.py — Data access layer for all database operations using PostgreSQL.
 Includes user authentication and isolates data by user_id.
 """
 
-import bcrypt
+import bcrypt  # type: ignore[import-not-found]
 import psycopg2
 import psycopg2.extras
 import streamlit as st
@@ -216,6 +216,18 @@ def get_all_subjects(user_id: int):
         conn.close()
 
 
+def get_subject_by_name(user_id: int, name: str):
+    """Find a subject by name for a user."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("SELECT * FROM subjects WHERE user_id = %s AND name = %s", (user_id, name.strip()))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+
 def add_subject(user_id: int, name: str, color: str = "#6366F1"):
     """Create a new subject. Returns the new subject ID or None if duplicate."""
     conn = get_connection()
@@ -264,11 +276,8 @@ def delete_subject(user_id: int, subject_id: int):
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            # We clean up associated progress explicitly since item_id points to topics/subtopics
+            # Clean up associated progress explicitly since item_id points to topics/subtopics
             # but has no actual hard foreign key inside topic_progress schema
-            chapters = conn.execute("SELECT id FROM chapters WHERE user_id = %s AND subject_id = %s", (user_id, subject_id))
-            # Wait, conn.execute is not supported in psycopg2, we must use cursor.execute
-            # Let's fix this database call:
             cursor.execute("SELECT id FROM chapters WHERE user_id = %s AND subject_id = %s", (user_id, subject_id))
             chapters_rows = cursor.fetchall()
             for ch in chapters_rows:

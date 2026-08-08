@@ -19,9 +19,15 @@ def apply_custom_css():
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
+        .stApp {
+            background-color: #0B0F19 !important;
+            color: #F8FAFC !important;
+        }
+
         h1, h2, h3, h4, h5, h6 {
             font-family: 'Outfit', sans-serif !important;
             letter-spacing: -0.02em;
+            color: #F8FAFC !important;
         }
 
         /* ═══════ Glassmorphism Card ═══════ */
@@ -268,9 +274,9 @@ def apply_custom_css():
 def render_header(title: str, subtitle: str = ""):
     """Render a stylish page header with optional subtitle."""
     st.markdown(f"""
-        <div style="margin-bottom: 24px;">
-            <h1 style="color: #F8FAFC; margin-bottom: 4px; font-weight: 700;">{title}</h1>
-            {f'<p style="color: #94A3B8; font-size: 1.05rem; margin-top: 0;">{subtitle}</p>' if subtitle else ''}
+        <div style="margin-bottom: 24px; padding: 16px 22px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95)); border-left: 5px solid #6366F1; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+            <h1 style="color: #FFFFFF !important; font-family: 'Outfit', sans-serif !important; font-weight: 700 !important; font-size: 2.2rem !important; margin: 0 0 6px 0 !important; text-shadow: 0 2px 4px rgba(0,0,0,0.6);">{title}</h1>
+            {f'<p style="color: #94A3B8 !important; font-size: 1.05rem !important; margin: 0 !important; font-weight: 500;">{subtitle}</p>' if subtitle else ''}
         </div>
     """, unsafe_allow_html=True)
 
