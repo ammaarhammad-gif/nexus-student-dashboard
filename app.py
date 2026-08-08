@@ -21,6 +21,9 @@ st.set_page_config(
 # Apply Futuristic Theme Styling First
 apply_custom_css()
 
+# Google Site Verification for Search Engine Indexing
+st.markdown('<meta name="google-site-verification" content="ArkovzIbKfH_-GW96FInyqF9VGOXvqFV_GVIP1mIYMw" />', unsafe_allow_html=True)
+
 # Ensure Database and Schema are Initialized
 db_ok = False
 try:
