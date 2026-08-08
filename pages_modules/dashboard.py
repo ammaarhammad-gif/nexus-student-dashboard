@@ -21,6 +21,17 @@ def render_dashboard_page(user_id: int):
     user_name = profile.get("name", "Student")
     class_info = f"{profile.get('class_name', '')} • {profile.get('board', '')} • {profile.get('academic_year', '')}"
 
+    # Auto-load official board syllabus if user has no subjects or 0 topics
+    subjects = get_all_subjects(user_id)
+    stats = get_overall_stats(user_id)
+    if not subjects or stats["total_topics"] == 0:
+        board = profile.get("board", "CBSE")
+        class_name = profile.get("class_name", "Class 10")
+        loaded = preload_standard_syllabus(user_id, board, class_name)
+        if loaded:
+            st.rerun()
+        stats = get_overall_stats(user_id)
+
     # ── Welcome Banner ──
     st.markdown(f"""
         <div class="welcome-banner">
@@ -28,8 +39,6 @@ def render_dashboard_page(user_id: int):
             <p>{class_info}</p>
         </div>
     """, unsafe_allow_html=True)
-
-    stats = get_overall_stats(user_id)
 
     # ── Top Metric Cards ──
     m1, m2, m3, m4, m5 = st.columns(5)
