@@ -132,7 +132,7 @@ def render_statistics_page(user_id: int):
         row_subs = subjects[row_start:row_start + 2]
         cols = st.columns(2)
         for idx, sub in enumerate(row_subs):
-            stats = get_subject_stats(sub["id"])
+            stats = get_subject_stats(user_id, sub["id"])
             with cols[idx]:
                 st.markdown(f"""
                     <div class="nexus-card" style="border-top: 3px solid {sub['color']};">

@@ -3,7 +3,7 @@ models.py — Data access layer for all database operations using PostgreSQL.
 Includes user authentication and isolates data by user_id.
 """
 
-import bcrypt
+import bcrypt  # type: ignore[import-not-found]
 import psycopg2
 import psycopg2.extras
 import streamlit as st
@@ -264,11 +264,8 @@ def delete_subject(user_id: int, subject_id: int):
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            # We clean up associated progress explicitly since item_id points to topics/subtopics
+            # Clean up associated progress explicitly since item_id points to topics/subtopics
             # but has no actual hard foreign key inside topic_progress schema
-            chapters = conn.execute("SELECT id FROM chapters WHERE user_id = %s AND subject_id = %s", (user_id, subject_id))
-            # Wait, conn.execute is not supported in psycopg2, we must use cursor.execute
-            # Let's fix this database call:
             cursor.execute("SELECT id FROM chapters WHERE user_id = %s AND subject_id = %s", (user_id, subject_id))
             chapters_rows = cursor.fetchall()
             for ch in chapters_rows:
