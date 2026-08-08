@@ -52,8 +52,8 @@ def render_setup_wizard(user_id: int):
     st.markdown("""
         <div style="text-align: center; margin-bottom: 30px;">
             <p style="color: #CBD5E1; font-size: 1.05rem;">
-                Welcome! Let's set up your dashboard in under a minute.<br>
-                Everything stays on <strong>your computer</strong> — no cloud, no login required.
+                Welcome! Let's set up your profile in under a minute.<br>
+                Your study progress is <strong>securely saved in the cloud</strong>.
             </p>
         </div>
     """, unsafe_allow_html=True)
