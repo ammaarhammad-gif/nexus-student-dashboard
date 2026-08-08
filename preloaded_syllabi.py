@@ -428,7 +428,16 @@ def preload_standard_syllabus(user_id: int, board: str, class_name: str) -> bool
     for sub_data in syllabus_list:
         sub_id = add_subject(user_id, sub_data["name"], sub_data.get("color", "#6366F1"))
         if sub_id is None:
-            # Subject already exists, skip or proceed
+            existing_sub = get_subject_by_name(user_id, sub_data["name"])
+            if existing_sub:
+                sub_id = existing_sub["id"]
+
+        if sub_id is None:
+            continue
+
+        existing_chapters = get_chapters_for_subject(user_id, sub_id)
+        if existing_chapters:
+            # Chapters already exist for this subject, skip creating duplicates
             continue
 
         for chap_data in sub_data.get("chapters", []):
