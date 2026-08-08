@@ -21,8 +21,20 @@ st.set_page_config(
 # Apply Futuristic Theme Styling First
 apply_custom_css()
 
-# Google Site Verification for Search Engine Indexing
-st.markdown('<meta name="google-site-verification" content="ArkovzIbKfH_-GW96FInyqF9VGOXvqFV_GVIP1mIYMw" />', unsafe_allow_html=True)
+# Google Site Verification for Search Engine Indexing (Injected into top-level <head>)
+import streamlit.components.v1 as components
+components.html("""
+    <script>
+        (function() {
+            try {
+                var meta = window.top.document.createElement('meta');
+                meta.name = "google-site-verification";
+                meta.content = "ArkovzIbKfH_-GW96FInyqF9VGOXvqFV_GVIP1mIYMw";
+                window.top.document.getElementsByTagName('head')[0].appendChild(meta);
+            } catch(e) { console.log(e); }
+        })();
+    </script>
+""", height=0)
 
 # Ensure Database and Schema are Initialized
 db_ok = False
