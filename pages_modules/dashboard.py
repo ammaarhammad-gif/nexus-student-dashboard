@@ -12,6 +12,7 @@ from models import (
     get_overall_stats, get_user_profile, get_all_subjects,
     get_subject_stats, get_all_terms
 )
+from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header, render_metric_card
 
 
@@ -148,7 +149,13 @@ def render_dashboard_page(user_id: int):
                         </div>
                     """, unsafe_allow_html=True)
     else:
-        st.info("No subjects added yet. Start by adding subjects in the **📚 Syllabus Manager**.")
+        board = profile.get("board", "CBSE")
+        class_name = profile.get("class_name", "Class 10")
+        with st.spinner(f"⚡ Auto-loading official {board} ({class_name}) syllabus..."):
+            loaded = preload_standard_syllabus(user_id, board, class_name)
+            if loaded:
+                st.toast(f"✅ Official {board} ({class_name}) syllabus loaded!", icon="🚀")
+                st.rerun()
 
 
 def _render_exam_countdown(user_id: int):
