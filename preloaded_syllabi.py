@@ -5,8 +5,6 @@ Automatically populates subjects, chapters, and topics for students so they don'
 have to type their syllabus manually.
 """
 
-from models import add_subject, add_chapter, add_topic
-
 # ══════════════════════════════════════════════════════════════════════════════
 # SYLLABUS DATASTORE FOR CBSE AND ICSE (CLASSES 1 to 10)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -391,6 +389,21 @@ SYLLABUS_DATA = {
 }
 
 
+from models import add_subject, add_chapter, add_topic, get_subject_by_name, get_chapters_for_subject
+
+def normalize_class_name(raw_class: str) -> str:
+    """Normalize class string to matching key format like 'Class 10'."""
+    s = str(raw_class).strip().lower()
+    for num in range(1, 11):
+        if str(num) in s or f"class {num}" in s or f"class{num}" in s:
+            return f"Class {num}"
+    if "ix" in s or "9" in s:
+        return "Class 9"
+    if "x" in s or "10" in s:
+        return "Class 10"
+    return "Class 10"
+
+
 def preload_standard_syllabus(user_id: int, board: str, class_name: str) -> bool:
     """
     Looks up standard syllabus data for (board, class_name) and creates all
@@ -398,11 +411,11 @@ def preload_standard_syllabus(user_id: int, board: str, class_name: str) -> bool
 
     Returns True if data was successfully loaded, False otherwise.
     """
-    # Normalize inputs
-    board_clean = "CBSE" if "CBSE" in board.upper() else ("ICSE" if "ICSE" in board.upper() else "CBSE")
+    board_clean = "ICSE" if "ICSE" in str(board).upper() else "CBSE"
+    norm_class = normalize_class_name(class_name)
     
     # Try exact match first
-    syllabus_list = SYLLABUS_DATA.get((board_clean, class_name))
+    syllabus_list = SYLLABUS_DATA.get((board_clean, norm_class))
 
     # Fallback to Class 10 if specific class key isn't explicitly defined
     if not syllabus_list:

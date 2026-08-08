@@ -216,6 +216,18 @@ def get_all_subjects(user_id: int):
         conn.close()
 
 
+def get_subject_by_name(user_id: int, name: str):
+    """Find a subject by name for a user."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("SELECT * FROM subjects WHERE user_id = %s AND name = %s", (user_id, name.strip()))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+
 def add_subject(user_id: int, name: str, color: str = "#6366F1"):
     """Create a new subject. Returns the new subject ID or None if duplicate."""
     conn = get_connection()
