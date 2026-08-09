@@ -1,19 +1,23 @@
 """
-planner.py — Study Planner, Daily Schedule, and Exam Term Allocation.
+planner.py — Study Planner, Daily Schedule, Exam Term Allocation, and Study Sessions.
 
 Features:
 1. Daily Task & Study Planner (date-based todo with subject tagging)
 2. Study Goals & Targets
 3. Exam Term Allocation (assign chapters to specific terms and view term-specific progress)
+4. Study Sessions (log, view, weekly summary)
 """
 
 import streamlit as st
 import datetime
+import plotly.graph_objects as go
 from models import (
     get_daily_plans, add_daily_plan, toggle_daily_plan, delete_daily_plan,
     get_all_goals, add_goal, update_goal_progress, delete_goal,
     get_all_terms, get_all_subjects, get_chapters_for_subject,
-    get_chapters_for_term, set_term_chapters, get_term_stats
+    get_chapters_for_term, set_term_chapters, get_term_stats,
+    add_study_session, get_study_sessions, delete_study_session,
+    get_weekly_study_summary
 )
 from styles import render_header, render_metric_card
 
@@ -21,8 +25,9 @@ from styles import render_header, render_metric_card
 def render_planner_page(user_id: int):
     render_header("🗓️ Study Planner & Exam Allocation", "Schedule daily study tasks, track goals, and allocate chapters to exam terms.")
 
-    tab_daily, tab_terms, tab_goals = st.tabs([
-        "📋 Daily Study Plan", 
+    tab_daily, tab_sessions, tab_terms, tab_goals = st.tabs([
+        "📋 Daily Study Plan",
+        "📖 Study Sessions",
         "🏷️ Exam Term Allocator", 
         "🎯 Study Goals"
     ])
@@ -31,11 +36,15 @@ def render_planner_page(user_id: int):
     with tab_daily:
         _render_daily_planner_tab(user_id)
 
-    # ── TAB 2: Exam Term Allocation ──
+    # ── TAB 2: Study Sessions ──
+    with tab_sessions:
+        _render_study_sessions_tab(user_id)
+
+    # ── TAB 3: Exam Term Allocation ──
     with tab_terms:
         _render_term_allocation_tab(user_id)
 
-    # ── TAB 3: Study Goals ──
+    # ── TAB 4: Study Goals ──
     with tab_goals:
         _render_goals_tab(user_id)
 
@@ -245,3 +254,117 @@ def _render_goals_tab(user_id: int):
                         delete_goal(user_id, g["id"])
                         st.rerun()
                 st.markdown("---")
+
+
+def _render_study_sessions_tab(user_id: int):
+    """Log, view, and analyze study sessions."""
+    st.subheader("📖 Study Sessions")
+    st.caption("Track how long you study each subject. Review your weekly habits.")
+
+    # ── Weekly Study Summary Chart ──
+    weekly = get_weekly_study_summary(user_id)
+    day_labels = [d["day_label"] for d in weekly]
+    day_minutes = [d["minutes"] for d in weekly]
+    total_week = sum(day_minutes)
+
+    col_chart, col_stat = st.columns([3, 1])
+    with col_stat:
+        render_metric_card("This Week", f"{total_week} min", "#A855F7",
+                          f"{round(total_week / 60, 1)} hours")
+        today_mins = day_minutes[-1] if day_minutes else 0
+        render_metric_card("Today", f"{today_mins} min", "#22C55E")
+
+    with col_chart:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=day_labels,
+            y=day_minutes,
+            marker_color=[
+                "#6366F1" if m > 0 else "#334155" for m in day_minutes
+            ],
+            text=[f"{m}m" if m > 0 else "" for m in day_minutes],
+            textposition="outside",
+            textfont=dict(color="#F8FAFC", size=12)
+        ))
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#CBD5E1"),
+            xaxis=dict(showgrid=False),
+            yaxis=dict(title="Minutes", showgrid=True,
+                       gridcolor="rgba(255,255,255,0.05)"),
+            margin=dict(t=10, b=30, l=40, r=20),
+            height=250
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Log a Session ──
+    with st.expander("➕ Log a Study Session", expanded=True):
+        subjects = get_all_subjects(user_id)
+        subject_options = {"— Select Subject —": None}
+        for s in subjects:
+            subject_options[s["name"]] = s["id"]
+
+        with st.form("log_session_form", clear_on_submit=True):
+            col_a, col_b = st.columns([3, 1])
+            with col_a:
+                sel_sub = st.selectbox("Subject *", list(subject_options.keys()),
+                                      key="session_subject")
+                sub_id = subject_options[sel_sub]
+            with col_b:
+                duration = st.number_input("Duration (min) *", min_value=1,
+                                          max_value=720, value=30, step=5)
+
+            col_c, col_d = st.columns(2)
+            with col_c:
+                sess_date = st.date_input("Date", value=datetime.date.today(),
+                                         key="session_date")
+            with col_d:
+                sess_notes = st.text_input("Notes (optional)",
+                                          placeholder="What did you study?")
+
+            if st.form_submit_button("💾 Log Session", use_container_width=True):
+                if not sub_id:
+                    st.error("Please select a subject.")
+                else:
+                    add_study_session(
+                        user_id, subject_id=sub_id,
+                        duration_minutes=duration,
+                        session_date=sess_date.strftime("%Y-%m-%d"),
+                        notes=sess_notes
+                    )
+                    st.success("Study session logged!")
+                    st.rerun()
+
+    st.markdown("---")
+
+    # ── Recent Sessions ──
+    st.subheader("📋 Recent Sessions")
+    sessions = get_study_sessions(user_id, limit=20)
+
+    if not sessions:
+        st.info("No study sessions logged yet. Start by adding one above!")
+    else:
+        for sess in sessions:
+            c1, c2, c3, c4 = st.columns([4, 2, 2, 1])
+            with c1:
+                sub_name = sess.get("subject_name") or "Unknown"
+                color = sess.get("subject_color") or "#475569"
+                st.markdown(
+                    f"<span style='background: {color}; padding: 2px 8px; "
+                    f"border-radius: 4px; font-size: 0.75rem; color: #fff;'>"
+                    f"{sub_name}</span> "
+                    f"<span style='color: #F8FAFC; font-weight: 500;'>"
+                    f"{sess.get('notes') or ''}</span>",
+                    unsafe_allow_html=True
+                )
+            with c2:
+                st.caption(f"⏱️ {sess['duration_minutes']} min")
+            with c3:
+                st.caption(f"📅 {sess.get('session_date', '')}")
+            with c4:
+                if st.button("🗑️", key=f"del_sess_{sess['id']}", help="Delete"):
+                    delete_study_session(user_id, sess["id"])
+                    st.rerun()

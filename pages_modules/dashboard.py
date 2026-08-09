@@ -10,7 +10,8 @@ import plotly.graph_objects as go
 import datetime
 from models import (
     get_overall_stats, get_user_profile, get_all_subjects,
-    get_subject_stats, get_all_terms
+    get_subject_stats, get_all_terms,
+    get_due_revisions, complete_revision
 )
 from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header, render_metric_card
@@ -129,6 +130,11 @@ def render_dashboard_page(user_id: int):
 
     st.markdown("---")
 
+    # ── Revision Reminders ──
+    _render_revision_reminders(user_id)
+
+    st.markdown("---")
+
     # ── Subject-wise Breakdown ──
     st.subheader("📚 Subject Summary")
     subjects = get_all_subjects(user_id)
@@ -236,3 +242,40 @@ def _render_exam_countdown(user_id: int):
                         st.error(f"⚠️ {days} days")
                     else:
                         st.info(f"{days} days")
+
+
+def _render_revision_reminders(user_id: int):
+    """Show today's due spaced revision reminders."""
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    due = get_due_revisions(user_id, today_str)
+
+    if not due:
+        return
+
+    st.subheader(f"🔔 Revision Reminders ({len(due)} due)")
+    st.caption("Topics you completed that are due for spaced revision today.")
+
+    for rev in due:
+        item_name = rev.get("item_name") or f"{rev['item_type']} #{rev['item_id']}"
+        subject_name = rev.get("subject_name") or ""
+        interval = rev.get("interval_days", 0)
+        due_date = rev.get("due_date", "")
+        is_overdue = due_date < today_str
+
+        c1, c2, c3 = st.columns([5, 2, 1])
+        with c1:
+            overdue_badge = " <span style='color: #EF4444; font-size: 0.75rem;'>⚠️ OVERDUE</span>" if is_overdue else ""
+            st.markdown(
+                f"<span style='color: #94A3B8; font-size: 0.8rem;'>{subject_name}</span> • "
+                f"<strong style='color: #F8FAFC;'>{item_name}</strong>{overdue_badge}",
+                unsafe_allow_html=True
+            )
+        with c2:
+            label_map = {1: "1-day", 3: "3-day", 7: "1-week", 14: "2-week", 30: "1-month"}
+            label = label_map.get(interval, f"{interval}d")
+            st.caption(f"📅 {label} review • Due: {due_date}")
+        with c3:
+            if st.button("✅", key=f"rev_done_{rev['id']}", help="Mark as revised"):
+                complete_revision(user_id, rev["id"])
+                st.toast(f"✅ Revision completed for '{item_name}'", icon="🌟")
+                st.rerun()

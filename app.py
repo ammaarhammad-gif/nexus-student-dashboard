@@ -9,6 +9,10 @@ from pages_modules.syllabus import render_syllabus_page
 from pages_modules.statistics import render_statistics_page
 from pages_modules.planner import render_planner_page
 from pages_modules.settings import render_settings_page
+from auth_utils import (
+    create_session_token, verify_session_token,
+    set_session_param, get_session_param, clear_session_param
+)
 
 # Page Configuration
 st.set_page_config(
@@ -74,6 +78,7 @@ def render_auth_page():
         with st.form("login_form"):
             username = st.text_input("Username").strip()
             password = st.text_input("Password", type="password")
+            keep_logged_in = st.checkbox("🔒 Keep me logged in", value=False)
             submitted = st.form_submit_button("Log In", use_container_width=True)
             if submitted:
                 if not username or not password:
@@ -84,6 +89,9 @@ def render_auth_page():
                     if user:
                         st.session_state["user_id"] = user["id"]
                         st.session_state["username"] = user["username"]
+                        if keep_logged_in:
+                            token = create_session_token(user["id"], user["username"])
+                            set_session_param(token)
                         st.success("Logged in successfully!")
                         st.rerun()
                     else:
@@ -121,6 +129,18 @@ def main():
 
     # Check User Authentication
     if "user_id" not in st.session_state:
+        # Try to restore session from query param token
+        token = get_session_param()
+        if token:
+            payload = verify_session_token(token)
+            if payload:
+                st.session_state["user_id"] = payload["uid"]
+                st.session_state["username"] = payload["usr"]
+            else:
+                # Token invalid or expired, clear it
+                clear_session_param()
+
+    if "user_id" not in st.session_state:
         render_auth_page()
         return
 
@@ -136,12 +156,14 @@ def main():
     # Sidebar Navigation Menu
     with st.sidebar:
         st.markdown(f"""
-            <div style="text-align: center; padding: 10px 0 15px 0;">
-                <h2 style="font-family: 'Dancing Script', cursive; color: #38BDF8; font-size: 2.2rem; margin-bottom: 2px; text-shadow: 0 0 10px rgba(56,189,248,0.5);">⚡ NEXUS</h2>
-                <p style="font-family: 'Caveat', cursive; color: #93C5FD; font-size: 1.2rem; margin: 0;">Syllabus & Exam Manager</p>
-                <div style="margin-top: 12px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.2)); border: 1px solid rgba(56, 189, 248, 0.4); padding: 10px 14px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                    <strong style="font-family: 'Dancing Script', cursive; color: #FDE047; font-size: 1.6rem; text-shadow: 0 0 8px rgba(253,224,71,0.5);">{profile.get('name', 'Student')}</strong><br>
-                    <span style="font-family: 'Inter', sans-serif; color: #E0F2FE; font-size: 0.85rem; font-weight: 500;">{profile.get('class_name', '')} • {profile.get('board', '')}</span>
+            <div style="text-align: center; padding: 10px 0 16px 0;">
+                <h2 style="font-family: 'Outfit', sans-serif; color: #38BDF8; font-size: 2rem; font-weight: 800; margin-bottom: 2px; letter-spacing: -0.02em; text-shadow: 0 0 15px rgba(56,189,248,0.4);">⚡ NEXUS</h2>
+                <p style="font-family: 'Plus Jakarta Sans', sans-serif; color: #94A3B8; font-size: 0.95rem; font-weight: 500; margin: 0;">Syllabus & Exam Manager</p>
+                <div style="margin-top: 14px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95)); border: 1px solid rgba(56, 189, 248, 0.35); padding: 12px 14px; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+                    <strong style="font-family: 'Outfit', sans-serif; color: #FFFFFF; font-size: 1.25rem; font-weight: 700; display: block; margin-bottom: 3px;">{profile.get('name', 'Student')}</strong>
+                    <span style="display: inline-block; background: rgba(56, 189, 248, 0.2); color: #38BDF8; font-size: 0.8rem; font-weight: 600; padding: 2px 10px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                        {profile.get('class_name', 'Class 10')} • {profile.get('board', 'ICSE')}
+                    </span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -161,15 +183,19 @@ def main():
         
         st.markdown("---")
         if st.button("🚪 Log Out", use_container_width=True):
-            del st.session_state["user_id"]
-            del st.session_state["username"]
+            clear_session_param()
+            for key in ["user_id", "username"]:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
             
         st.markdown("""
-            <div style="margin-top: 15px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
-                <p style="font-family: 'Caveat', cursive; color: #94A3B8; font-size: 1.1rem; margin: 0;">Crafted with ❤️ by</p>
-                <h3 style="font-family: 'Dancing Script', cursive; color: #FDE047; font-size: 1.7rem; margin: 2px 0 6px 0; text-shadow: 0 0 8px rgba(253,224,71,0.5);">Ammaar Akhtar</h3>
-                <span style="font-family: 'Caveat', cursive; color: #38BDF8; font-size: 1.1rem;">🌐 Cloud Sync Active • v1.2.0</span>
+            <div style="margin-top: 18px; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+                <p style="color: #64748B; font-size: 0.85rem; margin: 0; font-weight: 500;">Crafted with ❤️ by</p>
+                <h4 style="color: #F8FAFC; font-size: 1.1rem; font-weight: 700; margin: 2px 0 6px 0; font-family: 'Outfit', sans-serif;">Ammaar Akhtar</h4>
+                <span style="display: inline-block; color: #38BDF8; font-size: 0.78rem; font-weight: 600; background: rgba(56, 189, 248, 0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                    🌐 Cloud Sync Active • v1.2.0
+                </span>
             </div>
         """, unsafe_allow_html=True)
 

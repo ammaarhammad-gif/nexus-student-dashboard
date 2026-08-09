@@ -20,7 +20,7 @@ def render_statistics_page(user_id: int):
         st.info("📝 Add subjects in the **Syllabus Manager** to see statistics here.")
         return
 
-    # Gather data
+    # Gather data (cache stats to avoid duplicate DB calls)
     names = []
     pcts = []
     completed_counts = []
@@ -29,9 +29,11 @@ def render_statistics_page(user_id: int):
     avg_understandings = []
     revision_counts = []
     colors = []
+    stats_cache = {}  # subject_id -> stats dict
 
     for sub in subjects:
         stats = get_subject_stats(user_id, sub["id"])
+        stats_cache[sub["id"]] = stats
         names.append(sub["name"])
         pcts.append(stats["percent_completed"])
         completed_counts.append(stats["completed"])
@@ -40,6 +42,11 @@ def render_statistics_page(user_id: int):
         avg_understandings.append(stats["avg_understanding"])
         revision_counts.append(stats["revision_done"])
         colors.append(sub["color"])
+
+    # Guard: if every subject has 0 topics, show helpful message instead of empty charts
+    if sum(total_counts) == 0:
+        st.info("📝 Your subjects don't have any topics yet. Go to **📚 Syllabus Manager** and add chapters & topics to see statistics here.")
+        return
 
     # ── Completion Bar Chart ──
     st.subheader("📈 Completion by Subject")
@@ -125,14 +132,14 @@ def render_statistics_page(user_id: int):
 
     st.markdown("---")
 
-    # ── Per-Subject Stat Cards ──
+    # ── Per-Subject Stat Cards (reuse cached stats) ──
     st.subheader("📋 Detailed Subject Stats")
 
     for row_start in range(0, len(subjects), 2):
         row_subs = subjects[row_start:row_start + 2]
         cols = st.columns(2)
         for idx, sub in enumerate(row_subs):
-            stats = get_subject_stats(user_id, sub["id"])
+            stats = stats_cache[sub["id"]]
             with cols[idx]:
                 st.markdown(f"""
                     <div class="nexus-card" style="border-top: 3px solid {sub['color']};">

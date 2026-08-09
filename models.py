@@ -1055,6 +1055,271 @@ def delete_goal(user_id: int, goal_id: int):
 
 
 # ══════════════════════════════════════════════
+# CSV SYLLABUS IMPORT
+# ══════════════════════════════════════════════
+
+def import_syllabus_from_csv(user_id: int, rows: list) -> dict:
+    """
+    Import syllabus from a list of dicts with keys: Subject, Chapter, Topic.
+    Skips duplicates. Returns summary counts.
+    """
+    created_subjects = 0
+    created_chapters = 0
+    created_topics = 0
+    skipped = 0
+
+    # Cache lookups to avoid repeated DB calls
+    subject_cache = {}  # name -> id
+    chapter_cache = {}  # (subject_id, name) -> id
+
+    for row in rows:
+        sub_name = str(row.get("Subject", "")).strip()
+        chap_name = str(row.get("Chapter", "")).strip()
+        topic_name = str(row.get("Topic", "")).strip()
+
+        if not sub_name or not chap_name or not topic_name:
+            skipped += 1
+            continue
+
+        # Get or create subject
+        if sub_name not in subject_cache:
+            existing = get_subject_by_name(user_id, sub_name)
+            if existing:
+                subject_cache[sub_name] = existing["id"]
+            else:
+                sid = add_subject(user_id, sub_name)
+                if sid:
+                    subject_cache[sub_name] = sid
+                    created_subjects += 1
+                else:
+                    # Race condition fallback
+                    existing = get_subject_by_name(user_id, sub_name)
+                    subject_cache[sub_name] = existing["id"] if existing else None
+
+        subject_id = subject_cache.get(sub_name)
+        if not subject_id:
+            skipped += 1
+            continue
+
+        # Get or create chapter
+        chap_key = (subject_id, chap_name)
+        if chap_key not in chapter_cache:
+            chapters = get_chapters_for_subject(user_id, subject_id)
+            found = next((c for c in chapters if c["name"] == chap_name), None)
+            if found:
+                chapter_cache[chap_key] = found["id"]
+            else:
+                cid = add_chapter(user_id, subject_id, chap_name)
+                chapter_cache[chap_key] = cid
+                created_chapters += 1
+
+        chapter_id = chapter_cache.get(chap_key)
+        if not chapter_id:
+            skipped += 1
+            continue
+
+        # Get or create topic
+        topics = get_topics_for_chapter(user_id, chapter_id)
+        existing_topic = next((t for t in topics if t["name"] == topic_name), None)
+        if existing_topic:
+            skipped += 1
+        else:
+            add_topic(user_id, chapter_id, topic_name)
+            created_topics += 1
+
+    return {
+        "subjects": created_subjects,
+        "chapters": created_chapters,
+        "topics": created_topics,
+        "skipped": skipped
+    }
+
+
+# ══════════════════════════════════════════════
+# STUDY SESSIONS
+# ══════════════════════════════════════════════
+
+def add_study_session(user_id: int, subject_id: int = None, chapter_id: int = None,
+                      topic_id: int = None, duration_minutes: int = 30,
+                      session_date: str = None, notes: str = ""):
+    """Log a study session."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO study_sessions (user_id, subject_id, chapter_id, topic_id,
+                    duration_minutes, session_date, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """, (user_id, subject_id, chapter_id, topic_id, duration_minutes,
+                  session_date, notes.strip() if notes else ""))
+            session_id = cursor.fetchone()[0]
+            conn.commit()
+            return session_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_study_sessions(user_id: int, limit: int = 20):
+    """Retrieve recent study sessions with subject/chapter/topic names."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT ss.*, s.name as subject_name, s.color as subject_color,
+                       c.name as chapter_name, t.name as topic_name
+                FROM study_sessions ss
+                LEFT JOIN subjects s ON ss.subject_id = s.id
+                LEFT JOIN chapters c ON ss.chapter_id = c.id
+                LEFT JOIN topics t ON ss.topic_id = t.id
+                WHERE ss.user_id = %s
+                ORDER BY ss.session_date DESC, ss.created_at DESC
+                LIMIT %s
+            """, (user_id, limit))
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_study_session(user_id: int, session_id: int):
+    """Delete a study session."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM study_sessions WHERE user_id = %s AND id = %s",
+                           (user_id, session_id))
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_weekly_study_summary(user_id: int):
+    """Return total minutes studied per day for the last 7 days."""
+    import datetime
+    today = datetime.date.today()
+    week_ago = today - datetime.timedelta(days=6)
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT session_date, SUM(duration_minutes) as total_mins
+                FROM study_sessions
+                WHERE user_id = %s AND session_date >= %s AND session_date <= %s
+                GROUP BY session_date
+                ORDER BY session_date ASC
+            """, (user_id, week_ago.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")))
+            rows = cursor.fetchall()
+            data = {r[0]: r[1] for r in rows}
+
+            # Fill in missing days with 0
+            result = []
+            for i in range(7):
+                d = week_ago + datetime.timedelta(days=i)
+                ds = d.strftime("%Y-%m-%d")
+                result.append({
+                    "date": ds,
+                    "day_label": d.strftime("%a"),
+                    "minutes": data.get(ds, 0)
+                })
+            return result
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# SPACED REVISION REMINDERS
+# ══════════════════════════════════════════════
+
+REVISION_INTERVALS = [1, 3, 7, 14, 30]  # days after completion
+
+
+def schedule_revisions(user_id: int, item_type: str, item_id: int):
+    """Schedule spaced revision reminders for a completed topic/subtopic.
+    Clears any existing revisions for this item first, then creates new ones.
+    """
+    import datetime
+    today = datetime.date.today()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Remove old revisions for this item
+            cursor.execute(
+                "DELETE FROM revisions WHERE user_id = %s AND item_type = %s AND item_id = %s",
+                (user_id, item_type, item_id)
+            )
+            for interval in REVISION_INTERVALS:
+                due = today + datetime.timedelta(days=interval)
+                cursor.execute("""
+                    INSERT INTO revisions (user_id, item_type, item_id, due_date, interval_days, is_completed)
+                    VALUES (%s, %s, %s, %s, %s, 0)
+                """, (user_id, item_type, item_id, due.strftime("%Y-%m-%d"), interval))
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_due_revisions(user_id: int, date_str: str):
+    """Return revisions that are due on or before the given date and not yet completed.
+    Includes the topic/subtopic name for display.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT r.*,
+                    CASE
+                        WHEN r.item_type = 'topic' THEN t.name
+                        WHEN r.item_type = 'subtopic' THEN st.name
+                    END as item_name,
+                    CASE
+                        WHEN r.item_type = 'topic' THEN s.name
+                        WHEN r.item_type = 'subtopic' THEN s2.name
+                    END as subject_name
+                FROM revisions r
+                LEFT JOIN topics t ON r.item_type = 'topic' AND r.item_id = t.id
+                LEFT JOIN chapters c ON t.chapter_id = c.id
+                LEFT JOIN subjects s ON c.subject_id = s.id
+                LEFT JOIN subtopics st ON r.item_type = 'subtopic' AND r.item_id = st.id
+                LEFT JOIN topics t2 ON st.topic_id = t2.id
+                LEFT JOIN chapters c2 ON t2.chapter_id = c2.id
+                LEFT JOIN subjects s2 ON c2.subject_id = s2.id
+                WHERE r.user_id = %s AND r.due_date <= %s AND r.is_completed = 0
+                ORDER BY r.due_date ASC, r.interval_days ASC
+            """, (user_id, date_str))
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def complete_revision(user_id: int, revision_id: int):
+    """Mark a revision reminder as completed."""
+    import datetime
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE revisions SET is_completed = 1, completed_at = %s
+                WHERE user_id = %s AND id = %s
+            """, (datetime.date.today().strftime("%Y-%m-%d"), user_id, revision_id))
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
 # RESET ALL DATA
 # ══════════════════════════════════════════════
 

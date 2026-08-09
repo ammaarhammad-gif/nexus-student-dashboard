@@ -1,221 +1,288 @@
 """
-syllabus.py — Syllabus Manager & Progress Tracker page.
+syllabus.py — Syllabus Management and Progress Tracking page.
 
-Full CRUD for: Subjects → Chapters → Topics → Subtopics
-Plus inline progress tracking (status, understanding, notes, flags).
+Allows viewing auto-loaded official syllabi, 1-click ticking off completed topics,
+adjusting understanding levels, adding custom notes, and managing chapters/topics.
 """
 
 import streamlit as st
+import csv
+import io
 from models import (
     get_all_subjects, add_subject, rename_subject, delete_subject,
     get_chapters_for_subject, add_chapter, rename_chapter, delete_chapter,
     move_chapter,
     get_topics_for_chapter, add_topic, rename_topic, delete_topic,
     get_subtopics_for_topic, add_subtopic, rename_subtopic, delete_subtopic,
-    get_progress, save_progress, get_user_profile
+    get_progress, save_progress, get_user_profile,
+    import_syllabus_from_csv, schedule_revisions
 )
 from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header
 
 STATUS_OPTIONS = ["Not Started", "In Progress", "Completed", "Revision Done"]
 STATUS_ICONS = {
-    "Not Started":   "⚪",
-    "In Progress":   "🟡",
-    "Completed":     "🟢",
+    "Not Started": "⚪",
+    "In Progress": "🟡",
+    "Completed": "🟢",
     "Revision Done": "🔵"
 }
-
 UNDERSTANDING_LABELS = {
-    1: "1 — Very Difficult 🔴",
-    2: "2 — Difficult 🟠",
-    3: "3 — Okay 🟡",
-    4: "4 — Good 🟢",
-    5: "5 — Mastered 🌟"
+    1: "🔴 1 - Needs Help",
+    2: "🟠 2 - Basic",
+    3: "🟡 3 - Moderate",
+    4: "🟢 4 - Good",
+    5: "🌟 5 - Mastered"
 }
 
 
 def render_syllabus_page(user_id: int):
+    profile = get_user_profile(user_id)
+    board = profile.get("board", "ICSE")
+    class_name = profile.get("class_name", "Class 10")
+
     render_header(
         "📚 Syllabus Manager",
-        "Add subjects, chapters, and topics. Track your progress for each item."
+        f"Official {board} ({class_name}) Syllabus • Tick off topics as you finish studying them."
     )
 
+    tab_manage, tab_csv = st.tabs(["📚 My Syllabus", "📥 Import Custom CSV"])
+
+    with tab_manage:
+        _render_manage_syllabus_tab(user_id, board, class_name)
+
+    with tab_csv:
+        _render_csv_import_tab(user_id)
+
+
+def _render_csv_import_tab(user_id: int):
+    """CSV import tab: upload, preview, and import syllabus from a CSV file."""
+    st.subheader("📥 Import Syllabus from CSV")
+    st.markdown("""
+        Upload a CSV file with three columns: **Subject**, **Chapter**, **Topic**.  
+        Existing subjects/chapters/topics are automatically skipped (no duplicates).
+    """)
+
+    with st.expander("📋 Example CSV Format", expanded=False):
+        st.code(
+            "Subject,Chapter,Topic\n"
+            "Mathematics,Chapter 1: Commercial Mathematics,Goods and Services Tax (GST)\n"
+            "Mathematics,Chapter 1: Commercial Mathematics,Banking (Recurring Deposit)\n"
+            "Physics,Chapter 1: Force Work and Energy,Turning Effect of Force\n"
+            "Physics,Chapter 1: Force Work and Energy,Center of Gravity",
+            language="csv"
+        )
+
+    uploaded = st.file_uploader("Choose a CSV file", type=["csv"], key="csv_syllabus_upload")
+
+    if uploaded is not None:
+        try:
+            content = uploaded.getvalue().decode("utf-8-sig", errors="replace")
+            reader = csv.DictReader(io.StringIO(content))
+            raw_fields = [f.strip() if f else "" for f in (reader.fieldnames or [])]
+            
+            # Case-insensitive column resolution
+            sub_col = next((f for f in raw_fields if f.lower() == "subject"), None)
+            chap_col = next((f for f in raw_fields if f.lower() == "chapter"), None)
+            top_col = next((f for f in raw_fields if f.lower() == "topic"), None)
+
+            if not (sub_col and chap_col and top_col):
+                st.error(f"CSV must contain columns: **Subject**, **Chapter**, **Topic**. Found: {', '.join(raw_fields)}")
+                return
+
+            rows = []
+            for r in reader:
+                s_val = r.get(sub_col, "").strip()
+                c_val = r.get(chap_col, "").strip()
+                t_val = r.get(top_col, "").strip()
+                if s_val and c_val and t_val:
+                    rows.append({"Subject": s_val, "Chapter": c_val, "Topic": t_val})
+        except Exception as e:
+            st.error(f"Failed to read CSV: {e}")
+            return
+
+        if not rows:
+            st.warning("The CSV file has no valid rows after filtering empty values.")
+            return
+
+        st.success(f"✅ Found **{len(rows)}** valid rows in the CSV.")
+        
+        # Display preview table
+        preview_rows = rows[:15]
+        st.table(preview_rows)
+        if len(rows) > 15:
+            st.caption(f"Showing first 15 of {len(rows)} rows.")
+
+        # Summary preview
+        unique_subjects = len(set(r["Subject"] for r in rows))
+        unique_chapters = len(set((r["Subject"], r["Chapter"]) for r in rows))
+        st.markdown(f"**Preview:** {unique_subjects} subjects, {unique_chapters} chapters, {len(rows)} topics")
+
+        if st.button("🚀 Import Syllabus", use_container_width=True, type="primary"):
+            with st.spinner("Importing syllabus..."):
+                result = import_syllabus_from_csv(user_id, rows)
+            st.success(
+                f"✅ Import complete! "
+                f"Created **{result['subjects']}** subjects, "
+                f"**{result['chapters']}** chapters, "
+                f"**{result['topics']}** topics. "
+                f"Skipped **{result['skipped']}** duplicates/empty rows."
+            )
+            st.rerun()
+
+
+def _render_manage_syllabus_tab(user_id: int, board: str, class_name: str):
+    """Main syllabus management tab with 1-click topic completion."""
     subjects = get_all_subjects(user_id)
 
     # ── Auto-load official syllabus if user has no subjects ──
     if not subjects:
-        profile = get_user_profile(user_id)
-        board = profile.get("board", "CBSE")
-        class_name = profile.get("class_name", "Class 10")
-        with st.spinner(f"⚡ Auto-loading official {board} ({class_name}) syllabus for you..."):
+        with st.spinner(f"⚡ Loading official {board} ({class_name}) syllabus for you..."):
             loaded = preload_standard_syllabus(user_id, board, class_name)
             if loaded:
                 st.toast(f"✅ Official {board} ({class_name}) syllabus loaded!", icon="🚀")
                 st.rerun()
 
-    # ── Add New Subject ──
-    with st.expander("➕ Add Custom Subject", expanded=False):
-        with st.form("add_subject_form", clear_on_submit=True):
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                new_sub_name = st.text_input(
-                    "Subject Name",
-                    placeholder="e.g. Computer Science, Economics"
-                )
-            with col2:
-                sub_color = st.color_picker("Color", value="#6366F1")
-            sub_submitted = st.form_submit_button("Save Subject", use_container_width=True)
-            if sub_submitted:
-                if not new_sub_name.strip():
-                    st.error("Please enter a subject name.")
-                else:
-                    result = add_subject(user_id, new_sub_name.strip(), sub_color)
-                    if result is None:
-                        st.error(f"Subject '{new_sub_name.strip()}' already exists!")
-                    else:
-                        st.success(f"✅ Subject '{new_sub_name.strip()}' created!")
-                        st.rerun()
-
-        st.markdown("---")
-        profile = get_user_profile(user_id)
-        board = profile.get("board", "CBSE")
-        class_name = profile.get("class_name", "Class 10")
-        if st.button(f"⚡ Reload Full Official {board} ({class_name}) Syllabus", use_container_width=True):
-            loaded = preload_standard_syllabus(user_id, board, class_name)
-            if loaded:
-                st.success(f"✅ Reloaded official {board} syllabus for {class_name}!")
+    # ── Subject Action Toolbar ──
+    col_tb1, col_tb2 = st.columns([3, 1])
+    with col_tb1:
+        st.caption(f"Showing syllabus for **{board} {class_name}**. Click the checkbox on any topic to mark it done!")
+    with col_tb2:
+        with st.popover("⚙️ Syllabus Options"):
+            st.markdown("**➕ Add Custom Subject**")
+            with st.form("add_subject_form", clear_on_submit=True):
+                new_sub_name = st.text_input("Subject Name", placeholder="e.g. Economics, Art")
+                sub_color = st.color_picker("Subject Color", value="#6366F1")
+                if st.form_submit_button("Create Subject", use_container_width=True):
+                    if new_sub_name.strip():
+                        res = add_subject(user_id, new_sub_name.strip(), sub_color)
+                        if res:
+                            st.success(f"Created '{new_sub_name}'!")
+                            st.rerun()
+                        else:
+                            st.error("Subject already exists.")
+            
+            st.markdown("---")
+            if st.button(f"⚡ Reload Full {board} ({class_name}) Syllabus", use_container_width=True):
+                with st.spinner("Reloading official syllabus..."):
+                    preload_standard_syllabus(user_id, board, class_name)
+                st.success("Official syllabus reloaded!")
                 st.rerun()
 
     if not subjects:
         st.info("📝 Loading your syllabus... Please refresh if it does not load automatically.")
         return
 
-    st.markdown("---")
-
-    # ── Subject Selection ──
+    # ── Subject Selection Tabs/Dropdown ──
     subject_names = [s["name"] for s in subjects]
     selected_idx = st.selectbox(
-        "Select Subject",
+        "Select Subject to View & Track:",
         range(len(subject_names)),
         format_func=lambda i: f"📖 {subject_names[i]}",
         key="subject_selector"
     )
     selected_subject = subjects[selected_idx]
 
-    # ── Subject Header & Actions ──
-    col_sub_title, col_sub_actions = st.columns([3, 1])
-    with col_sub_title:
-        st.markdown(f"""
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                <div style="width: 8px; height: 36px; background: {selected_subject['color']};
-                     border-radius: 4px;"></div>
-                <h3 style="margin: 0; color: #F8FAFC;">{selected_subject['name']}</h3>
+    # ── Subject Banner & Quick Progress ──
+    chapters = get_chapters_for_subject(user_id, selected_subject["id"])
+    
+    # Calculate subject completion
+    total_subject_topics = 0
+    completed_subject_topics = 0
+    for ch in chapters:
+        top_list = get_topics_for_chapter(user_id, ch["id"])
+        total_subject_topics += len(top_list)
+        for t in top_list:
+            p = get_progress(user_id, "topic", t["id"])
+            if p["status"] == "Completed" or p["status"] == "Revision Done":
+                completed_subject_topics += 1
+
+    sub_pct = round((completed_subject_topics / total_subject_topics * 100)) if total_subject_topics > 0 else 0
+
+    st.markdown(f"""
+        <div class="nexus-card" style="border-top: 4px solid {selected_subject['color']}; margin-top: 10px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h2 style="margin: 0; color: #FFFFFF; font-size: 1.6rem;">{selected_subject['name']}</h2>
+                    <span style="color: #94A3B8; font-size: 0.9rem;">{len(chapters)} Chapters • {total_subject_topics} Topics</span>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 1.8rem; font-weight: 700; color: {selected_subject['color']};">{sub_pct}%</span>
+                    <span style="color: #CBD5E1; font-size: 0.85rem; display: block;">{completed_subject_topics}/{total_subject_topics} Done</span>
+                </div>
             </div>
-        """, unsafe_allow_html=True)
+        </div>
+    """, unsafe_allow_html=True)
 
-    with col_sub_actions:
-        with st.popover("⚙️ Subject Options"):
-            st.markdown("**Rename Subject**")
-            edit_sub_name = st.text_input(
-                "New name",
-                value=selected_subject["name"],
-                key=f"rename_sub_{selected_subject['id']}"
-            )
-            if st.button("✏️ Rename", key=f"btn_rename_sub_{selected_subject['id']}"):
-                if edit_sub_name.strip() and edit_sub_name.strip() != selected_subject["name"]:
-                    success = rename_subject(user_id, selected_subject["id"], edit_sub_name.strip())
-                    if success:
-                        st.success("Subject renamed!")
-                        st.rerun()
-                    else:
-                        st.error("A subject with that name already exists.")
-
-            st.markdown("---")
-            st.markdown("**⚠️ Danger Zone**")
-            st.caption("Deleting a subject removes ALL its chapters, topics, and progress.")
-            if st.button("🗑️ Delete This Subject", type="primary",
-                        key=f"btn_del_sub_{selected_subject['id']}"):
-                delete_subject(user_id, selected_subject["id"])
-                st.warning("Subject deleted!")
-                st.rerun()
-
-    # ── Add Chapter ──
-    with st.expander(f"➕ Add Chapter to {selected_subject['name']}"):
+    # ── Add Chapter Form ──
+    with st.expander(f"➕ Add Custom Chapter to {selected_subject['name']}", expanded=False):
         with st.form(f"add_chap_form_{selected_subject['id']}", clear_on_submit=True):
-            chap_name = st.text_input(
-                "Chapter Name",
-                placeholder="e.g. Chapter 1: Real Numbers"
-            )
-            chap_submitted = st.form_submit_button("Add Chapter", use_container_width=True)
-            if chap_submitted:
+            chap_name = st.text_input("Chapter Name", placeholder="e.g. Chapter 7: Probability")
+            if st.form_submit_button("Add Chapter", use_container_width=True):
                 if chap_name.strip():
                     add_chapter(user_id, selected_subject["id"], chap_name.strip())
-                    st.success(f"✅ Chapter '{chap_name.strip()}' added!")
+                    st.success(f"Added '{chap_name.strip()}'!")
                     st.rerun()
-                else:
-                    st.error("Chapter name cannot be empty.")
-
-    chapters = get_chapters_for_subject(user_id, selected_subject["id"])
 
     if not chapters:
-        st.info("No chapters yet. Add your first chapter above!")
+        st.info("No chapters in this subject yet. Click above to add a chapter or reload official syllabus.")
         return
 
     # ── Render Chapters & Topics ──
     for chap_idx, chap in enumerate(chapters):
-        with st.expander(f"📌 {chap['name']}", expanded=False):
-            # Chapter controls
-            col_c_title, col_c_actions = st.columns([3, 1])
-            with col_c_actions:
-                with st.popover(f"Edit Chapter"):
-                    new_c_name = st.text_input(
-                        "Rename", value=chap["name"],
-                        key=f"ren_c_{chap['id']}"
-                    )
-                    if st.button("Save", key=f"save_c_{chap['id']}"):
+        topics = get_topics_for_chapter(user_id, chap["id"])
+        
+        # Calculate chapter completion
+        ch_done = sum(1 for t in topics if get_progress(user_id, "topic", t["id"])["status"] in ["Completed", "Revision Done"])
+        ch_total = len(topics)
+        ch_badge = f"{ch_done}/{ch_total} Done" if ch_total > 0 else "0 Topics"
+        is_all_done = (ch_done == ch_total and ch_total > 0)
+
+        icon_prefix = "✅" if is_all_done else "📌"
+
+        with st.expander(f"{icon_prefix} {chap['name']}  ({ch_badge})", expanded=(chap_idx == 0)):
+            # Chapter controls in popover
+            col_ch_info, col_ch_act = st.columns([4, 1])
+            with col_ch_act:
+                with st.popover("⚙️ Chapter"):
+                    new_c_name = st.text_input("Rename Chapter", value=chap["name"], key=f"ren_c_{chap['id']}")
+                    if st.button("Save Name", key=f"save_c_{chap['id']}"):
                         if new_c_name.strip():
                             rename_chapter(user_id, chap["id"], new_c_name.strip())
                             st.rerun()
 
                     st.markdown("---")
-
-                    # Move buttons
-                    move_col1, move_col2 = st.columns(2)
-                    with move_col1:
-                        if st.button("⬆️ Up", key=f"up_c_{chap['id']}",
-                                    disabled=(chap_idx == 0)):
+                    mv1, mv2 = st.columns(2)
+                    with mv1:
+                        if st.button("⬆️ Up", key=f"up_c_{chap['id']}", disabled=(chap_idx == 0)):
                             move_chapter(user_id, chap["id"], "up")
                             st.rerun()
-                    with move_col2:
-                        if st.button("⬇️ Down", key=f"down_c_{chap['id']}",
-                                    disabled=(chap_idx == len(chapters) - 1)):
+                    with mv2:
+                        if st.button("⬇️ Down", key=f"down_c_{chap['id']}", disabled=(chap_idx == len(chapters) - 1)):
                             move_chapter(user_id, chap["id"], "down")
                             st.rerun()
 
                     st.markdown("---")
-                    if st.button("🗑️ Delete Chapter", type="primary",
-                                key=f"del_c_{chap['id']}"):
+                    if st.button("🗑️ Delete Chapter", type="primary", key=f"del_c_{chap['id']}"):
                         delete_chapter(user_id, chap["id"])
                         st.rerun()
 
-            # Add Topic form
+            # Add Topic to Chapter Form
             with st.form(f"add_topic_form_{chap['id']}", clear_on_submit=True):
-                col_t1, col_t2 = st.columns([3, 1])
+                col_t1, col_t2 = st.columns([4, 1])
                 with col_t1:
                     top_name = st.text_input(
-                        "New Topic",
-                        placeholder="e.g. Introduction, Properties, Applications",
-                        key=f"input_top_{chap['id']}"
+                        "Add Topic",
+                        placeholder="e.g. Formulae, Important Concepts, Derivations",
+                        key=f"input_top_{chap['id']}",
+                        label_visibility="collapsed"
                     )
                 with col_t2:
-                    st.write("")  # spacer
-                    top_submitted = st.form_submit_button("➕ Add", use_container_width=True)
+                    top_submitted = st.form_submit_button("➕ Add Topic", use_container_width=True)
                 if top_submitted and top_name.strip():
                     add_topic(user_id, chap["id"], top_name.strip())
                     st.success("Topic added!")
                     st.rerun()
-
-            topics = get_topics_for_chapter(user_id, chap["id"])
 
             if not topics:
                 st.caption("No topics in this chapter yet.")
@@ -226,141 +293,152 @@ def render_syllabus_page(user_id: int):
 
 
 def _render_topic_card(user_id: int, topic):
-    """Render a single topic with status controls, understanding, flags, notes, and subtopics."""
+    """Render a single topic with instant 1-click ticking and rich controls."""
     prog = get_progress(user_id, "topic", topic["id"])
-    icon = STATUS_ICONS.get(prog["status"], "⚪")
+    is_completed = (prog["status"] == "Completed" or prog["status"] == "Revision Done")
 
-    st.markdown(f"""
-        <div class="topic-row">
-            <span style="font-size: 0.95rem; color: #F8FAFC;">
-                {icon} <strong>{topic['name']}</strong>
-            </span>
-        </div>
-    """, unsafe_allow_html=True)
+    # ── Top Row: 1-Click Checkbox + Topic Name + Status Badge ──
+    col_check, col_details_btn = st.columns([5, 1])
 
-    # ── Status & Understanding row ──
-    col_s1, col_s2, col_s3 = st.columns([2, 2, 2])
-
-    with col_s1:
-        new_status = st.selectbox(
-            "Status",
-            STATUS_OPTIONS,
-            index=STATUS_OPTIONS.index(prog["status"]) if prog["status"] in STATUS_OPTIONS else 0,
-            key=f"status_{topic['id']}",
-            label_visibility="collapsed"
+    with col_check:
+        # Instant 1-Click Completion Toggle
+        checked = st.checkbox(
+            label=f"**{topic['name']}**",
+            value=is_completed,
+            key=f"quick_tick_{topic['id']}",
+            help="Click to tick off this topic as completed!"
         )
 
-    with col_s2:
-        understanding_val = st.selectbox(
-            "Understanding",
-            options=[1, 2, 3, 4, 5],
-            format_func=lambda x: UNDERSTANDING_LABELS[x],
-            index=max(0, min(4, prog["understanding"] - 1)),
-            key=f"und_{topic['id']}",
-            label_visibility="collapsed"
-        )
+    with col_details_btn:
+        with st.popover("⚙️ Edit"):
+            st.markdown(f"**Options for: {topic['name']}**")
+            
+            # Status Selector
+            new_status_select = st.selectbox(
+                "Status",
+                STATUS_OPTIONS,
+                index=STATUS_OPTIONS.index(prog["status"]) if prog["status"] in STATUS_OPTIONS else 0,
+                key=f"status_sel_{topic['id']}"
+            )
 
-    with col_s3:
-        f1, f2, f3 = st.columns(3)
-        with f1:
-            is_imp = st.checkbox("⭐", value=bool(prog["is_important"]),
-                                key=f"imp_{topic['id']}", help="Important")
-        with f2:
-            is_diff = st.checkbox("⚠️", value=bool(prog["is_difficult"]),
-                                 key=f"diff_{topic['id']}", help="Difficult")
-        with f3:
-            is_prac = st.checkbox("🔄", value=bool(prog["needs_practice"]),
-                                 key=f"prac_{topic['id']}", help="Needs Practice")
+            # Understanding Rating
+            new_understanding = st.selectbox(
+                "Understanding Level",
+                options=[1, 2, 3, 4, 5],
+                format_func=lambda x: UNDERSTANDING_LABELS[x],
+                index=max(0, min(4, prog["understanding"] - 1)),
+                key=f"und_sel_{topic['id']}"
+            )
 
-    # Notes
-    notes = st.text_input(
-        "Notes",
-        value=prog.get("notes", ""),
-        key=f"notes_{topic['id']}",
-        placeholder="Quick notes or key points...",
-        label_visibility="collapsed"
-    )
+            # Flags
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                is_imp = st.checkbox("⭐ Important", value=bool(prog["is_important"]), key=f"imp_{topic['id']}")
+            with col_f2:
+                is_diff = st.checkbox("⚠️ Difficult", value=bool(prog["is_difficult"]), key=f"diff_{topic['id']}")
+            with col_f3:
+                is_prac = st.checkbox("🔄 Practice", value=bool(prog["needs_practice"]), key=f"prac_{topic['id']}")
 
-    # Detect changes and auto-save
-    changed = (
-        new_status != prog["status"] or
-        understanding_val != prog["understanding"] or
-        notes != prog.get("notes", "") or
-        int(is_imp) != prog["is_important"] or
-        int(is_diff) != prog["is_difficult"] or
-        int(is_prac) != prog["needs_practice"]
-    )
+            # Notes
+            edit_notes = st.text_input(
+                "Notes / Key Formulae",
+                value=prog.get("notes", ""),
+                key=f"notes_input_{topic['id']}"
+            )
 
-    if changed:
+            if st.button("💾 Save Changes", key=f"save_details_{topic['id']}", use_container_width=True):
+                save_progress(
+                    user_id=user_id,
+                    item_type="topic",
+                    item_id=topic["id"],
+                    status=new_status_select,
+                    understanding=new_understanding,
+                    notes=edit_notes,
+                    is_important=int(is_imp),
+                    is_difficult=int(is_diff),
+                    needs_practice=int(is_prac)
+                )
+                if new_status_select == "Completed" and prog["status"] != "Completed":
+                    schedule_revisions(user_id, "topic", topic["id"])
+                st.toast("Saved changes!", icon="✅")
+                st.rerun()
+
+            st.markdown("---")
+            ren_t = st.text_input("Rename Topic", value=topic["name"], key=f"ren_t_{topic['id']}")
+            if st.button("✏️ Rename", key=f"btn_ren_{topic['id']}"):
+                if ren_t.strip():
+                    rename_topic(user_id, topic["id"], ren_t.strip())
+                    st.rerun()
+
+            if st.button("🗑️ Delete Topic", type="primary", key=f"del_t_{topic['id']}"):
+                delete_topic(user_id, topic["id"])
+                st.rerun()
+
+    # Detect 1-click tick change
+    if checked != is_completed:
+        new_status = "Completed" if checked else "Not Started"
         save_progress(
             user_id=user_id,
             item_type="topic",
             item_id=topic["id"],
             status=new_status,
-            understanding=understanding_val,
-            notes=notes,
-            is_important=int(is_imp),
-            is_difficult=int(is_diff),
-            needs_practice=int(is_prac)
+            understanding=prog.get("understanding", 3),
+            notes=prog.get("notes", ""),
+            is_important=prog.get("is_important", 0),
+            is_difficult=prog.get("is_difficult", 0),
+            needs_practice=prog.get("needs_practice", 0)
         )
-        st.toast(f"💾 Saved '{topic['name']}'", icon="✅")
+        if checked:
+            schedule_revisions(user_id, "topic", topic["id"])
+            st.toast(f"🌟 Completed '{topic['name']}'! Revision reminders scheduled.", icon="🎉")
         st.rerun()
+
+    # ── Display Badges and Notes if present ──
+    flags_html = []
+    if prog.get("is_important"):
+        flags_html.append("<span style='color: #FDE047; font-size: 0.78rem;'>⭐ Important</span>")
+    if prog.get("is_difficult"):
+        flags_html.append("<span style='color: #F87171; font-size: 0.78rem;'>⚠️ Difficult</span>")
+    if prog.get("needs_practice"):
+        flags_html.append("<span style='color: #60A5FA; font-size: 0.78rem;'>🔄 Needs Practice</span>")
+    if prog.get("notes"):
+        flags_html.append(f"<span style='color: #94A3B8; font-size: 0.78rem; font-style: italic;'>📝 {prog['notes']}</span>")
+
+    if flags_html:
+        st.markdown(f"<div style='margin-left: 28px; margin-bottom: 6px; display: flex; gap: 12px; flex-wrap: wrap;'>{' • '.join(flags_html)}</div>", unsafe_allow_html=True)
 
     # ── Subtopics ──
     subtopics = get_subtopics_for_topic(user_id, topic["id"])
-
     if subtopics:
         for sub in subtopics:
             sub_prog = get_progress(user_id, "subtopic", sub["id"])
-            sub_c1, sub_c2, sub_c3, sub_c4 = st.columns([3, 2, 1, 1])
+            sub_done = (sub_prog["status"] == "Completed")
+            
+            sub_c1, sub_c2 = st.columns([5, 1])
             with sub_c1:
-                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;└ {sub['name']}")
-            with sub_c2:
-                sub_status = st.selectbox(
-                    "Status",
-                    STATUS_OPTIONS,
-                    index=STATUS_OPTIONS.index(sub_prog["status"]) if sub_prog["status"] in STATUS_OPTIONS else 0,
-                    key=f"sub_status_{sub['id']}",
-                    label_visibility="collapsed"
+                sub_checked = st.checkbox(
+                    f"&nbsp;&nbsp;&nbsp;&nbsp;└ {sub['name']}",
+                    value=sub_done,
+                    key=f"sub_tick_{sub['id']}"
                 )
-                if sub_status != sub_prog["status"]:
-                    save_progress(user_id, "subtopic", sub["id"], status=sub_status,
+                if sub_checked != sub_done:
+                    new_sub_stat = "Completed" if sub_checked else "Not Started"
+                    save_progress(user_id, "subtopic", sub["id"], status=new_sub_stat,
                                 understanding=sub_prog["understanding"])
+                    if sub_checked:
+                        schedule_revisions(user_id, "subtopic", sub["id"])
                     st.rerun()
-            with sub_c3:
-                with st.popover("✏️", key=f"edit_subtop_{sub['id']}"):
-                    new_sub_name = st.text_input("Rename", value=sub["name"],
-                                                key=f"ren_subtop_{sub['id']}")
-                    if st.button("Save", key=f"save_subtop_{sub['id']}"):
-                        if new_sub_name.strip():
-                            rename_subtopic(user_id, sub["id"], new_sub_name.strip())
-                            st.rerun()
-            with sub_c4:
-                if st.button("❌", key=f"del_subtop_{sub['id']}", help="Delete subtopic"):
+            with sub_c2:
+                if st.button("❌", key=f"del_sub_{sub['id']}", help="Delete subtopic"):
                     delete_subtopic(user_id, sub["id"])
                     st.rerun()
 
-    # Add subtopic + Topic actions
-    action_col1, action_col2 = st.columns([1, 1])
-    with action_col1:
-        with st.popover("➕ Subtopic", key=f"pop_subtop_{topic['id']}"):
-            new_subtop = st.text_input("Subtopic Name", key=f"input_subtop_{topic['id']}")
-            if st.button("Save", key=f"btn_subtop_{topic['id']}"):
-                if new_subtop.strip():
-                    add_subtopic(user_id, topic["id"], new_subtop.strip())
-                    st.rerun()
-    with action_col2:
-        with st.popover("⚙️ Topic", key=f"opts_topic_{topic['id']}"):
-            ren_t = st.text_input("Rename Topic", value=topic["name"],
-                                 key=f"ren_t_{topic['id']}")
-            if st.button("✏️ Rename", key=f"save_t_{topic['id']}"):
-                if ren_t.strip():
-                    rename_topic(user_id, topic["id"], ren_t.strip())
-                    st.rerun()
-            st.markdown("---")
-            if st.button("🗑️ Delete Topic", type="primary",
-                        key=f"del_t_{topic['id']}"):
-                delete_topic(user_id, topic["id"])
+    # Add Subtopic trigger
+    with st.popover(f"➕ Add Subtopic", key=f"add_sub_pop_{topic['id']}"):
+        new_subtop = st.text_input("Subtopic Name", key=f"inp_sub_{topic['id']}")
+        if st.button("Save Subtopic", key=f"save_sub_{topic['id']}"):
+            if new_subtop.strip():
+                add_subtopic(user_id, topic["id"], new_subtop.strip())
                 st.rerun()
 
-    st.markdown("---")
+    st.markdown("<hr style='margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
