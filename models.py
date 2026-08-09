@@ -148,7 +148,7 @@ def get_user_wallpaper_config(user_id: int) -> dict:
     preset_id = get_setting(user_id, "wallpaper_preset_id", "")
     custom_url = get_setting(user_id, "wallpaper_custom_url", "")
     blur = int(get_setting(user_id, "wallpaper_blur", "0") or 0)
-    opacity = float(get_setting(user_id, "wallpaper_opacity", "0.82") or 0.82)
+    opacity = float(get_setting(user_id, "wallpaper_opacity", "0.30") or 0.30)
 
     url = None
     if mode == "preset" and preset_id:
@@ -170,7 +170,7 @@ def get_user_wallpaper_config(user_id: int) -> dict:
     }
 
 
-def set_user_wallpaper_config(user_id: int, mode: str, preset_id: str = "", custom_url: str = "", blur: int = 0, opacity: float = 0.82):
+def set_user_wallpaper_config(user_id: int, mode: str, preset_id: str = "", custom_url: str = "", blur: int = 0, opacity: float = 0.30):
     """Save user's wallpaper settings."""
     set_setting(user_id, "wallpaper_mode", mode)
     set_setting(user_id, "wallpaper_preset_id", preset_id)

@@ -157,7 +157,7 @@ WALLPAPER_PRESETS = [
 ]
 
 
-def apply_custom_css(theme: str = "Light", wallpaper_url: str = None, wallpaper_blur: int = 0, overlay_opacity: float = 0.82):
+def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_blur: int = 0, overlay_opacity: float = 0.30):
     """
     Injects the complete CSS theme (Light or Dark) and optional glassmorphism wallpaper into the Streamlit app.
     Supports 20 preset curated wallpapers and custom user-uploaded images.
@@ -166,9 +166,9 @@ def apply_custom_css(theme: str = "Light", wallpaper_url: str = None, wallpaper_
     has_wallpaper = bool(wallpaper_url and str(wallpaper_url).strip())
 
     if is_dark:
-        card_bg = "rgba(19, 27, 46, 0.78)" if has_wallpaper else "rgba(19, 27, 46, 0.9)"
-        sidebar_bg = "linear-gradient(180deg, rgba(9, 13, 22, 0.88) 0%, rgba(15, 23, 42, 0.92) 100%)" if has_wallpaper else "linear-gradient(180deg, #090D16 0%, #0F172A 100%)"
-        expander_bg = "rgba(19, 27, 46, 0.75)" if has_wallpaper else "rgba(19, 27, 46, 0.85)"
+        card_bg = "rgba(15, 23, 42, 0.65)" if has_wallpaper else "rgba(19, 27, 46, 0.9)"
+        sidebar_bg = "linear-gradient(180deg, rgba(9, 13, 22, 0.78) 0%, rgba(15, 23, 42, 0.85) 100%)" if has_wallpaper else "linear-gradient(180deg, #090D16 0%, #0F172A 100%)"
+        expander_bg = "rgba(15, 23, 42, 0.60)" if has_wallpaper else "rgba(19, 27, 46, 0.85)"
         
         theme_vars = f"""
         :root {{
@@ -204,7 +204,7 @@ def apply_custom_css(theme: str = "Light", wallpaper_url: str = None, wallpaper_
                 background-image: url('{wallpaper_url}') !important;
                 background-size: cover !important; background-position: center center !important;
                 background-repeat: no-repeat !important; background-attachment: fixed !important;
-                filter: blur({wallpaper_blur}px) brightness(0.85) !important;
+                filter: blur({wallpaper_blur}px) brightness(0.92) !important;
                 transform: scale(1.04) !important;
                 z-index: -2 !important; pointer-events: none !important;
             }}
@@ -219,6 +219,10 @@ def apply_custom_css(theme: str = "Light", wallpaper_url: str = None, wallpaper_
             html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stMain"], section.main, .block-container, [data-testid="stMainBlockContainer"], .stMain {{
                 background-color: transparent !important;
                 background: transparent !important;
+            }}
+            .nexus-card, div[data-testid="stMetric"], details[data-testid="stExpander"], div[data-testid="stForm"] {{
+                backdrop-filter: blur(16px) saturate(180%) !important;
+                -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
             }}
             """
         else:
@@ -378,9 +382,9 @@ def apply_custom_css(theme: str = "Light", wallpaper_url: str = None, wallpaper_
         .badge-revision-done { background-color: rgba(59, 130, 246, 0.2);  color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4); }
         """
     else:
-        card_bg = "rgba(255, 255, 255, 0.82)" if has_wallpaper else "#FFFFFF"
-        sidebar_bg = "linear-gradient(180deg, rgba(255, 255, 255, 0.90) 0%, rgba(248, 250, 252, 0.94) 100%)" if has_wallpaper else "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)"
-        expander_bg = "rgba(255, 255, 255, 0.82)" if has_wallpaper else "#FFFFFF"
+        card_bg = "rgba(255, 255, 255, 0.70)" if has_wallpaper else "#FFFFFF"
+        sidebar_bg = "linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(248, 250, 252, 0.90) 100%)" if has_wallpaper else "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)"
+        expander_bg = "rgba(255, 255, 255, 0.70)" if has_wallpaper else "#FFFFFF"
         
         theme_vars = f"""
         :root {{
@@ -431,6 +435,10 @@ def apply_custom_css(theme: str = "Light", wallpaper_url: str = None, wallpaper_
             html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stMain"], section.main, .block-container, [data-testid="stMainBlockContainer"], .stMain {{
                 background-color: transparent !important;
                 background: transparent !important;
+            }}
+            .nexus-card, div[data-testid="stMetric"], details[data-testid="stExpander"], div[data-testid="stForm"] {{
+                backdrop-filter: blur(16px) saturate(180%) !important;
+                -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
             }}
             """
         else:

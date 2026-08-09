@@ -213,8 +213,11 @@ def render_settings_page(user_id: int):
                     
                     btn_label = "✅ Active" if is_active else "Set Wallpaper"
                     if st.button(btn_label, key=f"set_wp_{p['id']}", use_container_width=True, type="primary" if is_active else "secondary"):
-                        set_user_wallpaper_config(user_id, mode="preset", preset_id=p["id"], blur=curr_blur, opacity=curr_opacity)
-                        st.toast(f"✅ Applied {p['name']}!", icon="🖼️")
+                        op_val = 0.30 if curr_opacity >= 0.75 else curr_opacity
+                        set_user_wallpaper_config(user_id, mode="preset", preset_id=p["id"], blur=curr_blur, opacity=op_val)
+                        set_user_theme(user_id, "Dark")
+                        st.session_state["theme_mode"] = "Dark"
+                        st.toast(f"✅ Applied {p['name']} in Dark Glassmorphism!", icon="🖼️")
                         st.rerun()
 
     with wp_tab2:
@@ -231,8 +234,11 @@ def render_settings_page(user_id: int):
                 st.markdown("##### Preview:")
                 st.image(uploaded_wp, use_container_width=True, caption="Live Preview of Uploaded Wallpaper")
                 if st.button("✨ Apply Custom Wallpaper", type="primary", use_container_width=True, key="save_custom_wp_btn"):
-                    set_user_wallpaper_config(user_id, mode="custom", custom_url=data_url, blur=curr_blur, opacity=curr_opacity)
-                    st.toast("✅ Custom wallpaper applied successfully!", icon="📸")
+                    op_val = 0.30 if curr_opacity >= 0.75 else curr_opacity
+                    set_user_wallpaper_config(user_id, mode="custom", custom_url=data_url, blur=curr_blur, opacity=op_val)
+                    set_user_theme(user_id, "Dark")
+                    st.session_state["theme_mode"] = "Dark"
+                    st.toast("✅ Custom wallpaper applied in Dark Glassmorphism!", icon="📸")
                     st.rerun()
             else:
                 st.error("Could not process image. Please try another JPG or PNG file.")

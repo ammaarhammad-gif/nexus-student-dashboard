@@ -192,7 +192,9 @@ def render_setup_wizard(user_id: int):
         if chosen_wp != "Solid Minimalist (No Wallpaper)":
             target_p = next((p for p in WALLPAPER_PRESETS if p["name"] == chosen_wp), None)
             if target_p:
-                set_user_wallpaper_config(user_id, mode="preset", preset_id=target_p["id"], blur=0, opacity=0.82)
+                set_user_wallpaper_config(user_id, mode="preset", preset_id=target_p["id"], blur=0, opacity=0.30)
+                set_user_theme(user_id, "Dark")
+                st.session_state["theme_mode"] = "Dark"
 
         # Save terms
         clear_all_terms(user_id=user_id)

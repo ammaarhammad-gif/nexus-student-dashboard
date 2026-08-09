@@ -46,13 +46,13 @@ def get_resolved_wallpaper(user_id=None):
             for p in WALLPAPER_PRESETS:
                 if p["id"] == preset_id:
                     return p["url"], blur, opacity
-        return None, 0, 0.82
+        return None, 0, 0.30
     except Exception:
-        return None, 0, 0.82
+        return None, 0, 0.30
 
 # Apply Theme Styling & Wallpaper (Syncs instantly with session state and DB)
 active_theme = "Light"
-wp_url, wp_blur, wp_opacity = None, 0, 0.82
+wp_url, wp_blur, wp_opacity = None, 0, 0.30
 
 if "user_id" in st.session_state:
     try:
@@ -313,8 +313,10 @@ def main():
                 else:
                     target_preset = next((p for p in WALLPAPER_PRESETS if p["name"] == chosen_wp_label), None)
                     if target_preset:
-                        set_user_wallpaper_config(user_id, mode="preset", preset_id=target_preset["id"], blur=wp_cfg.get("blur", 0), opacity=wp_cfg.get("opacity", 0.82))
-                        st.toast(f"Applied {target_preset['name']}!", icon="🖼️")
+                        set_user_wallpaper_config(user_id, mode="preset", preset_id=target_preset["id"], blur=wp_cfg.get("blur", 0), opacity=0.30)
+                        set_user_theme(user_id, "Dark")
+                        st.session_state["theme_mode"] = "Dark"
+                        st.toast(f"Applied {target_preset['name']} in Dark Glassmorphism!", icon="🖼️")
                 st.rerun()
 
             if st.button("🎨 Open Full Wallpaper Studio ➔", use_container_width=True, key="sb_open_studio_btn"):

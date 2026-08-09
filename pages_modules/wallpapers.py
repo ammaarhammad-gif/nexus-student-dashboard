@@ -123,7 +123,7 @@ def render_wallpapers_page(user_id: int):
     # ── TAB 1: CURATED 4K PRESETS ──
     with tab_presets:
         st.markdown("### 🌟 Choose Your Study Aesthetic")
-        st.caption("Click any wallpaper to instantly set your dashboard background with smooth glassmorphism.")
+        st.caption("Click any wallpaper below to instantly activate glowing dark glassmorphism and wallpaper ambience.")
 
         c_filt, c_rand = st.columns([3, 1])
         with c_filt:
@@ -135,8 +135,11 @@ def render_wallpapers_page(user_id: int):
             if st.button("🎲 Random Aesthetic", use_container_width=True, help="Surprise me with a random study wallpaper"):
                 import random
                 rand_wp = random.choice(WALLPAPER_PRESETS)
-                set_user_wallpaper_config(user_id, mode="preset", preset_id=rand_wp["id"], blur=curr_blur, opacity=curr_opacity)
-                st.toast(f"✅ Activated {rand_wp['name']}!", icon="🎲")
+                op_val = 0.30 if curr_opacity >= 0.75 else curr_opacity
+                set_user_wallpaper_config(user_id, mode="preset", preset_id=rand_wp["id"], blur=curr_blur, opacity=op_val)
+                set_user_theme(user_id, "Dark")
+                st.session_state["theme_mode"] = "Dark"
+                st.toast(f"✅ Activated {rand_wp['name']} in Dark Glassmorphism!", icon="🎲")
                 st.rerun()
 
         filtered_presets = WALLPAPER_PRESETS if "All" in cat_filter else [p for p in WALLPAPER_PRESETS if p.get("category") == cat_filter]
@@ -167,10 +170,13 @@ def render_wallpapers_page(user_id: int):
                         </div>
                     """, unsafe_allow_html=True)
 
-                    btn_label = "✅ Active Wallpaper" if is_active else "✨ Apply Wallpaper"
+                    btn_label = "✅ Active" if is_active else "✨ Apply Wallpaper"
                     if st.button(btn_label, key=f"studio_set_wp_{p['id']}", use_container_width=True, type="primary" if is_active else "secondary"):
-                        set_user_wallpaper_config(user_id, mode="preset", preset_id=p["id"], blur=curr_blur, opacity=curr_opacity)
-                        st.toast(f"✅ Applied {p['name']}!", icon="🖼️")
+                        op_val = 0.30 if curr_opacity >= 0.75 else curr_opacity
+                        set_user_wallpaper_config(user_id, mode="preset", preset_id=p["id"], blur=curr_blur, opacity=op_val)
+                        set_user_theme(user_id, "Dark")
+                        st.session_state["theme_mode"] = "Dark"
+                        st.toast(f"✅ Applied {p['name']} in Dark Glassmorphism!", icon="🖼️")
                         st.rerun()
 
     # ── TAB 2: UPLOAD CUSTOM WALLPAPER ──
@@ -195,8 +201,11 @@ def render_wallpapers_page(user_id: int):
                     st.write("")
                     st.success("✅ Image processed & optimized successfully!")
                     if st.button("✨ Set as Active Wallpaper", type="primary", use_container_width=True, key="studio_save_custom_wp_btn"):
-                        set_user_wallpaper_config(user_id, mode="custom", custom_url=data_url, blur=curr_blur, opacity=curr_opacity)
-                        st.toast("✅ Custom wallpaper applied to dashboard!", icon="📸")
+                        op_val = 0.30 if curr_opacity >= 0.75 else curr_opacity
+                        set_user_wallpaper_config(user_id, mode="custom", custom_url=data_url, blur=curr_blur, opacity=op_val)
+                        set_user_theme(user_id, "Dark")
+                        st.session_state["theme_mode"] = "Dark"
+                        st.toast("✅ Custom wallpaper applied in Dark Glassmorphism!", icon="📸")
                         st.rerun()
             else:
                 st.error("Could not process this image file. Please try another JPG or PNG image.")
@@ -235,14 +244,14 @@ def render_wallpapers_page(user_id: int):
 
         with c_sl2:
             new_opacity = st.slider(
-                "Card Contrast & Tint Opacity",
-                min_value=0.40,
-                max_value=0.96,
-                value=float(curr_opacity),
-                step=0.02,
-                help="Higher values increase card readability; lower values make cards more translucent and glassy."
+                "Background Dark Tint Overlay",
+                min_value=0.10,
+                max_value=0.80,
+                value=min(0.80, max(0.10, float(curr_opacity))),
+                step=0.05,
+                help="Lower values make the wallpaper brighter and clearer; higher values make text darker and higher contrast."
             )
-            st.caption(f"Card Tint Opacity: **{int(new_opacity * 100)}%**")
+            st.caption(f"Overlay Tint: **{int(new_opacity * 100)}%**")
 
         if st.button("💾 Save Glassmorphism Settings", key="studio_save_tuning_btn", type="primary", use_container_width=True):
             set_user_wallpaper_config(
