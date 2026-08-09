@@ -33,7 +33,6 @@ env/
 
 # Streamlit secrets (CRITICAL: Do NOT upload your database passwords!)
 .streamlit/secrets.toml
-.streamlit/config.toml
 
 # Databases and Local Data
 data/

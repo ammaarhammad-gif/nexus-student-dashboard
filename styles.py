@@ -711,6 +711,8 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         div[data-baseweb="popover"],
         div[data-baseweb="popover"] > div,
         div[data-baseweb="menu"],
+        div[data-baseweb="layer"] div[data-baseweb="popover"],
+        div[data-baseweb="layer"] div[data-baseweb="menu"],
         ul[role="listbox"],
         ul[data-baseweb="menu"] {
             background-color: #0F172A !important;
@@ -718,7 +720,7 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             color: #FFFFFF !important;
             border: 1px solid var(--nexus-card-border) !important;
             border-radius: 12px !important;
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7) !important;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.8) !important;
             overflow: hidden !important;
         }
 
@@ -762,22 +764,26 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         }
 
         /* Expanders Dark */
-        details[data-testid="stExpander"] {
+        details[data-testid="stExpander"],
+        div[data-testid="stExpander"] {
             background: var(--nexus-expander-bg) !important;
             border: 1px solid var(--nexus-expander-border) !important;
             border-radius: 14px !important;
             backdrop-filter: blur(14px) !important;
             -webkit-backdrop-filter: blur(14px) !important;
             overflow: hidden !important;
+            margin-bottom: 10px !important;
         }
 
+        details[data-testid="stExpander"] > summary,
         details[data-testid="stExpander"] summary,
-        details[data-testid="stExpander"] > summary:first-of-type,
-        .streamlit-expanderHeader {
+        .streamlit-expanderHeader,
+        summary.streamlit-expanderHeader {
             background: var(--nexus-card-bg) !important;
             color: var(--nexus-text-title) !important;
             font-weight: 600 !important;
             border-bottom: 1px solid var(--nexus-card-border) !important;
+            padding: 12px 16px !important;
         }
 
         details[data-testid="stExpander"] summary *,
@@ -785,10 +791,61 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             color: var(--nexus-text-title) !important;
         }
 
+        details[data-testid="stExpander"] summary:hover,
+        .streamlit-expanderHeader:hover {
+            background: rgba(30, 41, 59, 0.95) !important;
+            color: var(--nexus-accent) !important;
+        }
+
         details[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
             background: transparent !important;
             color: var(--nexus-text-main) !important;
             padding: 14px 16px !important;
+        }
+
+        /* Popovers Dark (Trigger Buttons & Body) */
+        div[data-testid="stPopover"],
+        div[data-testid="stPopover"] > button,
+        div[data-testid="stPopover"] button {
+            background: #1E293B !important;
+            background-color: #1E293B !important;
+            color: var(--nexus-text-title) !important;
+            border: 1px solid var(--nexus-btn-border) !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+            transition: all 0.2s ease !important;
+            font-weight: 600 !important;
+        }
+
+        div[data-testid="stPopover"] > button *,
+        div[data-testid="stPopover"] button * {
+            color: var(--nexus-text-title) !important;
+        }
+
+        div[data-testid="stPopover"] > button:hover,
+        div[data-testid="stPopover"] button:hover {
+            background: #334155 !important;
+            background-color: #334155 !important;
+            border-color: var(--nexus-accent) !important;
+            color: var(--nexus-accent) !important;
+            box-shadow: 0 4px 14px var(--nexus-glow) !important;
+        }
+
+        div[data-testid="stPopover"] > button:hover *,
+        div[data-testid="stPopover"] button:hover * {
+            color: var(--nexus-accent) !important;
+        }
+
+        div[data-testid="stPopoverBody"],
+        div[data-testid="stPopoverContent"],
+        div[data-testid="stPopoverBody"] > div {
+            background-color: #0F172A !important;
+            background: #0F172A !important;
+            color: #F8FAFC !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8) !important;
+            padding: 16px !important;
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -807,24 +864,70 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             box-shadow: 0 0 12px var(--nexus-glow) !important;
         }
 
-        .stButton > button {
+        /* Buttons Dark */
+        .stButton > button,
+        div[data-testid="stFormSubmitButton"] > button,
+        div[data-testid="stDownloadButton"] > button,
+        button[data-testid="baseButton-secondary"],
+        button[data-testid="stBaseButton-secondary"],
+        button[kind="secondary"] {
             background: #1E293B !important;
+            background-color: #1E293B !important;
             color: var(--nexus-text-main) !important;
             border: 1px solid var(--nexus-btn-border) !important;
+            border-radius: 10px !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
         }
 
-        .stButton > button:hover {
+        .stButton > button *,
+        div[data-testid="stFormSubmitButton"] > button *,
+        div[data-testid="stDownloadButton"] > button *,
+        button[data-testid="baseButton-secondary"] *,
+        button[data-testid="stBaseButton-secondary"] *,
+        button[kind="secondary"] * {
+            color: var(--nexus-text-main) !important;
+        }
+
+        .stButton > button:hover,
+        div[data-testid="stFormSubmitButton"] > button:hover,
+        div[data-testid="stDownloadButton"] > button:hover,
+        button[data-testid="baseButton-secondary"]:hover,
+        button[data-testid="stBaseButton-secondary"]:hover,
+        button[kind="secondary"]:hover {
+            background: #334155 !important;
+            background-color: #334155 !important;
             border-color: var(--nexus-accent) !important;
             color: var(--nexus-accent) !important;
             box-shadow: 0 4px 14px var(--nexus-glow) !important;
         }
 
-        .stButton > button[kind="primary"] {
+        .stButton > button:hover *,
+        div[data-testid="stFormSubmitButton"] > button:hover *,
+        button[data-testid="baseButton-secondary"]:hover *,
+        button[data-testid="stBaseButton-secondary"]:hover * {
+            color: var(--nexus-accent) !important;
+        }
+
+        .stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"],
+        button[data-testid="baseButton-primary"],
+        button[data-testid="stBaseButton-primary"],
+        button[kind="primary"] {
             background: var(--nexus-btn-gradient) !important;
+            background-color: transparent !important;
             color: #FFFFFF !important;
             border: none !important;
             box-shadow: 0 4px 18px var(--nexus-glow) !important;
+            font-weight: 700 !important;
+        }
+
+        .stButton > button[kind="primary"] *,
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"] *,
+        button[data-testid="baseButton-primary"] *,
+        button[data-testid="stBaseButton-primary"] * {
+            color: #FFFFFF !important;
         }
 
         .badge-not-started   { background-color: rgba(148, 163, 184, 0.15); color: #CBD5E1; border: 1px solid rgba(148, 163, 184, 0.3); }
@@ -1058,7 +1161,8 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         }
 
         /* Expanders Light */
-        details[data-testid="stExpander"] {
+        details[data-testid="stExpander"],
+        div[data-testid="stExpander"] {
             background: var(--nexus-expander-bg) !important;
             border: 1px solid var(--nexus-expander-border) !important;
             border-radius: 14px !important;
@@ -1066,15 +1170,18 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             backdrop-filter: blur(14px) !important;
             -webkit-backdrop-filter: blur(14px) !important;
             overflow: hidden !important;
+            margin-bottom: 10px !important;
         }
 
+        details[data-testid="stExpander"] > summary,
         details[data-testid="stExpander"] summary,
-        details[data-testid="stExpander"] > summary:first-of-type,
-        .streamlit-expanderHeader {
+        .streamlit-expanderHeader,
+        summary.streamlit-expanderHeader {
             background: var(--nexus-card-bg) !important;
             color: #0F172A !important;
             font-weight: 600 !important;
             border-bottom: 1px solid #E2E8F0 !important;
+            padding: 12px 16px !important;
         }
 
         details[data-testid="stExpander"] summary *,
@@ -1082,10 +1189,61 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             color: #0F172A !important;
         }
 
+        details[data-testid="stExpander"] summary:hover,
+        .streamlit-expanderHeader:hover {
+            background: #F1F5F9 !important;
+            color: #4F46E5 !important;
+        }
+
         details[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
             background: transparent !important;
             color: #334155 !important;
             padding: 14px 16px !important;
+        }
+
+        /* Popovers Light (Trigger Buttons & Body) */
+        div[data-testid="stPopover"],
+        div[data-testid="stPopover"] > button,
+        div[data-testid="stPopover"] button {
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+            transition: all 0.2s ease !important;
+            font-weight: 600 !important;
+        }
+
+        div[data-testid="stPopover"] > button *,
+        div[data-testid="stPopover"] button * {
+            color: #0F172A !important;
+        }
+
+        div[data-testid="stPopover"] > button:hover,
+        div[data-testid="stPopover"] button:hover {
+            background: #F8FAFC !important;
+            background-color: #F8FAFC !important;
+            border-color: #4F46E5 !important;
+            color: #4F46E5 !important;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15) !important;
+        }
+
+        div[data-testid="stPopover"] > button:hover *,
+        div[data-testid="stPopover"] button:hover * {
+            color: #4F46E5 !important;
+        }
+
+        div[data-testid="stPopoverBody"],
+        div[data-testid="stPopoverContent"],
+        div[data-testid="stPopoverBody"] > div {
+            background-color: #FFFFFF !important;
+            background: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 14px !important;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12) !important;
+            padding: 16px !important;
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -1104,24 +1262,68 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
         }
 
-        .stButton > button {
+        /* Buttons Light */
+        .stButton > button,
+        div[data-testid="stFormSubmitButton"] > button,
+        div[data-testid="stDownloadButton"] > button,
+        button[data-testid="baseButton-secondary"],
+        button[data-testid="stBaseButton-secondary"],
+        button[kind="secondary"] {
             background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
             color: #0F172A !important;
             border: 1px solid #CBD5E1 !important;
+            border-radius: 10px !important;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
         }
 
-        .stButton > button:hover {
+        .stButton > button *,
+        div[data-testid="stFormSubmitButton"] > button *,
+        div[data-testid="stDownloadButton"] > button *,
+        button[data-testid="baseButton-secondary"] *,
+        button[data-testid="stBaseButton-secondary"] *,
+        button[kind="secondary"] * {
+            color: #0F172A !important;
+        }
+
+        .stButton > button:hover,
+        div[data-testid="stFormSubmitButton"] > button:hover,
+        div[data-testid="stDownloadButton"] > button:hover,
+        button[data-testid="baseButton-secondary"]:hover,
+        button[data-testid="stBaseButton-secondary"]:hover,
+        button[kind="secondary"]:hover {
             border-color: #4F46E5 !important;
             color: #4F46E5 !important;
             box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15) !important;
         }
 
-        .stButton > button[kind="primary"] {
+        .stButton > button:hover *,
+        div[data-testid="stFormSubmitButton"] > button:hover *,
+        button[data-testid="baseButton-secondary"]:hover *,
+        button[data-testid="stBaseButton-secondary"]:hover * {
+            color: #4F46E5 !important;
+        }
+
+        .stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"],
+        button[data-testid="baseButton-primary"],
+        button[data-testid="stBaseButton-primary"],
+        button[kind="primary"] {
             background: linear-gradient(135deg, #4F46E5 0%, #0284C7 100%) !important;
+            background-color: transparent !important;
             color: #FFFFFF !important;
             border: none !important;
             box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3) !important;
+            font-weight: 700 !important;
+        }
+
+        .stButton > button[kind="primary"] *,
+        div[data-testid="stFormSubmitButton"] > button[kind="primary"] *,
+        button[data-testid="baseButton-primary"] *,
+        button[data-testid="stBaseButton-primary"] * {
+            color: #FFFFFF !important;
         }
 
         .badge-not-started   { background-color: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; }
