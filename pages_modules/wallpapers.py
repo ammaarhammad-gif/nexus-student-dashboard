@@ -152,9 +152,12 @@ def render_wallpapers_page(user_id: int):
             for idx, p in enumerate(row_items):
                 with cols[idx]:
                     is_active = (curr_mode == "preset" and curr_preset == p["id"])
-                    border_style = "3px solid #38BDF8; box-shadow: 0 0 18px rgba(56, 189, 248, 0.5);" if is_active else "1px solid rgba(255,255,255,0.15);"
+                    p_palette = p.get("palette", {})
+                    accent = p_palette.get("accent", "#38BDF8")
+                    accent_sub = p_palette.get("accent_sub", "#818CF8")
+                    border_style = f"3px solid {accent}; box-shadow: 0 0 20px {accent};" if is_active else "1px solid rgba(255,255,255,0.15);"
                     badge_label = "✅ ACTIVE" if is_active else p.get("category", "").split(" ")[-1]
-                    badge_bg = "#38BDF8" if is_active else "rgba(15, 23, 42, 0.75)"
+                    badge_bg = accent if is_active else "rgba(15, 23, 42, 0.75)"
                     badge_color = "#0B0F19" if is_active else "#E2E8F0"
 
                     st.markdown(f"""
@@ -165,7 +168,11 @@ def render_wallpapers_page(user_id: int):
                             <img src="{p['thumb']}" style="width: 100%; height: 130px; object-fit: cover; display: block;" loading="lazy" />
                             <div style="padding: 10px 12px; text-align: center;">
                                 <div style="font-size: 0.9rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #FFFFFF;">{p['name']}</div>
-                                <div style="font-size: 0.75rem; color: #94A3B8; margin-top: 2px;">{p.get('category', '')}</div>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px;">
+                                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {accent};"></span>
+                                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {accent_sub};"></span>
+                                    <span style="font-size: 0.73rem; color: #94A3B8; margin-left: 3px;">{p.get('category', '')}</span>
+                                </div>
                             </div>
                         </div>
                     """, unsafe_allow_html=True)

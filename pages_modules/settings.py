@@ -199,7 +199,9 @@ def render_settings_page(user_id: int):
             for idx, p in enumerate(row_items):
                 with cols[idx]:
                     is_active = (curr_mode == "preset" and curr_preset == p["id"])
-                    border_style = "3px solid #38BDF8; box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);" if is_active else "1px solid rgba(255,255,255,0.15);"
+                    p_palette = p.get("palette", {})
+                    accent = p_palette.get("accent", "#38BDF8")
+                    border_style = f"3px solid {accent}; box-shadow: 0 0 16px {accent};" if is_active else "1px solid rgba(255,255,255,0.15);"
                     
                     st.markdown(f"""
                         <div style="border-radius: 12px; overflow: hidden; border: {border_style}; margin-bottom: 8px; background: #1E293B;">

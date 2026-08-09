@@ -2,200 +2,578 @@
 styles.py — Custom CSS theming engine for the Nexus Student Dashboard.
 
 Supports:
-1. ☀️ Light Theme (Default) — Ultra-clean, modern, high-contrast, beautiful soft shadows.
+1. ☀️ Light Theme — Ultra-clean, modern, high-contrast, beautiful soft shadows.
 2. 🌙 Dark Theme — Futuristic glassmorphism, deep slate/navy, glowing cyber accents, vivid text.
-3. 💻 System Default — Maps to Light mode as standard default.
+3. 🖼️ Dynamic Wallpaper Palettes — 20 bespoke color schemes tailored perfectly to each wallpaper's mood and tones.
 """
 
 import streamlit as st
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 20 CURATED AESTHETIC HIGH-RES WALLPAPERS
+# DEFAULT PALETTES
+# ══════════════════════════════════════════════════════════════════════════
+DEFAULT_DARK_PALETTE = {
+    "accent": "#38BDF8",
+    "accent_sub": "#818CF8",
+    "card_bg": "rgba(15, 23, 42, 0.70)",
+    "card_border": "rgba(255, 255, 255, 0.14)",
+    "card_hover_border": "#38BDF8",
+    "text_title": "#FFFFFF",
+    "text_main": "#F8FAFC",
+    "text_sub": "#94A3B8",
+    "text_muted": "#64748B",
+    "sidebar_bg": "linear-gradient(180deg, rgba(9, 13, 22, 0.84) 0%, rgba(15, 23, 42, 0.88) 100%)",
+    "expander_bg": "rgba(15, 23, 42, 0.62)",
+    "input_bg": "rgba(19, 27, 46, 0.88)",
+    "btn_gradient": "linear-gradient(135deg, #6366F1 0%, #0284C7 100%)",
+    "glow": "rgba(56, 189, 248, 0.35)"
+}
+
+DEFAULT_LIGHT_PALETTE = {
+    "accent": "#4F46E5",
+    "accent_sub": "#0284C7",
+    "card_bg": "rgba(255, 255, 255, 0.72)",
+    "card_border": "#E2E8F0",
+    "card_hover_border": "#4F46E5",
+    "text_title": "#0F172A",
+    "text_main": "#0F172A",
+    "text_sub": "#64748B",
+    "text_muted": "#94A3B8",
+    "sidebar_bg": "linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(248, 250, 252, 0.92) 100%)",
+    "expander_bg": "rgba(255, 255, 255, 0.72)",
+    "input_bg": "rgba(255, 255, 255, 0.95)",
+    "btn_gradient": "linear-gradient(135deg, #4F46E5 0%, #0284C7 100%)",
+    "glow": "rgba(79, 70, 229, 0.25)"
+}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 20 CURATED AESTHETIC HIGH-RES WALLPAPERS WITH BESPOKE PALETTES
 # ══════════════════════════════════════════════════════════════════════════
 WALLPAPER_PRESETS = [
     {
         "id": "cosmic_nebula",
         "name": "🌌 Cosmic Nebula",
         "category": "🌌 Space & Sci-Fi",
-        "url": "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#818CF8",
+            "accent_sub": "#38BDF8",
+            "card_bg": "rgba(13, 16, 38, 0.70)",
+            "card_border": "rgba(129, 140, 248, 0.24)",
+            "card_hover_border": "#818CF8",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#C7D2FE",
+            "text_muted": "#818CF8",
+            "sidebar_bg": "linear-gradient(180deg, rgba(9, 11, 28, 0.84) 0%, rgba(15, 18, 42, 0.88) 100%)",
+            "expander_bg": "rgba(15, 18, 42, 0.62)",
+            "input_bg": "rgba(15, 18, 42, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #6366F1 0%, #38BDF8 100%)",
+            "glow": "rgba(129, 140, 248, 0.40)"
+        }
     },
     {
         "id": "cyberpunk_city",
         "name": "🏙️ Cyberpunk Neo-Tokyo",
         "category": "🏙️ Cyber & Neon",
-        "url": "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#F43F5E",
+            "accent_sub": "#06B6D4",
+            "card_bg": "rgba(18, 12, 30, 0.72)",
+            "card_border": "rgba(244, 63, 94, 0.28)",
+            "card_hover_border": "#F43F5E",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#FECDD3",
+            "text_muted": "#F43F5E",
+            "sidebar_bg": "linear-gradient(180deg, rgba(14, 8, 24, 0.85) 0%, rgba(24, 12, 38, 0.90) 100%)",
+            "expander_bg": "rgba(24, 12, 38, 0.64)",
+            "input_bg": "rgba(24, 12, 38, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #F43F5E 0%, #8B5CF6 50%, #06B6D4 100%)",
+            "glow": "rgba(244, 63, 94, 0.40)"
+        }
     },
     {
         "id": "alpine_forest",
         "name": "🌄 Misty Nordic Forest",
         "category": "🌿 Nature & Calm",
-        "url": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#10B981",
+            "accent_sub": "#34D399",
+            "card_bg": "rgba(10, 24, 20, 0.72)",
+            "card_border": "rgba(16, 185, 129, 0.25)",
+            "card_hover_border": "#34D399",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#A7F3D0",
+            "text_muted": "#6EE7B7",
+            "sidebar_bg": "linear-gradient(180deg, rgba(6, 18, 15, 0.85) 0%, rgba(12, 30, 24, 0.90) 100%)",
+            "expander_bg": "rgba(12, 30, 24, 0.62)",
+            "input_bg": "rgba(12, 30, 24, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%)",
+            "glow": "rgba(16, 185, 129, 0.40)"
+        }
     },
     {
         "id": "mountain_alpenglow",
         "name": "🏔️ Snow Summit Alpenglow",
         "category": "🌿 Nature & Calm",
-        "url": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#FB7185",
+            "accent_sub": "#F59E0B",
+            "card_bg": "rgba(22, 14, 26, 0.72)",
+            "card_border": "rgba(251, 113, 133, 0.25)",
+            "card_hover_border": "#FB7185",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#FFE4E6",
+            "text_muted": "#FDA4AF",
+            "sidebar_bg": "linear-gradient(180deg, rgba(16, 9, 20, 0.85) 0%, rgba(28, 16, 32, 0.90) 100%)",
+            "expander_bg": "rgba(28, 16, 32, 0.62)",
+            "input_bg": "rgba(28, 16, 32, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #E11D48 0%, #FB7185 50%, #F59E0B 100%)",
+            "glow": "rgba(251, 113, 133, 0.40)"
+        }
     },
     {
         "id": "obsidian_wave",
         "name": "✨ Liquid Obsidian Wave",
         "category": "✨ Abstract",
-        "url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#38BDF8",
+            "accent_sub": "#94A3B8",
+            "card_bg": "rgba(14, 19, 30, 0.74)",
+            "card_border": "rgba(148, 163, 184, 0.24)",
+            "card_hover_border": "#38BDF8",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#CBD5E1",
+            "text_muted": "#94A3B8",
+            "sidebar_bg": "linear-gradient(180deg, rgba(8, 12, 20, 0.85) 0%, rgba(16, 22, 34, 0.90) 100%)",
+            "expander_bg": "rgba(16, 22, 34, 0.62)",
+            "input_bg": "rgba(16, 22, 34, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)",
+            "glow": "rgba(56, 189, 248, 0.40)"
+        }
     },
     {
         "id": "midnight_library",
         "name": "📚 Midnight Grand Library",
         "category": "📚 Study & Vibes",
-        "url": "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#F59E0B",
+            "accent_sub": "#FBBF24",
+            "card_bg": "rgba(26, 18, 12, 0.74)",
+            "card_border": "rgba(245, 158, 11, 0.28)",
+            "card_hover_border": "#FBBF24",
+            "text_title": "#FFFBEB",
+            "text_main": "#FDFBF7",
+            "text_sub": "#FDE68A",
+            "text_muted": "#F59E0B",
+            "sidebar_bg": "linear-gradient(180deg, rgba(18, 11, 7, 0.86) 0%, rgba(32, 21, 14, 0.92) 100%)",
+            "expander_bg": "rgba(32, 21, 14, 0.65)",
+            "input_bg": "rgba(32, 21, 14, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #FBBF24 100%)",
+            "glow": "rgba(245, 158, 11, 0.40)"
+        }
     },
     {
         "id": "golden_sunset",
         "name": "🌇 Golden Horizon Sunset",
         "category": "🌿 Nature & Calm",
-        "url": "https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#FB923C",
+            "accent_sub": "#F59E0B",
+            "card_bg": "rgba(28, 16, 12, 0.74)",
+            "card_border": "rgba(251, 146, 60, 0.28)",
+            "card_hover_border": "#FB923C",
+            "text_title": "#FFF7ED",
+            "text_main": "#FDFBF7",
+            "text_sub": "#FED7AA",
+            "text_muted": "#FB923C",
+            "sidebar_bg": "linear-gradient(180deg, rgba(20, 10, 7, 0.86) 0%, rgba(34, 18, 14, 0.90) 100%)",
+            "expander_bg": "rgba(34, 18, 14, 0.64)",
+            "input_bg": "rgba(34, 18, 14, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #EA580C 0%, #FB923C 50%, #FBBF24 100%)",
+            "glow": "rgba(251, 146, 60, 0.40)"
+        }
     },
     {
         "id": "sakura_dawn",
         "name": "🌸 Sakura Blossom Dawn",
         "category": "📚 Study & Vibes",
-        "url": "https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#F472B6",
+            "accent_sub": "#FB7185",
+            "card_bg": "rgba(26, 12, 22, 0.72)",
+            "card_border": "rgba(244, 114, 182, 0.26)",
+            "card_hover_border": "#F472B6",
+            "text_title": "#FFF1F2",
+            "text_main": "#FDFBF7",
+            "text_sub": "#FBCFE8",
+            "text_muted": "#F472B6",
+            "sidebar_bg": "linear-gradient(180deg, rgba(18, 7, 15, 0.85) 0%, rgba(32, 14, 26, 0.90) 100%)",
+            "expander_bg": "rgba(32, 14, 26, 0.62)",
+            "input_bg": "rgba(32, 14, 26, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #DB2777 0%, #F472B6 50%, #FDA4AF 100%)",
+            "glow": "rgba(244, 114, 182, 0.40)"
+        }
     },
     {
         "id": "emerald_aurora",
         "name": "🌌 Emerald Aurora Borealis",
         "category": "🌌 Space & Sci-Fi",
-        "url": "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#2DD4BF",
+            "accent_sub": "#4ADE80",
+            "card_bg": "rgba(8, 24, 28, 0.72)",
+            "card_border": "rgba(45, 212, 191, 0.26)",
+            "card_hover_border": "#2DD4BF",
+            "text_title": "#F0FDFA",
+            "text_main": "#F8FAFC",
+            "text_sub": "#99F6E4",
+            "text_muted": "#2DD4BF",
+            "sidebar_bg": "linear-gradient(180deg, rgba(5, 16, 20, 0.85) 0%, rgba(10, 30, 34, 0.90) 100%)",
+            "expander_bg": "rgba(10, 30, 34, 0.62)",
+            "input_bg": "rgba(10, 30, 34, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #0D9488 0%, #2DD4BF 50%, #4ADE80 100%)",
+            "glow": "rgba(45, 212, 191, 0.40)"
+        }
     },
     {
         "id": "matrix_terminal",
         "name": "💎 Matrix Cyber Terminal",
         "category": "🏙️ Cyber & Neon",
-        "url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#22C55E",
+            "accent_sub": "#86EFAC",
+            "card_bg": "rgba(6, 22, 12, 0.75)",
+            "card_border": "rgba(34, 197, 94, 0.30)",
+            "card_hover_border": "#4ADE80",
+            "text_title": "#F0FDF4",
+            "text_main": "#F8FAFC",
+            "text_sub": "#BBF7D0",
+            "text_muted": "#4ADE80",
+            "sidebar_bg": "linear-gradient(180deg, rgba(4, 15, 8, 0.86) 0%, rgba(8, 28, 16, 0.92) 100%)",
+            "expander_bg": "rgba(8, 28, 16, 0.65)",
+            "input_bg": "rgba(8, 28, 16, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #16A34A 0%, #22C55E 50%, #86EFAC 100%)",
+            "glow": "rgba(34, 197, 94, 0.40)"
+        }
     },
     {
         "id": "deep_ocean",
         "name": "🌊 Deep Ocean Twilight",
         "category": "🌿 Nature & Calm",
-        "url": "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#38BDF8",
+            "accent_sub": "#0284C7",
+            "card_bg": "rgba(10, 22, 38, 0.72)",
+            "card_border": "rgba(56, 189, 248, 0.25)",
+            "card_hover_border": "#38BDF8",
+            "text_title": "#F0F9FF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#BAE6FD",
+            "text_muted": "#38BDF8",
+            "sidebar_bg": "linear-gradient(180deg, rgba(6, 14, 26, 0.85) 0%, rgba(12, 28, 48, 0.90) 100%)",
+            "expander_bg": "rgba(12, 28, 48, 0.62)",
+            "input_bg": "rgba(12, 28, 48, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)",
+            "glow": "rgba(56, 189, 248, 0.40)"
+        }
     },
     {
         "id": "pastel_clouds",
         "name": "☁️ Pastel Cloud Reverie",
         "category": "✨ Abstract",
-        "url": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#C084FC",
+            "accent_sub": "#E879F9",
+            "card_bg": "rgba(22, 14, 34, 0.72)",
+            "card_border": "rgba(192, 132, 252, 0.26)",
+            "card_hover_border": "#C084FC",
+            "text_title": "#FAF5FF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#E9D5FF",
+            "text_muted": "#C084FC",
+            "sidebar_bg": "linear-gradient(180deg, rgba(14, 8, 22, 0.85) 0%, rgba(26, 16, 40, 0.90) 100%)",
+            "expander_bg": "rgba(26, 16, 40, 0.62)",
+            "input_bg": "rgba(26, 16, 40, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #9333EA 0%, #C084FC 50%, #E879F9 100%)",
+            "glow": "rgba(192, 132, 252, 0.40)"
+        }
     },
     {
         "id": "zen_minimal",
         "name": "🏛️ Zen Minimalist Studio",
         "category": "📚 Study & Vibes",
-        "url": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#94A3B8",
+            "accent_sub": "#CBD5E1",
+            "card_bg": "rgba(18, 22, 28, 0.75)",
+            "card_border": "rgba(148, 163, 184, 0.22)",
+            "card_hover_border": "#CBD5E1",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#CBD5E1",
+            "text_muted": "#94A3B8",
+            "sidebar_bg": "linear-gradient(180deg, rgba(11, 14, 18, 0.85) 0%, rgba(20, 26, 34, 0.90) 100%)",
+            "expander_bg": "rgba(20, 26, 34, 0.62)",
+            "input_bg": "rgba(20, 26, 34, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #475569 0%, #64748B 100%)",
+            "glow": "rgba(148, 163, 184, 0.30)"
+        }
     },
     {
         "id": "synthwave_grid",
         "name": "⚡ Synthwave Neon Grid",
         "category": "🏙️ Cyber & Neon",
-        "url": "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#E879F9",
+            "accent_sub": "#F43F5E",
+            "card_bg": "rgba(22, 10, 32, 0.74)",
+            "card_border": "rgba(232, 121, 249, 0.28)",
+            "card_hover_border": "#E879F9",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#F5D0FE",
+            "text_muted": "#E879F9",
+            "sidebar_bg": "linear-gradient(180deg, rgba(14, 6, 22, 0.85) 0%, rgba(28, 12, 40, 0.90) 100%)",
+            "expander_bg": "rgba(28, 12, 40, 0.62)",
+            "input_bg": "rgba(28, 12, 40, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #C026D3 0%, #E879F9 50%, #F43F5E 100%)",
+            "glow": "rgba(232, 121, 249, 0.40)"
+        }
     },
     {
         "id": "coastal_sunset",
         "name": "🍂 Golden Coastal Shore",
         "category": "🌿 Nature & Calm",
-        "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#F59E0B",
+            "accent_sub": "#06B6D4",
+            "card_bg": "rgba(14, 24, 30, 0.72)",
+            "card_border": "rgba(245, 158, 11, 0.25)",
+            "card_hover_border": "#F59E0B",
+            "text_title": "#FFFBEB",
+            "text_main": "#FDFBF7",
+            "text_sub": "#FEF08A",
+            "text_muted": "#F59E0B",
+            "sidebar_bg": "linear-gradient(180deg, rgba(8, 16, 20, 0.85) 0%, rgba(18, 30, 38, 0.90) 100%)",
+            "expander_bg": "rgba(18, 30, 38, 0.62)",
+            "input_bg": "rgba(18, 30, 38, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #06B6D4 100%)",
+            "glow": "rgba(245, 158, 11, 0.40)"
+        }
     },
     {
         "id": "starlight_odyssey",
         "name": "🪐 Andromeda Galaxy Stars",
         "category": "🌌 Space & Sci-Fi",
-        "url": "https://images.unsplash.com/photo-1502134249126-9f3755a50d78?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1502134249126-9f3755a50d78?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1502134249126-9f3755a50d78?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1502134249126-9f3755a50d78?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#A855F7",
+            "accent_sub": "#38BDF8",
+            "card_bg": "rgba(16, 12, 34, 0.72)",
+            "card_border": "rgba(168, 85, 247, 0.26)",
+            "card_hover_border": "#A855F7",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#DDD6FE",
+            "text_muted": "#A855F7",
+            "sidebar_bg": "linear-gradient(180deg, rgba(10, 7, 24, 0.85) 0%, rgba(20, 14, 42, 0.90) 100%)",
+            "expander_bg": "rgba(20, 14, 42, 0.62)",
+            "input_bg": "rgba(20, 14, 42, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #7E22CE 0%, #A855F7 50%, #38BDF8 100%)",
+            "glow": "rgba(168, 85, 247, 0.40)"
+        }
     },
     {
         "id": "emerald_foliage",
         "name": "🌿 Tropical Emerald Foliage",
         "category": "🌿 Nature & Calm",
-        "url": "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#10B981",
+            "accent_sub": "#34D399",
+            "card_bg": "rgba(8, 22, 16, 0.74)",
+            "card_border": "rgba(16, 185, 129, 0.26)",
+            "card_hover_border": "#34D399",
+            "text_title": "#F0FDF4",
+            "text_main": "#F8FAFC",
+            "text_sub": "#A7F3D0",
+            "text_muted": "#10B981",
+            "sidebar_bg": "linear-gradient(180deg, rgba(5, 15, 10, 0.85) 0%, rgba(10, 28, 20, 0.90) 100%)",
+            "expander_bg": "rgba(10, 28, 20, 0.62)",
+            "input_bg": "rgba(10, 28, 20, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%)",
+            "glow": "rgba(16, 185, 129, 0.40)"
+        }
     },
     {
         "id": "lofi_study_desk",
         "name": "☕ Lofi Coffee & Focus Desk",
         "category": "📚 Study & Vibes",
-        "url": "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#D97706",
+            "accent_sub": "#F59E0B",
+            "card_bg": "rgba(26, 18, 12, 0.74)",
+            "card_border": "rgba(217, 119, 6, 0.26)",
+            "card_hover_border": "#F59E0B",
+            "text_title": "#FFFBEB",
+            "text_main": "#FDFBF7",
+            "text_sub": "#FDE68A",
+            "text_muted": "#D97706",
+            "sidebar_bg": "linear-gradient(180deg, rgba(18, 11, 7, 0.86) 0%, rgba(32, 21, 14, 0.92) 100%)",
+            "expander_bg": "rgba(32, 21, 14, 0.65)",
+            "input_bg": "rgba(32, 21, 14, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #B45309 0%, #D97706 50%, #F59E0B 100%)",
+            "glow": "rgba(217, 119, 6, 0.40)"
+        }
     },
     {
         "id": "prism_spectrum",
         "name": "🔮 Prism Refraction Waves",
         "category": "✨ Abstract",
-        "url": "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#818CF8",
+            "accent_sub": "#EC4899",
+            "card_bg": "rgba(18, 14, 36, 0.72)",
+            "card_border": "rgba(129, 140, 248, 0.26)",
+            "card_hover_border": "#818CF8",
+            "text_title": "#FFFFFF",
+            "text_main": "#F8FAFC",
+            "text_sub": "#E0E7FF",
+            "text_muted": "#818CF8",
+            "sidebar_bg": "linear-gradient(180deg, rgba(12, 8, 24, 0.85) 0%, rgba(22, 16, 44, 0.90) 100%)",
+            "expander_bg": "rgba(22, 16, 44, 0.62)",
+            "input_bg": "rgba(22, 16, 44, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #6366F1 0%, #818CF8 50%, #EC4899 100%)",
+            "glow": "rgba(129, 140, 248, 0.40)"
+        }
     },
     {
         "id": "midnight_dunes",
         "name": "🌙 Moonlit Sahara Dunes",
         "category": "🌿 Nature & Calm",
-        "url": "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=1920&q=80",
-        "thumb": "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=400&q=75"
+        "url": "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=2560&q=90",
+        "thumb": "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=400&q=75",
+        "palette": {
+            "accent": "#EAB308",
+            "accent_sub": "#38BDF8",
+            "card_bg": "rgba(22, 20, 14, 0.74)",
+            "card_border": "rgba(234, 179, 8, 0.26)",
+            "card_hover_border": "#EAB308",
+            "text_title": "#FEF9C3",
+            "text_main": "#FDFBF7",
+            "text_sub": "#FEF08A",
+            "text_muted": "#EAB308",
+            "sidebar_bg": "linear-gradient(180deg, rgba(15, 13, 9, 0.86) 0%, rgba(28, 24, 16, 0.90) 100%)",
+            "expander_bg": "rgba(28, 24, 16, 0.64)",
+            "input_bg": "rgba(28, 24, 16, 0.90)",
+            "btn_gradient": "linear-gradient(135deg, #CA8A04 0%, #EAB308 50%, #38BDF8 100%)",
+            "glow": "rgba(234, 179, 8, 0.40)"
+        }
     }
 ]
 
 
-def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_blur: int = 0, overlay_opacity: float = 0.30):
+def get_wallpaper_palette(preset_id: str = None, wallpaper_url: str = None) -> dict:
+    """Finds the tailored color palette for the active wallpaper preset or URL."""
+    if preset_id:
+        for p in WALLPAPER_PRESETS:
+            if p["id"] == preset_id:
+                return p["palette"]
+    if wallpaper_url:
+        for p in WALLPAPER_PRESETS:
+            if p["url"] in wallpaper_url or wallpaper_url in p["url"]:
+                return p["palette"]
+    return DEFAULT_DARK_PALETTE
+
+
+def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_blur: int = 0, overlay_opacity: float = 0.30, preset_id: str = None):
     """
     Injects the complete CSS theme (Light or Dark) and optional glassmorphism wallpaper into the Streamlit app.
-    Supports 20 preset curated wallpapers and custom user-uploaded images.
+    Automatically applies bespoke text colors, button gradients, and borders matching each wallpaper aesthetic.
     """
     is_dark = (theme.strip().lower() == "dark")
     has_wallpaper = bool(wallpaper_url and str(wallpaper_url).strip())
-
+    
     if is_dark:
-        card_bg = "rgba(15, 23, 42, 0.65)" if has_wallpaper else "rgba(19, 27, 46, 0.9)"
-        sidebar_bg = "linear-gradient(180deg, rgba(9, 13, 22, 0.78) 0%, rgba(15, 23, 42, 0.85) 100%)" if has_wallpaper else "linear-gradient(180deg, #090D16 0%, #0F172A 100%)"
-        expander_bg = "rgba(15, 23, 42, 0.60)" if has_wallpaper else "rgba(19, 27, 46, 0.85)"
+        palette = get_wallpaper_palette(preset_id=preset_id, wallpaper_url=wallpaper_url) if has_wallpaper else DEFAULT_DARK_PALETTE
+        
+        card_bg = palette["card_bg"] if has_wallpaper else "rgba(19, 27, 46, 0.92)"
+        sidebar_bg = palette["sidebar_bg"] if has_wallpaper else "linear-gradient(180deg, #090D16 0%, #0F172A 100%)"
+        expander_bg = palette["expander_bg"] if has_wallpaper else "rgba(19, 27, 46, 0.85)"
         
         theme_vars = f"""
         :root {{
             --nexus-bg: {'transparent' if has_wallpaper else '#0B0F19'};
             --nexus-card-bg: {card_bg};
-            --nexus-card-border: rgba(255, 255, 255, 0.13);
-            --nexus-card-hover-border: #38BDF8;
-            --nexus-text-main: #F8FAFC;
-            --nexus-text-title: #FFFFFF;
-            --nexus-text-sub: #94A3B8;
-            --nexus-text-muted: #64748B;
-            --nexus-input-bg: rgba(19, 27, 46, 0.85);
-            --nexus-input-border: rgba(255, 255, 255, 0.18);
-            --nexus-input-text: #FFFFFF;
+            --nexus-card-border: {palette["card_border"] if has_wallpaper else "rgba(255, 255, 255, 0.13)"};
+            --nexus-card-hover-border: {palette["card_hover_border"]};
+            --nexus-accent: {palette["accent"]};
+            --nexus-accent-sub: {palette["accent_sub"]};
+            --nexus-text-main: {palette["text_main"]};
+            --nexus-text-title: {palette["text_title"]};
+            --nexus-text-sub: {palette["text_sub"]};
+            --nexus-text-muted: {palette["text_muted"]};
+            --nexus-input-bg: {palette["input_bg"]};
+            --nexus-input-border: {palette["card_border"] if has_wallpaper else "rgba(255, 255, 255, 0.18)"};
+            --nexus-input-text: {palette["text_title"]};
             --nexus-sidebar-bg: {sidebar_bg};
-            --nexus-sidebar-border: rgba(255, 255, 255, 0.1);
+            --nexus-sidebar-border: {palette["card_border"] if has_wallpaper else "rgba(255, 255, 255, 0.1)"};
             --nexus-expander-bg: {expander_bg};
-            --nexus-expander-border: rgba(255, 255, 255, 0.12);
+            --nexus-expander-border: {palette["card_border"] if has_wallpaper else "rgba(255, 255, 255, 0.12)"};
             --nexus-tab-bg: rgba(15, 23, 42, 0.6);
-            --nexus-tab-border: rgba(255, 255, 255, 0.08);
+            --nexus-tab-border: {palette["card_border"] if has_wallpaper else "rgba(255, 255, 255, 0.08)"};
             --nexus-btn-bg: #1E293B;
-            --nexus-btn-text: #F8FAFC;
-            --nexus-btn-border: rgba(255, 255, 255, 0.15);
+            --nexus-btn-text: {palette["text_title"]};
+            --nexus-btn-border: {palette["card_border"] if has_wallpaper else "rgba(255, 255, 255, 0.15)"};
+            --nexus-btn-gradient: {palette["btn_gradient"]};
+            --nexus-glow: {palette["glow"]};
         }}
         """
         
         if has_wallpaper:
+            blur_rule = f"filter: blur({wallpaper_blur}px) brightness(0.96) !important;" if wallpaper_blur > 0 else "filter: brightness(0.96) !important;"
             wallpaper_css = f"""
             .stApp::before, [data-testid="stAppViewContainer"]::before {{
                 content: '' !important;
@@ -204,8 +582,9 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
                 background-image: url('{wallpaper_url}') !important;
                 background-size: cover !important; background-position: center center !important;
                 background-repeat: no-repeat !important; background-attachment: fixed !important;
-                filter: blur({wallpaper_blur}px) brightness(0.92) !important;
-                transform: scale(1.04) !important;
+                {blur_rule}
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: high-quality !important;
                 z-index: -2 !important; pointer-events: none !important;
             }}
             .stApp::after, [data-testid="stAppViewContainer"]::after {{
@@ -213,7 +592,6 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
                 position: fixed !important;
                 top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
                 background: rgba(11, 15, 25, {overlay_opacity}) !important;
-                backdrop-filter: blur(1px) !important;
                 z-index: -1 !important; pointer-events: none !important;
             }}
             html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stMain"], section.main, .block-container, [data-testid="stMainBlockContainer"], .stMain {{
@@ -221,8 +599,8 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
                 background: transparent !important;
             }}
             .nexus-card, div[data-testid="stMetric"], details[data-testid="stExpander"], div[data-testid="stForm"] {{
-                backdrop-filter: blur(16px) saturate(180%) !important;
-                -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+                backdrop-filter: blur(14px) saturate(170%) !important;
+                -webkit-backdrop-filter: blur(14px) saturate(170%) !important;
             }}
             """
         else:
@@ -243,7 +621,7 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
 
         theme_rules = """
         html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stMain"] {
-            color: #F8FAFC !important;
+            color: var(--nexus-text-main) !important;
             font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
             -webkit-font-smoothing: antialiased;
         }
@@ -251,82 +629,88 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         h1, h2, h3, h4, h5, h6 {
             font-family: 'Outfit', sans-serif !important;
             font-weight: 700 !important;
-            color: #FFFFFF !important;
+            color: var(--nexus-text-title) !important;
         }
 
         p, span, label, div {
-            color: #E2E8F0;
+            color: var(--nexus-text-main);
+        }
+
+        .caption, small, [data-testid="stCaptionContainer"] {
+            color: var(--nexus-text-sub) !important;
         }
 
         strong, b {
-            color: #FFFFFF !important;
+            color: var(--nexus-text-title) !important;
             font-weight: 600;
         }
 
         /* Sidebar Dark */
         section[data-testid="stSidebar"] {
             background: var(--nexus-sidebar-bg) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-right: 1px solid var(--nexus-sidebar-border) !important;
             backdrop-filter: blur(16px) !important;
             -webkit-backdrop-filter: blur(16px) !important;
         }
 
         section[data-testid="stSidebar"] [data-baseweb="radio"] {
-            background: rgba(30, 41, 59, 0.7) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background: rgba(30, 41, 59, 0.65) !important;
+            border: 1px solid var(--nexus-card-border) !important;
             border-radius: 12px !important;
             padding: 10px 16px !important;
             margin-bottom: 8px !important;
+            transition: all 0.2s ease !important;
         }
 
         section[data-testid="stSidebar"] [data-baseweb="radio"]:hover {
-            background: rgba(56, 189, 248, 0.15) !important;
-            border-color: #38BDF8 !important;
+            background: rgba(30, 41, 59, 0.90) !important;
+            border-color: var(--nexus-accent) !important;
             transform: translateX(4px);
         }
 
         section[data-testid="stSidebar"] [data-baseweb="radio"]:has(input:checked) {
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.85) 0%, rgba(56, 189, 248, 0.85) 100%) !important;
-            border: 1px solid #38BDF8 !important;
+            background: var(--nexus-btn-gradient) !important;
+            border: 1px solid var(--nexus-accent) !important;
+            box-shadow: 0 4px 16px var(--nexus-glow) !important;
         }
 
         section[data-testid="stSidebar"] [data-baseweb="radio"] p {
-            color: #F8FAFC !important;
+            color: var(--nexus-text-title) !important;
             font-weight: 600 !important;
         }
 
         /* Inputs & Controls Dark */
         .stTextInput input, .stNumberInput input, .stTextArea textarea, .stDateInput input {
-            background-color: #131B2E !important;
-            color: #FFFFFF !important;
-            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            background-color: var(--nexus-input-bg) !important;
+            color: var(--nexus-text-title) !important;
+            border: 1px solid var(--nexus-input-border) !important;
             border-radius: 10px !important;
         }
 
         .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus, .stDateInput input:focus {
-            border-color: #38BDF8 !important;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
+            border-color: var(--nexus-accent) !important;
+            box-shadow: 0 0 0 3px var(--nexus-glow) !important;
         }
 
         .stSelectbox [data-baseweb="select"] {
-            background-color: #131B2E !important;
-            color: #FFFFFF !important;
-            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            background-color: var(--nexus-input-bg) !important;
+            color: var(--nexus-text-title) !important;
+            border: 1px solid var(--nexus-input-border) !important;
             border-radius: 10px !important;
         }
 
         .stSelectbox [data-baseweb="select"] div {
-            color: #FFFFFF !important;
+            color: var(--nexus-text-title) !important;
         }
 
         div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
-            background-color: #131B2E !important;
-            color: #FFFFFF !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            background-color: var(--nexus-input-bg) !important;
+            color: var(--nexus-text-title) !important;
+            border: 1px solid var(--nexus-card-border) !important;
         }
 
         ul[role="listbox"] li {
-            color: #E2E8F0 !important;
+            color: var(--nexus-text-main) !important;
         }
 
         details[data-testid="stExpander"] {
@@ -338,42 +722,44 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         }
 
         details[data-testid="stExpander"] summary {
-            color: #F8FAFC !important;
+            color: var(--nexus-text-title) !important;
+            font-weight: 600;
         }
 
         .stTabs [data-baseweb="tab-list"] {
             background-color: rgba(15, 23, 42, 0.6) !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid var(--nexus-tab-border) !important;
         }
 
         .stTabs [data-baseweb="tab"] {
-            color: #94A3B8 !important;
+            color: var(--nexus-text-sub) !important;
         }
 
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
             background: rgba(30, 41, 59, 0.9) !important;
-            color: #38BDF8 !important;
-            border: 1px solid rgba(56, 189, 248, 0.3) !important;
+            color: var(--nexus-accent) !important;
+            border: 1px solid var(--nexus-accent) !important;
+            box-shadow: 0 0 12px var(--nexus-glow) !important;
         }
 
         .stButton > button {
             background: #1E293B !important;
-            color: #F8FAFC !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            color: var(--nexus-text-main) !important;
+            border: 1px solid var(--nexus-btn-border) !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
         }
 
         .stButton > button:hover {
-            border-color: #38BDF8 !important;
-            color: #38BDF8 !important;
-            box-shadow: 0 4px 14px rgba(56, 189, 248, 0.2) !important;
+            border-color: var(--nexus-accent) !important;
+            color: var(--nexus-accent) !important;
+            box-shadow: 0 4px 14px var(--nexus-glow) !important;
         }
 
         .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #6366F1 0%, #0284C7 100%) !important;
+            background: var(--nexus-btn-gradient) !important;
             color: #FFFFFF !important;
             border: none !important;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
+            box-shadow: 0 4px 18px var(--nexus-glow) !important;
         }
 
         .badge-not-started   { background-color: rgba(148, 163, 184, 0.15); color: #CBD5E1; border: 1px solid rgba(148, 163, 184, 0.3); }
@@ -392,6 +778,8 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             --nexus-card-bg: {card_bg};
             --nexus-card-border: #E2E8F0;
             --nexus-card-hover-border: #6366F1;
+            --nexus-accent: #4F46E5;
+            --nexus-accent-sub: #0284C7;
             --nexus-text-main: #0F172A;
             --nexus-text-title: #0F172A;
             --nexus-text-sub: #64748B;
@@ -408,10 +796,13 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             --nexus-btn-bg: #FFFFFF;
             --nexus-btn-text: #0F172A;
             --nexus-btn-border: #CBD5E1;
+            --nexus-btn-gradient: linear-gradient(135deg, #4F46E5 0%, #0284C7 100%);
+            --nexus-glow: rgba(79, 70, 229, 0.25);
         }}
         """
         
         if has_wallpaper:
+            blur_rule = f"filter: blur({wallpaper_blur}px) brightness(0.96) !important;" if wallpaper_blur > 0 else "filter: brightness(0.96) !important;"
             wallpaper_css = f"""
             .stApp::before, [data-testid="stAppViewContainer"]::before {{
                 content: '' !important;
@@ -420,8 +811,9 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
                 background-image: url('{wallpaper_url}') !important;
                 background-size: cover !important; background-position: center center !important;
                 background-repeat: no-repeat !important; background-attachment: fixed !important;
-                filter: blur({wallpaper_blur}px) brightness(0.95) !important;
-                transform: scale(1.04) !important;
+                {blur_rule}
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: high-quality !important;
                 z-index: -2 !important; pointer-events: none !important;
             }}
             .stApp::after, [data-testid="stAppViewContainer"]::after {{
@@ -429,7 +821,6 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
                 position: fixed !important;
                 top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
                 background: rgba(248, 250, 252, {overlay_opacity}) !important;
-                backdrop-filter: blur(1px) !important;
                 z-index: -1 !important; pointer-events: none !important;
             }}
             html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stMain"], section.main, .block-container, [data-testid="stMainBlockContainer"], .stMain {{
@@ -437,8 +828,8 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
                 background: transparent !important;
             }}
             .nexus-card, div[data-testid="stMetric"], details[data-testid="stExpander"], div[data-testid="stForm"] {{
-                backdrop-filter: blur(16px) saturate(180%) !important;
-                -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+                backdrop-filter: blur(14px) saturate(170%) !important;
+                -webkit-backdrop-filter: blur(14px) saturate(170%) !important;
             }}
             """
         else:
@@ -612,14 +1003,14 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             padding: 22px 26px;
             margin-bottom: 18px;
             box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08);
-            backdrop-filter: blur(14px) !important;
-            -webkit-backdrop-filter: blur(14px) !important;
+            backdrop-filter: blur(14px) saturate(170%) !important;
+            -webkit-backdrop-filter: blur(14px) saturate(170%) !important;
             transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
         }
 
         .nexus-card:hover {
             border-color: var(--nexus-card-hover-border) !important;
-            box-shadow: 0 12px 30px -4px rgba(99, 102, 241, 0.2);
+            box-shadow: 0 12px 30px -4px var(--nexus-glow);
             transform: translateY(-2px);
         }
 
@@ -638,14 +1029,15 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             padding: 20px 18px;
             text-align: center;
             box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
-            backdrop-filter: blur(14px) !important;
-            -webkit-backdrop-filter: blur(14px) !important;
+            backdrop-filter: blur(14px) saturate(170%) !important;
+            -webkit-backdrop-filter: blur(14px) saturate(170%) !important;
             transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
         }
 
         .metric-box:hover {
-            border-color: #6366F1 !important;
+            border-color: var(--nexus-card-hover-border) !important;
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--nexus-glow);
         }
 
         .metric-title {
@@ -661,6 +1053,8 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             font-family: 'Outfit', sans-serif !important;
             font-size: 2.2rem;
             font-weight: 800;
+            color: var(--nexus-accent) !important;
+            text-shadow: 0 0 16px var(--nexus-glow);
         }
 
         .metric-sub {
@@ -671,7 +1065,7 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
 
         /* Custom Progress Bars */
         .stProgress > div > div > div > div {
-            background-image: linear-gradient(90deg, #4F46E5 0%, #06B6D4 50%, #22C55E 100%) !important;
+            background-image: var(--nexus-btn-gradient) !important;
             border-radius: 10px;
         }
 
@@ -684,13 +1078,13 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
 
         /* Welcome Banner */
         .welcome-banner {
-            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #0284C7 100%);
+            background: var(--nexus-btn-gradient);
             border-radius: 16px;
             padding: 28px 34px;
             margin-bottom: 24px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(79, 70, 229, 0.25);
+            box-shadow: 0 10px 30px var(--nexus-glow);
         }
 
         .welcome-banner h2 {
@@ -701,7 +1095,7 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         }
 
         .welcome-banner p {
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: rgba(255, 255, 255, 0.92) !important;
             margin: 0 !important;
             font-size: 1.05rem !important;
             font-weight: 500 !important;
@@ -773,27 +1167,29 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
 
 
 def render_header(title: str, subtitle: str = "", theme: str = "Light"):
-    """Render a stylish page header with optional subtitle."""
+    """Render a stylish page header with optional subtitle matching active wallpaper colors."""
     is_dark = (theme.strip().lower() == "dark")
-    bg = "linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98))" if is_dark else "linear-gradient(135deg, #FFFFFF, #F8FAFC)"
-    border = "rgba(255,255,255,0.1)" if is_dark else "#E2E8F0"
-    title_color = "#FFFFFF" if is_dark else "#0F172A"
-    sub_color = "#94A3B8" if is_dark else "#64748B"
+    bg = "var(--nexus-expander-bg)" if is_dark else "linear-gradient(135deg, #FFFFFF, #F8FAFC)"
+    border = "var(--nexus-card-border)" if is_dark else "#E2E8F0"
+    title_color = "var(--nexus-text-title)" if is_dark else "#0F172A"
+    sub_color = "var(--nexus-text-sub)" if is_dark else "#64748B"
+    accent_border = "var(--nexus-accent)" if is_dark else "#4F46E5"
 
     st.markdown(f"""
-        <div style="margin-bottom: 20px; padding: 16px 20px; background: {bg}; border-left: 5px solid #4F46E5; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,{'0.35' if is_dark else '0.04'}); border-top: 1px solid {border}; border-right: 1px solid {border}; border-bottom: 1px solid {border};">
+        <div style="margin-bottom: 20px; padding: 16px 20px; background: {bg}; border-left: 5px solid {accent_border}; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,{'0.35' if is_dark else '0.04'}); border-top: 1px solid {border}; border-right: 1px solid {border}; border-bottom: 1px solid {border}; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);">
             <h1 style="color: {title_color} !important; font-family: 'Outfit', sans-serif !important; font-weight: 800 !important; font-size: clamp(1.35rem, 4vw, 2.1rem) !important; margin: 0 0 4px 0 !important; letter-spacing: -0.02em; line-height: 1.25;">{title}</h1>
             {f'<p style="color: {sub_color} !important; font-size: clamp(0.85rem, 2.5vw, 1.02rem) !important; margin: 0 !important; font-weight: 500; line-height: 1.45;">{subtitle}</p>' if subtitle else ''}
         </div>
     """, unsafe_allow_html=True)
 
 
-def render_metric_card(title: str, value, accent_color: str = "#4F46E5", subtitle: str = "", theme: str = "Light", **kwargs):
+def render_metric_card(title: str, value, accent_color: str = None, subtitle: str = "", theme: str = "Light", **kwargs):
     """Render a single styled metric box."""
+    accent = accent_color if accent_color else "var(--nexus-accent)"
     st.markdown(f"""
         <div class="metric-box">
             <div class="metric-title">{title}</div>
-            <div class="metric-value" style="color: {accent_color};">{value}</div>
+            <div class="metric-value" style="color: {accent};">{value}</div>
             {f'<div class="metric-sub">{subtitle}</div>' if subtitle else ''}
         </div>
     """, unsafe_allow_html=True)
@@ -1249,10 +1645,3 @@ def render_welcome_splash_screen(user_name: str, class_name: str = "Class 10", b
 </html>
 """
     components.html(html_code, height=270)
-
-
-
-
-
-
-

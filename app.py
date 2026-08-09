@@ -31,40 +31,40 @@ st.set_page_config(
 )
 
 def get_resolved_wallpaper(user_id=None):
-    """Helper to retrieve resolved wallpaper URL, blur, and opacity for a user."""
+    """Helper to retrieve resolved wallpaper URL, blur, opacity, and preset_id for a user."""
     if not user_id:
-        return None, 0, 0.82
+        return None, 0, 0.30, None
     try:
         wp_cfg = get_user_wallpaper_config(user_id)
         mode = wp_cfg.get("mode", "none")
         blur = wp_cfg.get("blur", 0)
-        opacity = wp_cfg.get("opacity", 0.82)
+        opacity = wp_cfg.get("opacity", 0.30)
+        preset_id = wp_cfg.get("preset_id", "")
         if mode == "custom":
-            return wp_cfg.get("custom_url"), blur, opacity
+            return wp_cfg.get("custom_url"), blur, opacity, "custom"
         elif mode == "preset":
-            preset_id = wp_cfg.get("preset_id")
             for p in WALLPAPER_PRESETS:
                 if p["id"] == preset_id:
-                    return p["url"], blur, opacity
-        return None, 0, 0.30
+                    return p["url"], blur, opacity, preset_id
+        return None, 0, 0.30, None
     except Exception:
-        return None, 0, 0.30
+        return None, 0, 0.30, None
 
 # Apply Theme Styling & Wallpaper (Syncs instantly with session state and DB)
 active_theme = "Light"
-wp_url, wp_blur, wp_opacity = None, 0, 0.30
+wp_url, wp_blur, wp_opacity, wp_preset_id = None, 0, 0.30, None
 
 if "user_id" in st.session_state:
     try:
         active_theme = get_user_theme(st.session_state["user_id"])
         st.session_state["theme_mode"] = active_theme
-        wp_url, wp_blur, wp_opacity = get_resolved_wallpaper(st.session_state["user_id"])
+        wp_url, wp_blur, wp_opacity, wp_preset_id = get_resolved_wallpaper(st.session_state["user_id"])
     except Exception:
         active_theme = "Light"
 elif "theme_mode" in st.session_state:
     active_theme = st.session_state["theme_mode"]
 
-apply_custom_css(active_theme, wallpaper_url=wp_url, wallpaper_blur=wp_blur, overlay_opacity=wp_opacity)
+apply_custom_css(active_theme, wallpaper_url=wp_url, wallpaper_blur=wp_blur, overlay_opacity=wp_opacity, preset_id=wp_preset_id)
 
 
 
@@ -200,8 +200,8 @@ def main():
     profile = get_user_profile(user_id)
     user_theme = get_user_theme(user_id)
     st.session_state["theme_mode"] = user_theme
-    wp_url, wp_blur, wp_opacity = get_resolved_wallpaper(user_id)
-    apply_custom_css(user_theme, wallpaper_url=wp_url, wallpaper_blur=wp_blur, overlay_opacity=wp_opacity)
+    wp_url, wp_blur, wp_opacity, wp_preset_id = get_resolved_wallpaper(user_id)
+    apply_custom_css(user_theme, wallpaper_url=wp_url, wallpaper_blur=wp_blur, overlay_opacity=wp_opacity, preset_id=wp_preset_id)
     is_dark = (user_theme.strip().lower() == "dark")
 
     # ── Fullscreen Welcome Splash Screen on Login / Signup / Setup ──
