@@ -9,7 +9,13 @@ import streamlit as st
 import datetime
 import io
 import base64
-from PIL import Image
+
+try:
+    from PIL import Image
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
 from models import (
     get_user_profile, save_user_profile, get_all_terms, add_term,
     update_term, delete_term, clear_all_terms, reset_all_data,
@@ -24,17 +30,22 @@ from pages_modules.setup_wizard import CLASS_OPTIONS
 def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: int = 80):
     """Resizes and compresses an uploaded image into a high-performance JPEG data URL."""
     try:
-        image = Image.open(uploaded_file)
-        if image.mode in ("RGBA", "P"):
-            image = image.convert("RGB")
-        if image.width > max_width:
-            aspect = image.height / image.width
-            new_height = int(max_width * aspect)
-            image = image.resize((max_width, new_height), Image.Resampling.LANCZOS)
-        
-        buffered = io.BytesIO()
-        image.save(buffered, format="JPEG", quality=quality, optimize=True)
-        img_bytes = buffered.getvalue()
+        if HAS_PIL:
+            image = Image.open(uploaded_file)
+            if image.mode in ("RGBA", "P"):
+                image = image.convert("RGB")
+            if image.width > max_width:
+                aspect = image.height / image.width
+                new_height = int(max_width * aspect)
+                image = image.resize((max_width, new_height), Image.Resampling.LANCZOS)
+            
+            buffered = io.BytesIO()
+            image.save(buffered, format="JPEG", quality=quality, optimize=True)
+            img_bytes = buffered.getvalue()
+        else:
+            uploaded_file.seek(0)
+            img_bytes = uploaded_file.read()
+
         b64_str = base64.b64encode(img_bytes).decode("utf-8")
         return f"data:image/jpeg;base64,{b64_str}"
     except Exception:
