@@ -1339,6 +1339,62 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         /* Google Fonts */
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
+        /* Authentication Screen Premium Styling */
+        .auth-hero-container {
+            text-align: center;
+            margin-bottom: 24px;
+            padding-top: 15px;
+        }
+
+        .auth-brand-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            color: #38BDF8;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 5px 14px;
+            border-radius: 30px;
+            margin-bottom: 12px;
+        }
+
+        .auth-hero-title {
+            font-family: 'Outfit', sans-serif !important;
+            font-size: clamp(2.0rem, 5vw, 2.7rem) !important;
+            font-weight: 800 !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #E0E7FF 50%, #38BDF8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 8px 0 !important;
+            letter-spacing: -0.02em;
+        }
+
+        .auth-hero-subtitle {
+            font-size: clamp(0.9rem, 2.5vw, 1.02rem) !important;
+            color: #94A3B8 !important;
+            max-width: 520px;
+            margin: 0 auto !important;
+            line-height: 1.5;
+        }
+
+        .auth-feature-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(30, 41, 59, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #E2E8F0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
         .nexus-card {
             background: var(--nexus-card-bg) !important;
             border: 1px solid var(--nexus-card-border) !important;

@@ -51,8 +51,8 @@ def get_resolved_wallpaper(user_id=None):
         return None, 0, 0.30, None
 
 # Apply Theme Styling & Wallpaper (Syncs instantly with session state and DB)
-active_theme = "Light"
-wp_url, wp_blur, wp_opacity, wp_preset_id = None, 0, 0.30, None
+active_theme = "Dark"
+wp_url, wp_blur, wp_opacity, wp_preset_id = WALLPAPER_PRESETS[0]["url"], 0, 0.35, "cosmic_nebula"
 
 if "user_id" in st.session_state:
     try:
@@ -60,9 +60,10 @@ if "user_id" in st.session_state:
         st.session_state["theme_mode"] = active_theme
         wp_url, wp_blur, wp_opacity, wp_preset_id = get_resolved_wallpaper(st.session_state["user_id"])
     except Exception:
-        active_theme = "Light"
+        active_theme = "Dark"
 elif "theme_mode" in st.session_state:
     active_theme = st.session_state["theme_mode"]
+    wp_url, wp_blur, wp_opacity, wp_preset_id = WALLPAPER_PRESETS[0]["url"], 0, 0.35, "cosmic_nebula"
 
 apply_custom_css(active_theme, wallpaper_url=wp_url, wallpaper_blur=wp_blur, overlay_opacity=wp_opacity, preset_id=wp_preset_id)
 
@@ -112,61 +113,86 @@ def render_db_config_instructions():
     """)
 
 def render_auth_page():
-    render_cinematic_welcome_banner(user_name="Scholar", class_name="Classes 1 to 10", board="ICSE & CBSE", theme="Light")
+    # Centered modern auth layout
+    c_pad1, c_auth, c_pad2 = st.columns([1, 1.4, 1])
     
-    tab_login, tab_signup = st.tabs(["🔑 Log In", "📝 Sign Up"])
-
-    
-    with tab_login:
-        st.subheader("Welcome back!")
-        with st.form("login_form"):
-            username = st.text_input("Username").strip()
-            password = st.text_input("Password", type="password")
-            keep_logged_in = st.checkbox("🔒 Keep me logged in", value=False)
-            submitted = st.form_submit_button("Log In", use_container_width=True)
-            if submitted:
-                if not username or not password:
-                    st.error("Please fill in all fields.")
-                else:
-                    from models import verify_user
-                    user = verify_user(username, password)
-                    if user:
-                        st.session_state["user_id"] = user["id"]
-                        st.session_state["username"] = user["username"]
-                        st.session_state["show_welcome_splash"] = True
-                        if keep_logged_in:
-                            token = create_session_token(user["id"], user["username"])
-                            set_session_param(token)
-                        st.success("Logged in successfully!")
-                        st.rerun()
+    with c_auth:
+        st.markdown("""
+            <div class="auth-hero-container">
+                <div class="auth-brand-badge">⚡ NEXUS ECOSYSTEM • CLASS 1-10</div>
+                <h1 class="auth-hero-title">Welcome to Nexus</h1>
+                <p class="auth-hero-subtitle">Your intelligent companion for CBSE & ICSE curriculum tracking, smart timetables, and performance mastery.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        tab_login, tab_signup = st.tabs(["🔑 Sign In to Nexus", "✨ Create Free Account"])
+        
+        with tab_login:
+            with st.form("login_form", clear_on_submit=False):
+                st.markdown("<h3 style='margin: 0 0 14px 0; font-size: 1.2rem; color: #FFFFFF; font-family: Outfit, sans-serif;'>Sign In to Your Workspace</h3>", unsafe_allow_html=True)
+                username = st.text_input("Username", placeholder="e.g. ammaarakhtar_718").strip()
+                password = st.text_input("Password", type="password", placeholder="Enter your password")
+                keep_logged_in = st.checkbox("🔒 Keep me logged in on this device (30 days)", value=True)
+                
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                submitted = st.form_submit_button("⚡ Enter Your Study Space", use_container_width=True, type="primary")
+                if submitted:
+                    if not username or not password:
+                        st.error("Please enter both username and password.")
                     else:
-                        st.error("Invalid username or password.")
-                        
-    with tab_signup:
-        st.subheader("Create a new account")
-        with st.form("signup_form"):
-            new_username = st.text_input("Username").strip()
-            new_password = st.text_input("Password", type="password")
-            confirm_password = st.text_input("Confirm Password", type="password")
-            submitted = st.form_submit_button("Sign Up", use_container_width=True)
-            if submitted:
-                if not new_username or not new_password or not confirm_password:
-                    st.error("Please fill in all fields.")
-                elif new_password != confirm_password:
-                    st.error("Passwords do not match.")
-                elif len(new_password) < 6:
-                    st.error("Password must be at least 6 characters.")
-                else:
-                    from models import create_user
-                    user_id = create_user(new_username, new_password)
-                    if user_id:
-                        st.session_state["user_id"] = user_id
-                        st.session_state["username"] = new_username
-                        st.session_state["show_welcome_splash"] = True
-                        st.success("Account created successfully!")
-                        st.rerun()
+                        from models import verify_user
+                        user = verify_user(username, password)
+                        if user:
+                            st.session_state["user_id"] = user["id"]
+                            st.session_state["username"] = user["username"]
+                            st.session_state["show_welcome_splash"] = True
+                            if keep_logged_in:
+                                token = create_session_token(user["id"], user["username"])
+                                set_session_param(token)
+                            st.success("Welcome back! Loading your workspace...")
+                            st.rerun()
+                        else:
+                            st.error("Invalid username or password. Please try again.")
+                            
+        with tab_signup:
+            with st.form("signup_form", clear_on_submit=False):
+                st.markdown("<h3 style='margin: 0 0 14px 0; font-size: 1.2rem; color: #FFFFFF; font-family: Outfit, sans-serif;'>Create Your Student Profile</h3>", unsafe_allow_html=True)
+                new_username = st.text_input("Choose Username", placeholder="e.g. ammaar_scholar").strip()
+                new_password = st.text_input("Create Password", type="password", placeholder="At least 6 characters")
+                confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
+                
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                submitted = st.form_submit_button("🚀 Create Free Account & Get Started", use_container_width=True, type="primary")
+                if submitted:
+                    if not new_username or not new_password or not confirm_password:
+                        st.error("Please fill in all required fields.")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match.")
+                    elif len(new_password) < 6:
+                        st.error("Password must be at least 6 characters long.")
                     else:
-                        st.error("Username is already taken.")
+                        from models import create_user
+                        user_id = create_user(new_username, new_password)
+                        if user_id:
+                            st.session_state["user_id"] = user_id
+                            st.session_state["username"] = new_username
+                            st.session_state["show_welcome_splash"] = True
+                            st.success("Account created successfully! Welcome aboard.")
+                            st.rerun()
+                        else:
+                            st.error("Username is already taken. Please choose another username.")
+        
+        # Feature Pills Footer below Auth Box
+        st.markdown("""
+            <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 24px;">
+                <span class="auth-feature-pill">📚 Official ICSE & CBSE Syllabus</span>
+                <span class="auth-feature-pill">📅 Intelligent Timetable</span>
+                <span class="auth-feature-pill">🎨 20+ Bespoke 4K Themes</span>
+            </div>
+            <div style="text-align: center; margin-top: 18px; color: #64748B; font-size: 0.8rem;">
+                Crafted with ❤️ by <strong>Ammaar Akhtar</strong> • Cloud Synced & Encrypted
+            </div>
+        """, unsafe_allow_html=True)
 
 def main():
     if not db_ok:
