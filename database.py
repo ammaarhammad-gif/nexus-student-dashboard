@@ -235,9 +235,17 @@ def init_db():
             item_id INTEGER NOT NULL,
             due_date VARCHAR(50) NOT NULL,
             interval_days INTEGER DEFAULT 1,
+            interval_number INTEGER DEFAULT 1,
             is_completed INTEGER DEFAULT 0,
-            completed_at VARCHAR(50)
+            completed_at VARCHAR(50),
+            scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        """)
+
+        # Migration for existing revisions table
+        cursor.execute("""
+        ALTER TABLE revisions ADD COLUMN IF NOT EXISTS interval_number INTEGER DEFAULT 1;
+        ALTER TABLE revisions ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
         """)
 
         # ── 13. Achievements ──
@@ -271,7 +279,130 @@ def init_db():
         );
         """)
 
-        # ── 15. Performance Indexes for Instant Screen Transitions (<100ms) ──
+        # ── 15. Mistake Vault ──
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mistakes (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+            chapter_id INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
+            topic_id INTEGER REFERENCES topics(id) ON DELETE SET NULL,
+            question TEXT NOT NULL,
+            your_answer TEXT DEFAULT '',
+            correct_answer TEXT DEFAULT '',
+            mistake_type VARCHAR(50) DEFAULT 'Conceptual',
+            explanation TEXT DEFAULT '',
+            prevention_strategy TEXT DEFAULT '',
+            is_reviewed INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # ── 16. Notes System ──
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+            chapter_id INTEGER REFERENCES chapters(id) ON DELETE CASCADE,
+            topic_id INTEGER REFERENCES topics(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            tags VARCHAR(255) DEFAULT '',
+            is_pinned INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # ── 17. Formula Vault ──
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS formulas (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+            chapter_id INTEGER REFERENCES chapters(id) ON DELETE CASCADE,
+            topic_id INTEGER REFERENCES topics(id) ON DELETE SET NULL,
+            title VARCHAR(255) NOT NULL,
+            formula_latex TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            variables_json TEXT DEFAULT '{}',
+            is_favorite INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # ── 18. Quizzes & Attempts ──
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS quizzes (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+            chapter_id INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
+            topic_id INTEGER REFERENCES topics(id) ON DELETE SET NULL,
+            difficulty VARCHAR(50) DEFAULT 'Mixed',
+            questions_json TEXT NOT NULL DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS quiz_attempts (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            quiz_id INTEGER REFERENCES quizzes(id) ON DELETE CASCADE,
+            score INTEGER DEFAULT 0,
+            total_questions INTEGER DEFAULT 0,
+            accuracy_pct REAL DEFAULT 0.0,
+            time_taken_seconds INTEGER DEFAULT 0,
+            weak_topics_json TEXT DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # ── 19. Active Recall Responses ──
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recall_responses (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            topic_id INTEGER REFERENCES topics(id) ON DELETE CASCADE,
+            prompt_text TEXT NOT NULL,
+            user_response TEXT NOT NULL,
+            evaluation_feedback TEXT DEFAULT '',
+            understanding_score INTEGER DEFAULT 3,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # ── 20. Gamification XP Events ──
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_xp_events (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            action_type VARCHAR(100) NOT NULL,
+            xp_amount INTEGER DEFAULT 0,
+            description VARCHAR(255) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # ── Migrations for Topic Progress & Users ──
+        cursor.execute("""
+        ALTER TABLE topic_progress ADD COLUMN IF NOT EXISTS difficulty VARCHAR(20) DEFAULT 'Medium';
+        ALTER TABLE topic_progress ADD COLUMN IF NOT EXISTS importance VARCHAR(20) DEFAULT 'Medium';
+        ALTER TABLE topic_progress ADD COLUMN IF NOT EXISTS estimated_minutes INTEGER DEFAULT 45;
+        ALTER TABLE topic_progress ADD COLUMN IF NOT EXISTS last_studied_at TIMESTAMP;
+        ALTER TABLE topic_progress ADD COLUMN IF NOT EXISTS last_revised_at TIMESTAMP;
+
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS total_xp INTEGER DEFAULT 0;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS nexus_level INTEGER DEFAULT 1;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_date VARCHAR(20);
+        """)
+
+        # ── 21. Performance Indexes for Instant Screen Transitions (<100ms) ──
         cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_topic_prog_user_item ON topic_progress (user_id, item_type, item_id);
         CREATE INDEX IF NOT EXISTS idx_topic_prog_user_status ON topic_progress (user_id, status);
@@ -283,6 +414,13 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_term_chaps_user_term ON term_chapters (user_id, term_id);
         CREATE INDEX IF NOT EXISTS idx_revisions_user_due ON revisions (user_id, is_completed, due_date);
         CREATE INDEX IF NOT EXISTS idx_study_sess_user ON study_sessions (user_id, session_date);
+        CREATE INDEX IF NOT EXISTS idx_mistakes_user ON mistakes (user_id, mistake_type);
+        CREATE INDEX IF NOT EXISTS idx_notes_user_topic ON notes (user_id, topic_id);
+        CREATE INDEX IF NOT EXISTS idx_formulas_user ON formulas (user_id, subject_id);
+        CREATE INDEX IF NOT EXISTS idx_quiz_user ON quizzes (user_id);
+        CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts (user_id);
+        CREATE INDEX IF NOT EXISTS idx_recall_user ON recall_responses (user_id, topic_id);
+        CREATE INDEX IF NOT EXISTS idx_xp_user ON user_xp_events (user_id, created_at);
         """)
 
         conn.commit()

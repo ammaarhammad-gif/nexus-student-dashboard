@@ -17,6 +17,11 @@ from pages_modules.statistics import render_statistics_page
 from pages_modules.planner import render_planner_page
 from pages_modules.wallpapers import render_wallpapers_page
 from pages_modules.settings import render_settings_page
+from pages_modules.revisions import render_revisions_page
+from pages_modules.mistakes import render_mistakes_page
+from pages_modules.formulas import render_formulas_page
+from pages_modules.notes import render_notes_page
+from pages_modules.focus import render_focus_page
 from auth_utils import (
     create_session_token, verify_session_token,
     set_session_param, get_session_param, clear_session_param
@@ -268,12 +273,50 @@ def main():
             </div>
         """, unsafe_allow_html=True)
         
+        # ── Global Nexus Search Engine ──
+        st.markdown("""
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--nexus-text-title); margin-bottom: 6px; font-family: 'Outfit', sans-serif;">
+                🔍 Global Nexus Search
+            </div>
+        """, unsafe_allow_html=True)
+        search_query = st.text_input("Global Search", placeholder="Search topics, notes, mistakes...", key="global_search_input", label_visibility="collapsed")
+        
+        if search_query and len(search_query.strip()) >= 2:
+            from models import global_nexus_search
+            results = global_nexus_search(user_id, search_query)
+            total_hits = sum(len(v) for v in results.values())
+            if total_hits == 0:
+                st.caption(f"No results for '{search_query}'")
+            else:
+                with st.expander(f"✨ Search Results ({total_hits})", expanded=True):
+                    # Topics
+                    for t in results.get("topics", [])[:3]:
+                        st.markdown(f"📚 **{t['topic_name']}** ({t['subject_name']})")
+                    # Notes
+                    for n in results.get("notes", [])[:2]:
+                        st.markdown(f"📝 **{n['title']}** ({n.get('subject_name','')})")
+                    # Mistakes
+                    for m in results.get("mistakes", [])[:2]:
+                        st.markdown(f"❌ **{m['question'][:30]}...** ({m.get('mistake_type')})")
+                    # Exams
+                    for e in results.get("exams", [])[:2]:
+                        st.markdown(f"⏰ **{e['exam_name']}** ({e.get('exam_date')})")
+                    # Tasks
+                    for tk in results.get("tasks", [])[:2]:
+                        st.markdown(f"🗓️ **{tk['description']}** ({tk.get('plan_date')})")
+        
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         st.markdown("### Navigation")
         page_options = [
             "🏠 Dashboard",
             "📚 Syllabus Manager",
-            "📊 Statistics",
+            "🧠 Revision Queue",
+            "⏱️ Nexus Focus Studio",
+            "❌ Mistake Vault",
+            "📐 Formula Vault",
+            "📝 Nexus Notes",
             "🗓️ Study Planner",
+            "📊 Statistics",
             "🖼️ Wallpapers & Themes",
             "⚙️ Settings"
         ]
@@ -368,7 +411,7 @@ def main():
                 <p style="color: #64748B; font-size: 0.85rem; margin: 0; font-weight: 500;">Crafted with ❤️ by</p>
                 <h4 style="color: {footer_name_color}; font-size: 1.1rem; font-weight: 700; margin: 2px 0 6px 0; font-family: 'Outfit', sans-serif;">Ammaar Akhtar</h4>
                 <span style="display: inline-block; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 0.78rem; font-weight: 600; background: {'rgba(56, 189, 248, 0.1)' if is_dark else 'rgba(79, 70, 229, 0.08)'}; padding: 3px 10px; border-radius: 12px; border: 1px solid {'rgba(56, 189, 248, 0.2)' if is_dark else 'rgba(79, 70, 229, 0.15)'};">
-                    🌐 Cloud Sync Active • v1.2.0
+                    🌐 Cloud Sync Active • Student OS
                 </span>
             </div>
         """, unsafe_allow_html=True)
@@ -379,6 +422,16 @@ def main():
         render_dashboard_page(user_id)
     elif page == "📚 Syllabus Manager":
         render_syllabus_page(user_id)
+    elif page == "🧠 Revision Queue":
+        render_revisions_page(user_id)
+    elif page == "⏱️ Nexus Focus Studio":
+        render_focus_page(user_id)
+    elif page == "❌ Mistake Vault":
+        render_mistakes_page(user_id)
+    elif page == "📐 Formula Vault":
+        render_formulas_page(user_id)
+    elif page == "📝 Nexus Notes":
+        render_notes_page(user_id)
     elif page == "📊 Statistics":
         render_statistics_page(user_id)
     elif page == "🗓️ Study Planner":

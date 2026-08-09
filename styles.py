@@ -1395,6 +1395,137 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             backdrop-filter: blur(10px);
         }
 
+        /* ── Student OS Semantic Status Pills ── */
+        .nexus-pill-critical {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #EF4444 !important;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .nexus-pill-high {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(249, 115, 22, 0.15);
+            border: 1px solid rgba(249, 115, 22, 0.4);
+            color: #F97316 !important;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .nexus-pill-medium {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(234, 179, 8, 0.15);
+            border: 1px solid rgba(234, 179, 8, 0.4);
+            color: #EAB308 !important;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .nexus-pill-low {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #22C55E !important;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .nexus-pill-revision {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(56, 189, 248, 0.15);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #38BDF8 !important;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Priority Card ── */
+        .priority-item-card {
+            background: var(--nexus-card-bg) !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-left: 4px solid #38BDF8 !important;
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(12px) saturate(160%) !important;
+            -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+            transition: all 0.2s ease;
+        }
+
+        .priority-item-card:hover {
+            transform: translateX(4px);
+            border-color: var(--nexus-card-hover-border) !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ── Exam Readiness Widget Card ── */
+        .readiness-container {
+            background: var(--nexus-card-bg) !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-radius: 16px;
+            padding: 20px 24px;
+            margin-bottom: 18px;
+            backdrop-filter: blur(14px) saturate(170%) !important;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        .readiness-score-big {
+            font-family: 'Outfit', sans-serif !important;
+            font-size: 3.2rem;
+            font-weight: 800;
+            line-height: 1;
+            background: linear-gradient(135deg, #38BDF8 0%, #F97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* ── Global Search Hit Card ── */
+        .search-hit-box {
+            background: var(--nexus-card-bg) !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .search-hit-box:hover {
+            border-color: #38BDF8 !important;
+            background: rgba(56, 189, 248, 0.08) !important;
+        }
+
         .nexus-card {
             background: var(--nexus-card-bg) !important;
             border: 1px solid var(--nexus-card-border) !important;

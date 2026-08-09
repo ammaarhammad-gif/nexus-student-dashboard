@@ -1668,7 +1668,9 @@ def reset_all_data(user_id: int):
             tables = [
                 "topic_progress", "term_chapters", "subtopics", "topics",
                 "chapters", "subjects", "terms", "goals", "study_sessions",
-                "revisions", "achievements", "daily_plans", "settings"
+                "revisions", "achievements", "daily_plans", "mistakes",
+                "notes", "formulas", "quizzes", "quiz_attempts",
+                "recall_responses", "user_xp_events", "settings"
             ]
             for table in tables:
                 cursor.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
@@ -1679,4 +1681,965 @@ def reset_all_data(user_id: int):
         raise
     finally:
         conn.close()
+
+
+# ══════════════════════════════════════════════
+# GLOBAL NEXUS SEARCH ENGINE (Phase 2)
+# ══════════════════════════════════════════════
+
+@st.cache_data(ttl=10, show_spinner=False)
+def global_nexus_search(user_id: int, query: str) -> dict:
+    """
+    Performs a fast, case-insensitive global search across 8 student entities:
+    Subjects, Chapters, Topics, Notes, Mistakes, Exams/Terms, Daily Tasks, and Goals.
+    """
+    if not query or len(query.strip()) < 2:
+        return {}
+    
+    term = f"%{query.strip().lower()}%"
+    conn = get_connection()
+    results = {
+        "topics": [],
+        "chapters": [],
+        "subjects": [],
+        "notes": [],
+        "mistakes": [],
+        "exams": [],
+        "tasks": [],
+        "goals": []
+    }
+    
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # 1. Search Topics
+            cursor.execute("""
+                SELECT t.id, t.name as topic_name, c.name as chapter_name, s.name as subject_name,
+                       COALESCE(tp.status, 'Not Started') as status,
+                       COALESCE(tp.understanding, 3) as understanding
+                FROM topics t
+                JOIN chapters c ON t.chapter_id = c.id
+                JOIN subjects s ON c.subject_id = s.id
+                LEFT JOIN topic_progress tp ON tp.user_id = %s AND tp.item_type = 'topic' AND tp.item_id = t.id
+                WHERE t.user_id = %s AND LOWER(t.name) LIKE %s
+                ORDER BY s.name, c.name, t.name
+                LIMIT 10
+            """, (user_id, user_id, term))
+            for row in cursor.fetchall():
+                results["topics"].append(dict(row))
+
+            # 2. Search Chapters
+            cursor.execute("""
+                SELECT c.id, c.name as chapter_name, s.name as subject_name
+                FROM chapters c
+                JOIN subjects s ON c.subject_id = s.id
+                WHERE c.user_id = %s AND LOWER(c.name) LIKE %s
+                ORDER BY s.name, c.name
+                LIMIT 10
+            """, (user_id, term))
+            for row in cursor.fetchall():
+                results["chapters"].append(dict(row))
+
+            # 3. Search Subjects
+            cursor.execute("""
+                SELECT id, name as subject_name, color
+                FROM subjects
+                WHERE user_id = %s AND LOWER(name) LIKE %s
+                ORDER BY name
+                LIMIT 5
+            """, (user_id, term))
+            for row in cursor.fetchall():
+                results["subjects"].append(dict(row))
+
+            # 4. Search Notes
+            cursor.execute("""
+                SELECT n.id, n.title, n.tags, t.name as topic_name, s.name as subject_name
+                FROM notes n
+                LEFT JOIN topics t ON n.topic_id = t.id
+                LEFT JOIN subjects s ON n.subject_id = s.id
+                WHERE n.user_id = %s AND (LOWER(n.title) LIKE %s OR LOWER(n.content) LIKE %s OR LOWER(n.tags) LIKE %s)
+                ORDER BY n.updated_at DESC
+                LIMIT 8
+            """, (user_id, term, term, term))
+            for row in cursor.fetchall():
+                results["notes"].append(dict(row))
+
+            # 5. Search Mistakes
+            cursor.execute("""
+                SELECT m.id, m.question, m.mistake_type, m.explanation, s.name as subject_name
+                FROM mistakes m
+                LEFT JOIN subjects s ON m.subject_id = s.id
+                WHERE m.user_id = %s AND (LOWER(m.question) LIKE %s OR LOWER(m.explanation) LIKE %s OR LOWER(m.mistake_type) LIKE %s)
+                ORDER BY m.created_at DESC
+                LIMIT 8
+            """, (user_id, term, term, term))
+            for row in cursor.fetchall():
+                results["mistakes"].append(dict(row))
+
+            # 6. Search Exams / Terms
+            cursor.execute("""
+                SELECT id, name as exam_name, exam_date, is_already_done
+                FROM terms
+                WHERE user_id = %s AND LOWER(name) LIKE %s
+                ORDER BY exam_date ASC
+                LIMIT 5
+            """, (user_id, term))
+            for row in cursor.fetchall():
+                results["exams"].append(dict(row))
+
+            # 7. Search Daily Tasks
+            cursor.execute("""
+                SELECT dp.id, dp.description, dp.plan_date, dp.is_completed, s.name as subject_name
+                FROM daily_plans dp
+                LEFT JOIN subjects s ON dp.subject_id = s.id
+                WHERE dp.user_id = %s AND LOWER(dp.description) LIKE %s
+                ORDER BY dp.plan_date DESC
+                LIMIT 8
+            """, (user_id, term))
+            for row in cursor.fetchall():
+                results["tasks"].append(dict(row))
+
+            # 8. Search Goals
+            cursor.execute("""
+                SELECT id, title, goal_type, target, progress, is_completed
+                FROM goals
+                WHERE user_id = %s AND LOWER(title) LIKE %s
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (user_id, term))
+            for row in cursor.fetchall():
+                results["goals"].append(dict(row))
+
+            return results
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# SMART PRIORITY ENGINE (Phase 3)
+# ══════════════════════════════════════════════
+
+def get_top_nexus_priorities(user_id: int, limit: int = 8) -> list:
+    """
+    Calculates dynamic priority score (0-100) for all unfinished or weak topics.
+    Considers: Exam proximity (days left), Understanding rating (1-5),
+    Topic completion status, Overdue revisions, and Topic importance/difficulty.
+    Returns categorized items: 🔴 Critical (>=70), 🟠 High (50-69), 🟡 Medium (30-49), 🟢 Low (<30).
+    """
+    import datetime
+    today = datetime.date.today()
+    
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # Fetch active upcoming exams and their chapter mappings
+            cursor.execute("""
+                SELECT t.id as term_id, t.name as term_name, t.exam_date, tc.chapter_id
+                FROM terms t
+                JOIN term_chapters tc ON t.id = tc.term_id
+                WHERE t.user_id = %s AND t.is_already_done = 0 AND t.exam_date IS NOT NULL AND t.exam_date != ''
+            """, (user_id,))
+            term_rows = cursor.fetchall()
+            
+            # Map chapter_id -> minimum days until exam
+            chapter_exam_proximity = {}
+            for r in term_rows:
+                try:
+                    ex_date = datetime.datetime.strptime(r["exam_date"], "%Y-%m-%d").date()
+                    days_left = (ex_date - today).days
+                    if days_left >= 0:
+                        chap_id = r["chapter_id"]
+                        if chap_id not in chapter_exam_proximity or days_left < chapter_exam_proximity[chap_id]["days"]:
+                            chapter_exam_proximity[chap_id] = {
+                                "days": days_left,
+                                "term_name": r["term_name"],
+                                "date": r["exam_date"]
+                            }
+                except Exception:
+                    pass
+
+            # Fetch all topics with their status, understanding, and overdue revisions
+            cursor.execute("""
+                SELECT t.id as topic_id, t.name as topic_name, c.id as chapter_id, c.name as chapter_name,
+                       s.id as subject_id, s.name as subject_name, s.color as subject_color,
+                       COALESCE(tp.status, 'Not Started') as status,
+                       COALESCE(tp.understanding, 3) as understanding,
+                       COALESCE(tp.is_important, 0) as is_important,
+                       COALESCE(tp.is_difficult, 0) as is_difficult,
+                       COALESCE(tp.needs_practice, 0) as needs_practice,
+                       (SELECT COUNT(*) FROM revisions r WHERE r.user_id = %s AND r.item_id = t.id AND r.is_completed = 0 AND r.due_date <= %s) as overdue_revisions
+                FROM topics t
+                JOIN chapters c ON t.chapter_id = c.id
+                JOIN subjects s ON c.subject_id = s.id
+                LEFT JOIN topic_progress tp ON tp.user_id = %s AND tp.item_type = 'topic' AND tp.item_id = t.id
+                WHERE t.user_id = %s
+            """, (user_id, today.strftime("%Y-%m-%d"), user_id, user_id))
+            
+            topic_rows = cursor.fetchall()
+            prioritized_list = []
+            
+            for row in topic_rows:
+                topic_id = row["topic_id"]
+                chap_id = row["chapter_id"]
+                status = row["status"]
+                understanding = row["understanding"]
+                is_important = row["is_important"]
+                is_difficult = row["is_difficult"]
+                needs_practice = row["needs_practice"]
+                overdue_revs = row["overdue_revisions"]
+                
+                # Priority Score Algorithm (0 to 100)
+                score = 0
+                reasons = []
+                
+                # Factor 1: Topic status
+                if status == "Not Started":
+                    score += 30
+                    reasons.append("Topic not started")
+                elif status == "In Progress":
+                    score += 20
+                    reasons.append("Study in progress")
+                elif status == "Completed" and understanding <= 2:
+                    score += 15
+                    reasons.append("Low understanding")
+                
+                # Factor 2: Understanding rating (Lower understanding = Higher urgency)
+                if understanding == 1:
+                    score += 35
+                    reasons.append("Critical understanding rating (1/5)")
+                elif understanding == 2:
+                    score += 25
+                    reasons.append("Weak understanding (2/5)")
+                elif understanding == 3 and status != "Completed":
+                    score += 10
+                
+                # Factor 3: Exam Proximity
+                exam_info = chapter_exam_proximity.get(chap_id)
+                if exam_info:
+                    days_left = exam_info["days"]
+                    if days_left <= 3:
+                        score += 45
+                        reasons.append(f"Exam in {days_left}d ({exam_info['term_name']})")
+                    elif days_left <= 7:
+                        score += 35
+                        reasons.append(f"Exam in {days_left}d ({exam_info['term_name']})")
+                    elif days_left <= 14:
+                        score += 25
+                        reasons.append(f"Exam in {days_left}d")
+                    elif days_left <= 30:
+                        score += 15
+                        reasons.append(f"Upcoming exam ({days_left}d)")
+                
+                # Factor 4: Overdue revisions
+                if overdue_revs > 0:
+                    score += 25
+                    reasons.append(f"{overdue_revs} revision(s) overdue")
+                
+                # Factor 5: Importance & Difficulty flags
+                if is_important:
+                    score += 15
+                    reasons.append("Marked High Importance")
+                if is_difficult:
+                    score += 12
+                    reasons.append("Marked Difficult")
+                if needs_practice:
+                    score += 10
+                    reasons.append("Practice needed")
+                
+                # Cap score at 100
+                score = min(100, score)
+                
+                # Only include topics that need student attention (score >= 25 or incomplete or low understanding)
+                if score >= 25 or status != "Completed" or overdue_revs > 0 or understanding <= 2:
+                    # Categorize
+                    if score >= 70:
+                        tier = "Critical"
+                        badge_color = "#EF4444"
+                        tier_icon = "🔴"
+                    elif score >= 50:
+                        tier = "High"
+                        badge_color = "#F97316"
+                        tier_icon = "🟠"
+                    elif score >= 30:
+                        tier = "Medium"
+                        badge_color = "#EAB308"
+                        tier_icon = "🟡"
+                    else:
+                        tier = "Low"
+                        badge_color = "#22C55E"
+                        tier_icon = "🟢"
+                        
+                    prioritized_list.append({
+                        "topic_id": topic_id,
+                        "topic_name": row["topic_name"],
+                        "chapter_id": chap_id,
+                        "chapter_name": row["chapter_name"],
+                        "subject_id": row["subject_id"],
+                        "subject_name": row["subject_name"],
+                        "subject_color": row["subject_color"],
+                        "status": status,
+                        "understanding": understanding,
+                        "score": score,
+                        "tier": tier,
+                        "tier_icon": tier_icon,
+                        "badge_color": badge_color,
+                        "reasons": reasons[:3],
+                        "exam_info": exam_info
+                    })
+            
+            # Sort descending by priority score
+            prioritized_list.sort(key=lambda x: x["score"], reverse=True)
+            return prioritized_list[:limit]
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# ADAPTIVE SPACED REPETITION ENGINE (Phase 5)
+# ══════════════════════════════════════════════
+
+def schedule_adaptive_revisions(user_id: int, item_type: str, item_id: int, understanding: int = 3):
+    """
+    Schedules future revision sessions for a completed topic.
+    Adaptive Intervals based on understanding rating (1 to 5):
+    - Understanding 1-2 (Weak): Review in 1d, 3d, 7d
+    - Understanding 3 (Moderate): Review in 2d, 5d, 10d, 21d
+    - Understanding 4-5 (Strong): Review in 3d, 7d, 14d, 30d
+    """
+    import datetime
+    today = datetime.date.today()
+    
+    if understanding <= 2:
+        intervals = [1, 3, 7]
+    elif understanding == 3:
+        intervals = [2, 5, 10, 21]
+    else:
+        intervals = [3, 7, 14, 30]
+        
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Delete any incomplete old revisions for this item
+            cursor.execute("""
+                DELETE FROM revisions 
+                WHERE user_id = %s AND item_type = %s AND item_id = %s AND is_completed = 0
+            """, (user_id, item_type, item_id))
+            
+            for step, days in enumerate(intervals, 1):
+                due = today + datetime.timedelta(days=days)
+                cursor.execute("""
+                    INSERT INTO revisions (user_id, item_type, item_id, due_date, interval_days, interval_number, is_completed)
+                    VALUES (%s, %s, %s, %s, %s, %s, 0)
+                """, (user_id, item_type, item_id, due.strftime("%Y-%m-%d"), days, step))
+                
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def get_revision_queue(user_id: int) -> dict:
+    """
+    Returns the student's revision queue categorized into:
+    - Overdue (due < today)
+    - Due Today (due == today)
+    - Due This Week (today < due <= today + 7d)
+    - Upcoming (due > today + 7d)
+    - Recent Completed
+    """
+    import datetime
+    today = datetime.date.today()
+    today_str = today.strftime("%Y-%m-%d")
+    week_str = (today + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    conn = get_connection()
+    queue = {
+        "overdue": [],
+        "due_today": [],
+        "due_this_week": [],
+        "upcoming": [],
+        "recent_completed": []
+    }
+    
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT r.id, r.item_type, r.item_id, r.due_date, r.interval_days, r.interval_number,
+                       r.is_completed, r.completed_at,
+                       t.name as topic_name, c.name as chapter_name, s.name as subject_name, s.color as subject_color,
+                       COALESCE(tp.understanding, 3) as understanding
+                FROM revisions r
+                JOIN topics t ON r.item_type = 'topic' AND r.item_id = t.id
+                JOIN chapters c ON t.chapter_id = c.id
+                JOIN subjects s ON c.subject_id = s.id
+                LEFT JOIN topic_progress tp ON tp.user_id = %s AND tp.item_type = 'topic' AND tp.item_id = t.id
+                WHERE r.user_id = %s
+                ORDER BY r.due_date ASC, s.name ASC
+            """, (user_id, user_id))
+            
+            for row in cursor.fetchall():
+                item = dict(row)
+                due_date_str = item["due_date"]
+                is_done = item["is_completed"] == 1
+                
+                if is_done:
+                    if len(queue["recent_completed"]) < 10:
+                        queue["recent_completed"].append(item)
+                else:
+                    if due_date_str < today_str:
+                        queue["overdue"].append(item)
+                    elif due_date_str == today_str:
+                        queue["due_today"].append(item)
+                    elif due_date_str <= week_str:
+                        queue["due_this_week"].append(item)
+                    else:
+                        queue["upcoming"].append(item)
+                        
+            return queue
+    finally:
+        conn.close()
+
+
+def complete_adaptive_revision(user_id: int, revision_id: int, new_understanding: int = None):
+    """Marks a revision as completed, updates topic progress & awards XP."""
+    import datetime
+    today = datetime.date.today()
+    today_str = today.strftime("%Y-%m-%d")
+    
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # Fetch revision details
+            cursor.execute("SELECT * FROM revisions WHERE id = %s AND user_id = %s", (revision_id, user_id))
+            rev = cursor.fetchone()
+            if not rev:
+                return
+            
+            # Mark revision completed
+            cursor.execute("""
+                UPDATE revisions SET is_completed = 1, completed_at = %s
+                WHERE id = %s AND user_id = %s
+            """, (today_str, revision_id, user_id))
+            
+            item_type = rev["item_type"]
+            item_id = rev["item_id"]
+            
+            # Update topic progress last_revised_at and status
+            if new_understanding is not None:
+                cursor.execute("""
+                    UPDATE topic_progress 
+                    SET status = 'Revision Done', understanding = %s, last_revised_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = %s AND item_type = %s AND item_id = %s
+                """, (new_understanding, user_id, item_type, item_id))
+            else:
+                cursor.execute("""
+                    UPDATE topic_progress 
+                    SET status = 'Revision Done', last_revised_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = %s AND item_type = %s AND item_id = %s
+                """, (user_id, item_type, item_id))
+                
+            conn.commit()
+            st.cache_data.clear()
+            
+            # Award +50 XP for revision
+            award_user_xp(user_id, "revision_completed", 50, f"Completed revision #{rev.get('interval_number', 1)}")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# EXAM READINESS SCORE ENGINE (Phase 6)
+# ══════════════════════════════════════════════
+
+@st.cache_data(ttl=20, show_spinner=False)
+def calculate_exam_readiness_score(user_id: int) -> dict:
+    """
+    Calculates composite Exam Readiness Score (0-100) using 4 core metrics:
+    - Syllabus Completion (35% weight)
+    - Understanding Index (30% weight)
+    - Revision Completion (20% weight)
+    - Practice & Weak Area Coverage (15% weight)
+    Includes dynamic actionable recommendations ("What should I do next?").
+    """
+    stats = get_overall_stats(user_id)
+    total_topics = stats.get("total_topics", 0)
+    completed_topics = stats.get("completed_topics", 0)
+    avg_understanding = stats.get("avg_understanding", 3.0)
+    
+    # 1. Syllabus Completion Component (0-100)
+    syllabus_pct = (completed_topics / total_topics * 100) if total_topics > 0 else 0.0
+    
+    # 2. Understanding Component (0-100) -> mapped from (1-5) scale
+    understanding_pct = min(100.0, max(0.0, ((avg_understanding - 1) / 4.0) * 100)) if total_topics > 0 else 0.0
+    
+    # 3. Revision Completion Component
+    queue = get_revision_queue(user_id)
+    overdue_count = len(queue.get("overdue", []))
+    due_today_count = len(queue.get("due_today", []))
+    completed_revs = len(queue.get("recent_completed", []))
+    total_revs = overdue_count + due_today_count + completed_revs
+    if total_revs > 0:
+        revision_pct = max(0.0, (completed_revs / total_revs) * 100.0)
+    else:
+        revision_pct = 75.0 if completed_topics > 0 else 0.0
+        
+    # 4. Practice & Consistency Component
+    priorities = get_top_nexus_priorities(user_id, limit=5)
+    critical_count = sum(1 for p in priorities if p["tier"] == "Critical")
+    practice_pct = max(20.0, 100.0 - (critical_count * 18.0)) if total_topics > 0 else 0.0
+    
+    # Weighted Composite Readiness Score (0-100)
+    readiness_score = int(round(
+        (syllabus_pct * 0.35) +
+        (understanding_pct * 0.30) +
+        (revision_pct * 0.20) +
+        (practice_pct * 0.15)
+    ))
+    readiness_score = max(0, min(100, readiness_score))
+    
+    # Dynamic Actionable Recommendations ("What Should I Do Next?")
+    recommendations = []
+    if overdue_count > 0:
+        recommendations.append(f"⚠️ Clear your {overdue_count} overdue revision(s) in the Revision Queue.")
+    if critical_count > 0:
+        top_crit = priorities[0]
+        recommendations.append(f"🔴 Study critical topic: **{top_crit['subject_name']} → {top_crit['topic_name']}**.")
+    if avg_understanding < 3.5 and completed_topics > 0:
+        recommendations.append("🧠 Strengthen weak concepts with low understanding ratings.")
+    if syllabus_pct < 60:
+        recommendations.append("📚 Complete remaining foundational chapters to boost coverage.")
+    if len(recommendations) < 3:
+        recommendations.append("⏱️ Start a 25-minute Nexus Focus session to build your study streak.")
+        
+    return {
+        "readiness_score": readiness_score,
+        "syllabus_pct": round(syllabus_pct, 1),
+        "understanding_pct": round(understanding_pct, 1),
+        "revision_pct": round(revision_pct, 1),
+        "practice_pct": round(practice_pct, 1),
+        "overdue_count": overdue_count,
+        "critical_count": critical_count,
+        "recommendations": recommendations[:3]
+    }
+
+
+# ══════════════════════════════════════════════
+# NEXUS MISTAKE VAULT (Phase 7)
+# ══════════════════════════════════════════════
+
+def add_mistake(user_id: int, question: str, mistake_type: str, subject_id: int = None,
+                chapter_id: int = None, topic_id: int = None, your_answer: str = "",
+                correct_answer: str = "", explanation: str = "", prevention_strategy: str = "") -> int:
+    """Adds a new recorded mistake into the student's Mistake Vault."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO mistakes (user_id, subject_id, chapter_id, topic_id, question, your_answer,
+                                      correct_answer, mistake_type, explanation, prevention_strategy)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (user_id, subject_id, chapter_id, topic_id, question.strip(), your_answer.strip(),
+                  correct_answer.strip(), mistake_type, explanation.strip(), prevention_strategy.strip()))
+            mistake_id = cursor.fetchone()[0]
+            conn.commit()
+            st.cache_data.clear()
+            award_user_xp(user_id, "logged_mistake", 20, "Logged mistake in Vault")
+            return mistake_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def get_all_mistakes(user_id: int, subject_id: int = None, mistake_type: str = None) -> list:
+    """Retrieves mistakes with optional subject and type filtering."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            query = """
+                SELECT m.*, s.name as subject_name, s.color as subject_color, c.name as chapter_name, t.name as topic_name
+                FROM mistakes m
+                LEFT JOIN subjects s ON m.subject_id = s.id
+                LEFT JOIN chapters c ON m.chapter_id = c.id
+                LEFT JOIN topics t ON m.topic_id = t.id
+                WHERE m.user_id = %s
+            """
+            params = [user_id]
+            if subject_id:
+                query += " AND m.subject_id = %s"
+                params.append(subject_id)
+            if mistake_type and mistake_type != "All":
+                query += " AND m.mistake_type = %s"
+                params.append(mistake_type)
+            query += " ORDER BY m.created_at DESC"
+            
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_mistake_analytics(user_id: int) -> dict:
+    """Computes distribution and percentage breakdown of mistake types."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT mistake_type, COUNT(*) as count
+                FROM mistakes
+                WHERE user_id = %s
+                GROUP BY mistake_type
+                ORDER BY count DESC
+            """, (user_id,))
+            rows = cursor.fetchall()
+            total = sum(r["count"] for r in rows)
+            breakdown = []
+            for r in rows:
+                pct = round((r["count"] / total * 100), 1) if total > 0 else 0
+                breakdown.append({
+                    "type": r["mistake_type"],
+                    "count": r["count"],
+                    "pct": pct
+                })
+            return {"total": total, "breakdown": breakdown}
+    finally:
+        conn.close()
+
+
+def toggle_mistake_reviewed(user_id: int, mistake_id: int, is_reviewed: int):
+    """Toggles reviewed status of a mistake."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE mistakes SET is_reviewed = %s WHERE id = %s AND user_id = %s", (is_reviewed, mistake_id, user_id))
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def delete_mistake(user_id: int, mistake_id: int):
+    """Deletes a mistake from the vault."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM mistakes WHERE id = %s AND user_id = %s", (mistake_id, user_id))
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# NEXUS NOTES SYSTEM (Phase 12)
+# ══════════════════════════════════════════════
+
+def add_note(user_id: int, subject_id: int, chapter_id: int, topic_id: int,
+             title: str, content: str, tags: str = "", is_pinned: int = 0) -> int:
+    """Creates a new rich note linked to a subject, chapter, and topic."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO notes (user_id, subject_id, chapter_id, topic_id, title, content, tags, is_pinned)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (user_id, subject_id, chapter_id, topic_id, title.strip(), content.strip(), tags.strip(), is_pinned))
+            note_id = cursor.fetchone()[0]
+            conn.commit()
+            st.cache_data.clear()
+            award_user_xp(user_id, "created_note", 25, f"Created note: {title}")
+            return note_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def get_all_notes(user_id: int, subject_id: int = None, topic_id: int = None) -> list:
+    """Retrieves all notes with optional subject or topic filters."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            query = """
+                SELECT n.*, s.name as subject_name, s.color as subject_color, c.name as chapter_name, t.name as topic_name
+                FROM notes n
+                JOIN subjects s ON n.subject_id = s.id
+                JOIN chapters c ON n.chapter_id = c.id
+                JOIN topics t ON n.topic_id = t.id
+                WHERE n.user_id = %s
+            """
+            params = [user_id]
+            if subject_id:
+                query += " AND n.subject_id = %s"
+                params.append(subject_id)
+            if topic_id:
+                query += " AND n.topic_id = %s"
+                params.append(topic_id)
+            query += " ORDER BY n.is_pinned DESC, n.updated_at DESC"
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def delete_note(user_id: int, note_id: int):
+    """Deletes a note."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM notes WHERE id = %s AND user_id = %s", (note_id, user_id))
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# FORMULA VAULT (Phase 13)
+# ══════════════════════════════════════════════
+
+def add_formula(user_id: int, subject_id: int, chapter_id: int, title: str,
+                formula_latex: str, topic_id: int = None, description: str = "") -> int:
+    """Adds a mathematical/scientific formula with LaTeX rendering to the vault."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO formulas (user_id, subject_id, chapter_id, topic_id, title, formula_latex, description)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (user_id, subject_id, chapter_id, topic_id, title.strip(), formula_latex.strip(), description.strip()))
+            formula_id = cursor.fetchone()[0]
+            conn.commit()
+            st.cache_data.clear()
+            return formula_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def get_all_formulas(user_id: int, subject_id: int = None) -> list:
+    """Retrieves all formulas with optional subject filtering."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            query = """
+                SELECT f.*, s.name as subject_name, s.color as subject_color, c.name as chapter_name
+                FROM formulas f
+                JOIN subjects s ON f.subject_id = s.id
+                JOIN chapters c ON f.chapter_id = c.id
+                WHERE f.user_id = %s
+            """
+            params = [user_id]
+            if subject_id:
+                query += " AND f.subject_id = %s"
+                params.append(subject_id)
+            query += " ORDER BY f.is_favorite DESC, s.name, c.name, f.title"
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def toggle_formula_favorite(user_id: int, formula_id: int, is_fav: int):
+    """Toggles favorite bookmark for a formula."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE formulas SET is_favorite = %s WHERE id = %s AND user_id = %s", (is_fav, formula_id, user_id))
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def delete_formula(user_id: int, formula_id: int):
+    """Deletes a formula from the vault."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM formulas WHERE id = %s AND user_id = %s", (formula_id, user_id))
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# GAMIFICATION & STREAKS (Phase 11)
+# ══════════════════════════════════════════════
+
+def award_user_xp(user_id: int, action_type: str, xp_amount: int, description: str = ""):
+    """Awards XP to a student and recalculates their Nexus Level."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 1. Log XP Event
+            cursor.execute("""
+                INSERT INTO user_xp_events (user_id, action_type, xp_amount, description)
+                VALUES (%s, %s, %s, %s)
+            """, (user_id, action_type, xp_amount, description))
+            
+            # 2. Update User Total XP
+            cursor.execute("""
+                UPDATE users 
+                SET total_xp = COALESCE(total_xp, 0) + %s
+                WHERE id = %s
+                RETURNING total_xp
+            """, (xp_amount, user_id))
+            new_total = cursor.fetchone()[0]
+            
+            # 3. Calculate New Level
+            # Level 1 (0 XP), Level 5 (1000 XP), Level 10 (3000 XP), Level 20 (7500 XP), Level 30 (15000 XP), Level 50 (30000 XP)
+            if new_total >= 30000:
+                level = 50
+            elif new_total >= 15000:
+                level = 30
+            elif new_total >= 7500:
+                level = 20
+            elif new_total >= 3000:
+                level = 10
+            elif new_total >= 1000:
+                level = 5
+            elif new_total >= 300:
+                level = 2
+            else:
+                level = 1
+                
+            cursor.execute("UPDATE users SET nexus_level = %s WHERE id = %s", (level, user_id))
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_user_xp_summary(user_id: int) -> dict:
+    """Returns total XP, current Level, level title, and progress to next level."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("SELECT total_xp, nexus_level, current_streak, longest_streak FROM users WHERE id = %s", (user_id,))
+            row = cursor.fetchone()
+            if not row:
+                return {"total_xp": 0, "level": 1, "title": "Recruit", "streak": 0, "longest_streak": 0}
+            
+            total_xp = row["total_xp"] or 0
+            level = row["nexus_level"] or 1
+            streak = row["current_streak"] or 0
+            longest = row["longest_streak"] or 0
+            
+            if level >= 50:
+                title = "Nexus Elite"
+                next_xp = 50000
+            elif level >= 30:
+                title = "Master Scholar"
+                next_xp = 30000
+            elif level >= 20:
+                title = "Strategist"
+                next_xp = 15000
+            elif level >= 10:
+                title = "Senior Scholar"
+                next_xp = 7500
+            elif level >= 5:
+                title = "Explorer"
+                next_xp = 3000
+            elif level >= 2:
+                title = "Apprentice"
+                next_xp = 1000
+            else:
+                title = "Recruit"
+                next_xp = 300
+                
+            progress_pct = min(100, int((total_xp / next_xp) * 100)) if next_xp > 0 else 100
+            return {
+                "total_xp": total_xp,
+                "level": level,
+                "title": title,
+                "streak": streak,
+                "longest_streak": longest,
+                "next_xp": next_xp,
+                "progress_pct": progress_pct
+            }
+    finally:
+        conn.close()
+
+
+def update_user_streak(user_id: int):
+    """Updates the student's daily study streak."""
+    import datetime
+    today = datetime.date.today()
+    today_str = today.strftime("%Y-%m-%d")
+    yesterday_str = (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("SELECT last_active_date, current_streak, longest_streak FROM users WHERE id = %s", (user_id,))
+            user = cursor.fetchone()
+            if not user:
+                return
+            
+            last_date = user["last_active_date"]
+            curr_streak = user["current_streak"] or 0
+            longest = user["longest_streak"] or 0
+            
+            if last_date == today_str:
+                # Already active today
+                return
+            elif last_date == yesterday_str:
+                # Consecutive day active!
+                new_streak = curr_streak + 1
+            else:
+                # Broken streak, reset to 1
+                new_streak = 1
+                
+            new_longest = max(longest, new_streak)
+            cursor.execute("""
+                UPDATE users 
+                SET last_active_date = %s, current_streak = %s, longest_streak = %s
+                WHERE id = %s
+            """, (today_str, new_streak, new_longest, user_id))
+            conn.commit()
+            st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
