@@ -5,7 +5,7 @@ Automatically populates subjects, chapters, and topics for students so they don'
 have to type anything manually — all they need to do is tick off topics as they study.
 """
 
-from models import add_subject, add_chapter, add_topic, get_subject_by_name, get_chapters_for_subject
+from models import add_subject, add_chapter, add_topic, get_subject_by_name, get_chapters_for_subject, bulk_create_syllabus
 
 # ══════════════════════════════════════════════════════════════════════════════
 # COMPREHENSIVE SYLLABUS DATASTORE FOR CBSE AND ICSE (CLASSES 1 TO 10)
@@ -452,6 +452,67 @@ SYLLABUS_DATA = {
                 {"name": "Unit 3: Library Classes & String Handling", "topics": ["Wrapper Classes: Character, Integer, Double and Methods (isLetter, isDigit, toUpperCase)", "String Class Methods: length(), charAt(), indexOf(), substring(), toUpperCase(), equals(), compareTo(), replace(), trim()", "String Buffer & String Tokenizer Basics", "String Manipulation Algorithms (Reversing, Palindrome, Pig Latin, Word Frequency)"]},
                 {"name": "Unit 4: Arrays & Data Structures", "topics": ["Single Dimensional Arrays (1D): Declaration, Initialization, Input", "Searching Algorithms: Linear Search and Binary Search", "Sorting Algorithms: Bubble Sort and Selection Sort", "Double Dimensional Arrays (2D): Declaration, Row-wise/Column-wise Traversal, Sum of Diagonals"]}
             ]
+        },
+        {
+            "name": "Hindi (हिन्दी)", "color": "#E11D48",
+            "chapters": [
+                {
+                    "name": "Chapter 1: हिन्दी भाषा एवं व्याकरण (Hindi Grammar & Writing)",
+                    "topics": [
+                        "निबन्ध लेखन (प्रस्ताव / Essay Writing - वर्णनात्मक, विचारात्मक, विवरणात्मक)",
+                        "पत्र लेखन (औपचारिक एवं अनौपचारिक पत्र / Formal & Informal Letter)",
+                        "अपठित गद्यांश बोध एवं प्रश्नोत्तर (Unseen Comprehension)",
+                        "व्यावहारिक व्याकरण: विलोम शब्द, पर्यायवाची शब्द, भाववाचक संज्ञा निर्माण",
+                        "विशेषण निर्माण, अनेक शब्दों के लिए एक शब्द, समरूपी भिन्नार्थक शब्द",
+                        "मुहावरे एवं लोकोक्तियाँ: अर्थ एवं वाक्य प्रयोग",
+                        "वाक्य रूपान्तरण (सरल, संयुक्त, मिश्रित), वाच्य परिवर्तन, काल परिवर्तन",
+                        "वाक्य शुद्धिकरण एवं वर्तनी शुद्धि"
+                    ]
+                },
+                {
+                    "name": "Chapter 2: साहित्य सागर (गद्य भाग - कहानियाँ)",
+                    "topics": [
+                        "बात अठन्नी की - सुदर्शन (कथासार, चरित्र-चित्रण व प्रश्नोत्तर)",
+                        "काकी - सियारामशरण गुप्त (कथासार, चरित्र-चित्रण व प्रश्नोत्तर)",
+                        "महायज्ञ का पुरस्कार - यशपाल (कथासार, चरित्र-चित्रण व प्रश्नोत्तर)",
+                        "नेताजी का चश्मा - स्वयं प्रकाश (कथासार, देशप्रेम भाव व प्रश्नोत्तर)",
+                        "अपना-अपना भाग्य - जैनेन्द्र कुमार (कथासार, सामाजिक विषमता व प्रश्नोत्तर)",
+                        "बड़े घर की बेटी - प्रेमचंद (कथासार, संयुक्त परिवार मूल्य व प्रश्नोत्तर)",
+                        "संदेह - जयशंकर प्रसाद (कथासार, मनोविज्ञान व प्रश्नोत्तर)",
+                        "भीड़ में खोया आदमी - लीलाधर शर्मा पर्वतीय (जनसंख्या समस्या व प्रश्नोत्तर)",
+                        "भेड़ें और भेड़िए - हरिशंकर परसाई (व्यंग्य कथासार व राजनीति बोध)",
+                        "दो कलाकार - मन्नू भंडारी (कथासार, चित्रा व अरुणा का चरित्र-चित्रण)"
+                    ]
+                },
+                {
+                    "name": "Chapter 3: साहित्य सागर (पद्य भाग - कविताएँ)",
+                    "topics": [
+                        "साखी - कबीरदास (दोहे, अर्थ, व्याख्या व सन्देश)",
+                        "गिरधर की कुंडलियाँ - गिरधर कविराय (नीतिपरक कुंडलियाँ व व्याख्या)",
+                        "स्वर्ग बना सकते हैं - रामधारी सिंह 'दिनकर' (काव्य भावार्थ व सामाजिक चेतना)",
+                        "वह जन्मभूमि मेरी - सोहनलाल द्विवेदी (देशप्रेम, प्राकृतिक सौंदर्य व व्याख्या)",
+                        "मेघ आए - सर्वेश्वर दयाल सक्सेना (मानवीकरण अलंकार, प्रकृति चित्रण व भावार्थ)",
+                        "सूर के पद - सूरदास (वात्सल्य रस, बाल-लीला व व्याख्या)",
+                        "विनय के पद - तुलसीदास (भक्ति भाव, दीनता व व्याख्या)",
+                        "भिक्षुक - सूर्यकांत त्रिपाठी 'निराला' (करुण रस, यथार्थ चित्रण व व्याख्या)",
+                        "चलना हमारा काम है - शिवमंगल सिंह 'सुमन' (कर्मशीलता, प्रेरणा व व्याख्या)",
+                        "मातृ मंदिर की ओर - सुभद्रा कुमारी चौहान (बलिदान, राष्ट्रप्रेम व व्याख्या)"
+                    ]
+                },
+                {
+                    "name": "Chapter 4: नया रास्ता / एकांकी संचय",
+                    "topics": [
+                        "नया रास्ता - सुषमा अग्रवाल (अध्याय 1 से 12: मीनू का संघर्ष, आत्मनिर्भरता)",
+                        "नया रास्ता - सुषमा अग्रवाल (अध्याय 13 से 26: अमित, दयाराम व सफलता)",
+                        "एकांकी संचय: संस्कार और भावना - विष्णु प्रभाकर",
+                        "एकांकी संचय: बहू की विदा - विनोद रस्तोगी (दहेज प्रथा पर प्रहार)",
+                        "एकांकी संचय: मातृभूमि का मान - पं. हरिकृष्ण 'प्रेमी'",
+                        "एकांकी संचय: सूखी डाली - उपेन्द्रनाथ 'अश्क'",
+                        "एकांकी संचय: महाभारत की एक साँझ - भारतभूषण अग्रवाल",
+                        "एकांकी संचय: दीपदान - डॉ. रामकुमार वर्मा (पन्ना धाय का त्याग)"
+                    ]
+                }
+            ]
         }
     ],
 
@@ -585,27 +646,193 @@ SYLLABUS_DATA = {
         {
             "name": "Mathematics", "color": "#6366F1",
             "chapters": [
-                {"name": "Chapter 1: Knowing Our Numbers", "topics": ["Comparing Numbers", "Large Numbers in Practice", "Indian & International System", "Estimation & Rounding Off"]},
-                {"name": "Chapter 2: Whole Numbers & Playing with Numbers", "topics": ["Properties of Whole Numbers", "Factors & Multiples", "Prime & Composite Numbers", "HCF and LCM"]},
-                {"name": "Chapter 3: Basic Geometrical Ideas & Integers", "topics": ["Points, Lines & Rays", "Angles, Triangles & Quadrilaterals", "Integers on Number Line", "Addition & Subtraction of Integers"]},
-                {"name": "Chapter 4: Fractions, Decimals & Algebra", "topics": ["Types of Fractions", "Decimal Numbers & Conversion", "Introduction to Variables", "Algebraic Equations"]}
+                {"name": "Chapter 1: Knowing Our Numbers", "topics": ["Comparing Numbers (Greatest and Smallest)", "Making Large Numbers & Shift Digits", "Indian & International System of Numeration", "Large Numbers in Practice (Units of length, mass, capacity)", "Estimation & Rounding Off to nearest 10, 100, 1000", "Roman Numerals up to 1000"]},
+                {"name": "Chapter 2: Whole Numbers", "topics": ["Predecessor and Successor", "Representation of Whole Numbers on Number Line", "Addition, Subtraction & Multiplication on Number Line", "Properties of Whole Numbers (Closure, Commutative, Associative, Distributive)", "Identity for Addition and Multiplication", "Patterns in Whole Numbers"]},
+                {"name": "Chapter 3: Playing with Numbers", "topics": ["Factors and Multiples & Perfect Numbers", "Prime and Composite Numbers (Sieve of Eratosthenes)", "Tests for Divisibility of Numbers (2, 3, 4, 5, 6, 8, 9, 10, 11)", "Common Factors and Common Multiples & Co-prime Numbers", "Prime Factorisation & Factor Tree Method", "Highest Common Factor (HCF) by Prime Factorisation & Division", "Lowest Common Multiple (LCM) & Real Life Word Problems"]},
+                {"name": "Chapter 4: Basic Geometrical Ideas", "topics": ["Points, Line Segment, Line and Ray", "Intersecting Lines and Parallel Lines", "Curves: Open and Closed Curves, Polygons", "Angles: Vertex, Arms, Interior and Exterior", "Triangles: Vertices, Sides, Angles", "Quadrilaterals: Adjacent and Opposite Sides/Angles", "Circles: Radius, Diameter, Chord, Arc, Sector, Segment, Circumference"]},
+                {"name": "Chapter 5: Understanding Elementary Shapes", "topics": ["Measuring Line Segments (Comparison by Ruler and Divider)", "Angles: Right, Straight, Complete, Acute, Obtuse and Reflex", "Measuring Angles with Protractor & Perpendicular Lines", "Classification of Triangles (by Sides and by Angles)", "Quadrilaterals: Trapezium, Parallelogram, Rectangle, Rhombus, Square", "Polygons (Pentagon, Hexagon, Octagon)", "Three Dimensional 3D Shapes (Cube, Cuboid, Cylinder, Cone, Sphere, Prism, Pyramid)"]},
+                {"name": "Chapter 6: Integers", "topics": ["Concept of Positive and Negative Numbers in Daily Life", "Representation of Integers on the Number Line", "Ordering and Comparison of Integers", "Addition of Integers using Number Line and Rules", "Subtraction of Integers with Number Line and Additive Inverse"]},
+                {"name": "Chapter 7: Fractions", "topics": ["Fraction as Part of a Whole & Part of a Collection", "Representation of Fractions on Number Line", "Proper Fractions, Improper Fractions & Mixed Fractions", "Equivalent Fractions (Simplest Form / Lowest Terms)", "Like and Unlike Fractions & Comparing Fractions", "Addition and Subtraction of Like and Unlike Fractions"]},
+                {"name": "Chapter 8: Decimals", "topics": ["Tenths and Hundredths Concept", "Decimals on Number Line & Place Value Chart", "Converting Fractions to Decimals and Decimals to Fractions", "Comparing Decimals", "Using Decimals in Money, Length and Weight", "Addition and Subtraction of Numbers with Decimals"]},
+                {"name": "Chapter 9: Data Handling", "topics": ["Recording and Organizing Data using Tally Marks", "Pictograph: Reading and Interpretation", "Drawing Pictographs using Suitable Scale", "Bar Graph: Reading and Interpreting Horizontal/Vertical Bar Graphs", "Drawing Bar Graphs from Given Data"]},
+                {"name": "Chapter 10: Mensuration", "topics": ["Perimeter of Closed Figures", "Perimeter of Rectangle and Square (Formulas)", "Perimeter of Regular Polygons (Equilateral Triangle, Regular Hexagon)", "Area Concept & Counting Squares on Grid Paper", "Area of Rectangle and Area of Square"]},
+                {"name": "Chapter 11: Algebra", "topics": ["Introduction to Variables using Matchstick Patterns", "Idea of Variable and Algebraic Expressions", "Forming Expressions with Operations (+, -, ×, ÷)", "Translating Word Statements into Algebraic Expressions", "Concept of an Equation (LHS = RHS)", "Solving Equations by Trial and Error Method"]},
+                {"name": "Chapter 12: Ratio and Proportion", "topics": ["Concept of Ratio & Simplest Form", "Equivalent Ratios and Comparison", "Concept of Proportion and Extreme/Middle Terms", "Unitary Method: Direct Variation and Word Problems"]}
             ]
         },
         {
             "name": "Science", "color": "#06B6D4",
             "chapters": [
-                {"name": "Chapter 1: Components of Food", "topics": ["Carbohydrates, Proteins, Fats", "Vitamins & Minerals", "Balanced Diet", "Deficiency Diseases"]},
-                {"name": "Chapter 2: Sorting Materials into Groups", "topics": ["Appearance & Hardness", "Solubility in Water", "Transparency, Translucency & Opacity", "Floatation"]},
-                {"name": "Chapter 3: Separation of Substances", "topics": ["Handpicking, Threshing, Winnowing", "Sieving & Magnetic Separation", "Sedimentation, Decantation & Filtration", "Evaporation & Saturation"]},
-                {"name": "Chapter 4: Getting to Know Plants & Body Movements", "topics": ["Herbs, Shrubs, Trees", "Root System & Shoot System", "Leaf Structure & Transpiration", "Human Skeleton & Joints"]}
+                {"name": "Chapter 1: Components of Food", "topics": ["Major Nutrients: Carbohydrates, Proteins, Fats, Vitamins, Minerals", "Testing for Starch, Protein and Fat in Food Samples", "Dietary Fibres (Roughage) and Water in Digestion", "Balanced Diet across Different Age Groups", "Deficiency Diseases (Scurvy, Beriberi, Rickets, Anaemia, Goitre, Marasmus, Kwashiorkor)"]},
+                {"name": "Chapter 2: Sorting Materials into Groups", "topics": ["Objects Around Us and Materials Used", "Properties of Materials: Lustre / Appearance", "Hardness: Hard vs Soft Materials", "Solubility: Soluble and Insoluble Substances in Water", "Floatation: Objects that Float or Sink in Water", "Transparency: Transparent, Opaque and Translucent Objects"]},
+                {"name": "Chapter 3: Separation of Substances", "topics": ["Need for Separation of Substances", "Handpicking, Threshing and Winnowing", "Sieving and Magnetic Separation", "Sedimentation, Decantation and Filtration", "Evaporation and Condensation (Obtaining Common Salt)", "Saturated Solutions and Effect of Temperature on Solubility"]},
+                {"name": "Chapter 4: Getting to Know Plants", "topics": ["Classification of Plants: Herbs, Shrubs, Trees, Climbers, Creepers", "Stem: Functions and Conduction of Water/Minerals", "Leaf: Petiole, Lamina, Venation (Reticulate vs Parallel)", "Transpiration and Photosynthesis in Leaves", "Roots: Tap Root vs Fibrous Root, Functions of Roots", "Flower: Sepals, Petals, Stamens (Anther, Filament), Pistil (Stigma, Style, Ovary, Ovules)"]},
+                {"name": "Chapter 5: Body Movements", "topics": ["Human Skeleton: Functions, Skull, Backbone, Ribcage, Shoulder and Pelvic Bones", "Cartilage and Muscles (Contraction and Relaxation)", "Types of Joints: Ball and Socket, Hinge, Pivotal, Fixed Joints", "Gait of Animals: Earthworm (Bristles & Muscular Contraction)", "Gait of Animals: Snail, Cockroach, Birds (Streamlined Body & Hollow Bones)", "Gait of Animals: Fish (Fins & Streamlined Shape) and Snakes (Slithering Loops)"]},
+                {"name": "Chapter 6: The Living Organisms — Characteristics & Habitats", "topics": ["Organisms and Their Surroundings", "Biotic and Abiotic Components of Environment", "Adaptations in Terrestrial Habitats (Deserts - Camel & Cactus, Mountains - Yak & Pine, Grasslands - Lion & Deer)", "Adaptations in Aquatic Habitats (Oceans, Ponds and Lakes - Water Lily)", "Characteristics of Living Organisms (Nutrition, Respiration, Growth, Excretion, Stimuli Response, Reproduction, Movement)"]},
+                {"name": "Chapter 7: Motion and Measurement of Distances", "topics": ["Story of Transport (Ancient to Modern)", "Standard Units of Measurement and SI Unit (Metre)", "Correct Measurement of Length using Ruler & Avoiding Parallax Error", "Measuring the Length of a Curved Line using Thread", "Types of Motion: Rectilinear Motion, Circular Motion, Periodic Motion, Rotational Motion"]},
+                {"name": "Chapter 8: Light, Shadows and Reflections", "topics": ["Luminous and Non-luminous Objects", "Opaque, Transparent and Translucent Objects in Light", "Formation and Characteristics of Shadows", "Pinhole Camera: Construction, Working and Image Formation", "Mirrors and Reflection of Light (Periscope Application)"]},
+                {"name": "Chapter 9: Electricity and Circuits", "topics": ["Electric Cell: Terminals (+ and -) and Chemical Energy", "Electric Bulb: Filament and Terminals", "Electric Circuit: Closed Circuit vs Open Circuit, Direction of Current Flow", "Electric Switch: Making and Working in Circuit", "Electric Conductors and Insulators (Safety Precautions)"]},
+                {"name": "Chapter 10: Fun with Magnets", "topics": ["Discovery of Magnets (Magnes the Shepherd)", "Magnetic and Non-Magnetic Materials", "Poles of a Magnet (North Pole and South Pole)", "Finding Directions with a Freely Suspended Magnetic Needle / Compass", "Making Your Own Magnet (Single Touch Method)", "Attraction and Repulsion Between Magnetic Poles", "Care and Storage of Magnets (Keepers)"]},
+                {"name": "Chapter 11: Air Around Us", "topics": ["Presence of Air Everywhere & Wind", "Composition of Air: Nitrogen, Oxygen, Carbon Dioxide, Water Vapour, Dust and Smoke", "Availability of Oxygen to Animals and Plants in Water and Soil", "How Oxygen in Atmosphere is Replaced (Balance by Photosynthesis and Respiration)", "Importance of Atmosphere and Uses of Windmill"]}
             ]
         },
         {
-            "name": "Social Science", "color": "#F59E0B",
+            "name": "Social Science - History (Our Pasts - I)", "color": "#F59E0B",
             "chapters": [
-                {"name": "History: What, Where, How and When?", "topics": ["Finding Out What Happened", "Where Did People Live?", "Names of the Land", "Dates & Manuscripts"]},
-                {"name": "Geography: The Earth in the Solar System", "topics": ["Celestial Bodies & Stars", "The Solar System & Planets", "Earth & Moon", "Asteroids & Meteoroids"]},
-                {"name": "Civics: Understanding Diversity", "topics": ["Concept of Diversity", "Diversity in India", "Unity in Diversity", "Inequality vs Diversity"]}
+                {"name": "Chapter 1: What, Where, How and When?", "topics": ["Finding Out What Happened in the Past", "Where Did Early People Live (Narmada, Sulaiman, Kirthar, Garo Hills)?", "Names of the Land: Bharat and India", "Finding Out About the Past: Manuscripts and Inscriptions", "Archaeology and Dating: BC, AD, BCE, CE"]},
+                {"name": "Chapter 2: From Hunting-Gathering to Growing Food", "topics": ["Hunter-Gatherers: Stone Tools (Palaeolithic, Mesolithic, Neolithic)", "Discovery and Uses of Fire (Kurnool Caves)", "Changing Environment & Beginning of Farming and Herding", "A New Way of Life: Domestication, Storing Animals & Grain", "Finding Out About the First Farmers and Herders (Mehrgarh, Burzahom, Daojali Hading)"]},
+                {"name": "Chapter 3: In the Earliest Cities (Harappan Civilisation)", "topics": ["The Story of Harappa & Architecture of Cities (Citadel and Lower Town)", "Special Buildings: The Great Bath at Mohenjo-daro", "Houses, Drains and Planned Streets", "Life in the City: Rulers, Scribes, Crafts Persons", "New Crafts in Harappa: Seal Making, Terracotta Toys, Beads, Copper, Bronze, Gold", "Search for Raw Materials & Agriculture (The Plough)", "Harappan Towns in Gujarat: Dholavira and Lothal & The Mystery of the End"]},
+                {"name": "Chapter 4: What Books and Burials Tell Us", "topics": ["One of the Oldest Books in the World: The Vedas (Rigveda, Samaveda, Yajurveda, Atharvaveda)", "Silent Sentinels: The Story of Megaliths (Burials at Inamgaon)", "Social Differences in Burials & Occupations at Inamgaon"]},
+                {"name": "Chapter 5: Kingdoms, Kings and an Early Republic", "topics": ["How Some Men Became Rulers: Ashvamedha Sacrifice", "The Varna System (Brahmins, Kshatriyas, Vaishyas, Shudras)", "Janapadas to Mahajanapadas (Fortification & Armies)", "Taxes: Taxes on Crops (Bhaga), Crafts, Trade, Herders", "Changes in Agriculture: Iron Ploughshares & Paddy Transplantation", "Magadha: A Powerful Mahajanapada & Vajji: A Gana/Sangha Republic"]},
+                {"name": "Chapter 6: New Questions and Ideas (Buddhism & Jainism)", "topics": ["The Story of the Buddha (Gautama): Enlightenment, Teachings, Kisagotami Story", "Upanishads: Soul (Atman) and Universal Soul (Brahman), Gargi and Satyakama Jabala", "Jainism: Vardhamana Mahavira, Teachings, Ahimsa, Followers", "The Sangha & Monasteries (Viharas)"]},
+                {"name": "Chapter 7: Ashoka, The Emperor Who Gave Up War", "topics": ["A Very Big Kingdom: An Empire (Empires vs Kingdoms)", "Ruling the Empire: Pataliputra, Taxila, Ujjain, Tribute vs Taxes", "Ashoka: A Unique Ruler & The Kalinga War Transformation", "Ashoka's Dhamma: Messages, Officials (Dhamma Mahamatta), Edicts and Inscriptions"]},
+                {"name": "Chapter 8: Vital Villages, Thriving Towns", "topics": ["Iron Tools and Agriculture: Increased Production & Irrigation Works", "Who Lived in the Villages (Vellalar, Uzhavar, Kadaisiyar in Tamil Nadu; Gramabhojaka in North)", "Finding Out About Cities: Jatakas, Sculpture, Archaeological Ring Wells", "Coins: Punch-Marked Coins & Mathura as an Important Center", "Crafts and Crafts Persons: Shrenis (Guilds) & Arikamedu Port Town"]},
+                {"name": "Chapter 9: Traders, Kings and Pilgrims", "topics": ["How to Find Out About Trade and Traders (Black Pottery, South Indian Spices, Silk Route)", "The Story of the Silk Route & The Kushanas (Kanishka)", "The Spread of Buddhism: Mahayana Buddhism & Bodhisattvas", "Pilgrims from China: Fa Xian, Xuan Zang, I-Qing", "The Beginning of Bhakti: Meaning, Deities (Shiva, Vishnu, Durga) & Bhagavad Gita"]},
+                {"name": "Chapter 10: New Empires and Kingdoms & Cultural Heritage", "topics": ["Prashastis: Samudragupta's Prashasti (Allahabad Pillar / Prayag Prashasti)", "Genealogies: The Guptas & Chandragupta II (Vikramaditya)", "Harshavardhana and the Harshacharita (Banabhatta)", "The Pallavas, Chalukyas and Pulakeshin II", "Administration of Kingdoms & New Kinds of Armies", "Buildings, Paintings and Books: Iron Pillar at Mehrauli, Stupas, Cave Paintings at Ajanta, Epics (Silappadikaram, Manimekalai), Aryabhata"]}
+            ]
+        },
+        {
+            "name": "Social Science - Geography (The Earth Our Habitat)", "color": "#8B5CF6",
+            "chapters": [
+                {"name": "Chapter 1: The Earth in the Solar System", "topics": ["Full Moon (Poornima) & New Moon (Amavasya)", "Celestial Bodies, Stars and Constellations (Ursa Major, Saptarishi, Pole Star)", "The Solar System: Sun, Planets, Order of Planets, Terrestrial vs Gas Giants", "The Earth: The Blue Planet and Unique Features Supporting Life", "The Moon: Phases, Conditions on Moon & Satellites (Natural and Artificial)", "Asteroids and Meteoroids & The Milky Way Galaxy"]},
+                {"name": "Chapter 2: Globe: Latitudes and Longitudes", "topics": ["Globe as a True Model of Earth & Axis and Poles", "Equator and Parallels of Latitudes", "Important Parallels: Tropic of Cancer, Tropic of Capricorn, Arctic Circle, Antarctic Circle", "Heat Zones of the Earth: Torrid Zone, Temperate Zones, Frigid Zones", "Meridians of Longitude & Prime Meridian (Greenwich)", "Longitude and Time Calculation & Indian Standard Time (IST - 82°30'E)"]},
+                {"name": "Chapter 3: Motions of the Earth", "topics": ["Rotation of Earth: Orbital Plane, Circle of Illumination, Day and Night", "Revolution of Earth: Leap Year & Orbit (365 ¼ Days)", "Inclination of Earth's Axis & Changes of Seasons", "Summer Solstice (June 21) & Winter Solstice (December 22)", "Equinox (March 21 & September 23)"]},
+                {"name": "Chapter 4: Maps", "topics": ["Types of Maps: Physical Maps, Political Maps, Thematic Maps", "Components of Maps: Distance and Scale (Small Scale vs Large Scale Maps)", "Direction: Cardinal Points (N, S, E, W) & Intermediate Directions, The Compass", "Symbols and Conventional Colours used in Maps", "Sketch and Plan: Differences and Uses"]},
+                {"name": "Chapter 5: Major Domains of the Earth", "topics": ["Lithosphere: Continents (Asia, Europe, Africa, North America, South America, Australia, Antarctica)", "Hydrosphere: Oceans (Pacific, Atlantic, Indian, Southern, Arctic Ocean)", "Atmosphere: Layers of Atmosphere (Troposphere, Stratosphere, Mesosphere, Thermosphere, Exosphere)", "Composition of Atmosphere: Nitrogen, Oxygen and other gases", "Biosphere: The Domain of Life & Global Warming Effects"]},
+                {"name": "Chapter 6: Our Country — India", "topics": ["Geographical Location, Latitudinal and Longitudinal Extent of India", "India's Neighbours (Land and Sea Boundaries)", "Political and Administrative Divisions (States and Union Territories)", "Physical Divisions: The Great Himalayas (Himadri, Himachal, Shiwalik)", "Northern Indian Plains, Great Indian Desert (Thar), Peninsular Plateau (Western & Eastern Ghats)", "Coastal Plains (Western vs Eastern) and Island Groups (Lakshadweep and Andaman & Nicobar)"]}
+            ]
+        },
+        {
+            "name": "Social Science - Civics (Social & Political Life - I)", "color": "#10B981",
+            "chapters": [
+                {"name": "Chapter 1: Understanding Diversity", "topics": ["Concept of Diversity in Languages, Food, Festivals, Religions", "Diversity in Daily Life: Samir Ek and Samir Do Story", "Historical and Geographical Factors Influencing Diversity", "Case Study: Ladakh (Cold Desert, Pashmina Wool, Caravans)", "Case Study: Kerala (Spices, St. Thomas, Ibn Battuta, Chinese Fishing Nets)", "Unity in Diversity: Freedom Struggle and National Anthem"]},
+                {"name": "Chapter 2: Diversity and Discrimination", "topics": ["Difference and Prejudice", "Creating Stereotypes (Gender Stereotypes & societal expectations)", "Inequality and Discrimination: Dr. B.R. Ambedkar's Experience at Koregaon", "Caste-based Discrimination & Dalits (Untouchability)", "Striving for Equality: Preamble & Constitutional Safeguards for Minorities"]},
+                {"name": "Chapter 3: What is Government?", "topics": ["Definition and Need for a Government", "Levels of Government: Local Level, State Level, National Level", "Laws and the Government: Power to Make and Enforce Decisions", "Types of Government: Democratic Government vs Monarchy", "Democratic Governments: Representative Democracy, Universal Adult Franchise, Women's Suffrage Movement"]},
+                {"name": "Chapter 4: Key Elements of a Democratic Government", "topics": ["Apartheid System in South Africa: Hector Pieterson Story & Nelson Mandela's Victory", "Participation of People: Elections and Voting", "Other Ways of Participating: Rallies, Strikes, Signature Campaigns, Media", "Need to Resolve Conflict: Rivers as source of conflict (Cauvery Water Dispute)", "Equality and Justice: Untouchability ban & Affirmative action"]},
+                {"name": "Chapter 5: Panchayati Raj", "topics": ["Gram Sabha: Composition, Meeting, Role in Checking Gram Panchayat", "The Gram Panchayat: Ward Members (Panchs), Sarpanch, Secretary", "Functions and Sources of Funds of Gram Panchayat", "Three Levels of Panchayats: Gram Panchayat, Panchayat Samiti (Block Level), Zilla Parishad (District Level)"]},
+                {"name": "Chapter 6: Rural Administration", "topics": ["Maintaining Law and Order in Villages: Police Station and SHO", "Maintenance of Land Records: The Patwari (Lekhpal/Karnam) & Khasra Record", "Revenue Department: Tehsildar and District Collector", "A New Law: Hindu Succession Amendment Act (2005) - Equal rights for women in agricultural land"]},
+                {"name": "Chapter 7: Urban Administration", "topics": ["City Life vs Village Life & Need for Municipal Administration", "The Municipal Corporation (Mahanagarpalika) & Municipal Council", "The Ward Councillor and Administrative Staff (Commissioner)", "How Municipal Corporations Get Money (Property Tax, Water Tax, Entertainment Tax)", "Community Protest: Gangabai's Story on Garbage Collection"]},
+                {"name": "Chapter 8: Rural and Urban Livelihoods", "topics": ["Livelihoods in Kalpattu Village: Farming, Agricultural Labourers (Thulasi), Small Farmers (Sekar), Big Farmers (Ramalingam)", "Debt Cycle of Farmers and Fisherman Life in Pudupet", "Livelihoods in the City: Street Workers, Vendors and Hawkers", "In the Market: Permanent Shops, Showrooms, Businesspersons", "In the Factory-Workshop Area: Casual Labourers and Labour Chowk", "In the Office: Regular and Permanent Workers (Call Centers, Government Offices)"]}
+            ]
+        },
+        {
+            "name": "English", "color": "#0284C7",
+            "chapters": [
+                {
+                    "name": "Unit 1: Honeysuckle (Prose & Poetry)",
+                    "topics": [
+                        "Who Did Patrick's Homework? (Prose) & A House, A Home (Poem)",
+                        "How the Dog Found Himself a New Master! (Prose) & The Kite (Poem)",
+                        "Taro's Reward (Prose) & The Quarrel (Poem)",
+                        "An Indian - American Woman in Space: Kalpana Chawla (Prose) & Beauty (Poem)",
+                        "A Different Kind of School (Prose) & Where Do All the Teachers Go? (Poem)",
+                        "Who I Am (Prose) & The Wonderful Words (Poem)",
+                        "Fair Play (Prose by Premchand)",
+                        "The Banyan Tree (Prose by Ruskin Bond) & Vocation (Poem)"
+                    ]
+                },
+                {
+                    "name": "Unit 2: A Pact with the Sun (Supplementary Reader)",
+                    "topics": [
+                        "A Tale of Two Birds (Story & Moral)",
+                        "The Friendly Mongoose (Panchatantra Story)",
+                        "The Shepherd's Treasure (Iranian Folktale)",
+                        "Tansen (Life and Musical Mastery of Tansen)",
+                        "The Monkey and the Crocodile (Panchatantra Story)",
+                        "The Wonder Called Sleep (Biological Benefits of Sleep)",
+                        "A Pact with the Sun (Saeeda's Story & Sunshine)",
+                        "What Happened to the Reptiles (Pambupatti Tale of Harmony)"
+                    ]
+                },
+                {
+                    "name": "Unit 3: English Grammar & Composition",
+                    "topics": [
+                        "Nouns: Common, Proper, Collective, Abstract Nouns & Gender/Number",
+                        "Pronouns: Personal, Possessive, Demonstrative, Relative Pronouns",
+                        "Verbs: Main Verbs, Helping Verbs, Transitive and Intransitive Verbs",
+                        "Tenses: Simple Present, Present Continuous, Simple Past, Past Continuous, Simple Future",
+                        "Adjectives: Degrees of Comparison (Positive, Comparative, Superlative)",
+                        "Adverbs: Adverbs of Manner, Time, Place and Frequency",
+                        "Prepositions of Time and Place (in, on, at, under, behind)",
+                        "Conjunctions: Coordinating (and, but, or, so) & Subordinating (because, although)",
+                        "Punctuation & Capitalization Rules",
+                        "Reading Comprehension: Unseen Prose and Poetry Passages",
+                        "Writing Skills: Paragraph Writing, Story Writing with Outlines",
+                        "Writing Skills: Notice Writing and Formal/Informal Letter Writing"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Hindi (हिन्दी)", "color": "#E11D48",
+            "chapters": [
+                {
+                    "name": "Chapter 1: वसंत भाग-1 (गद्य एवं पद्य भाग)",
+                    "topics": [
+                        "वह चिड़िया जो (कविता - केदारनाथ अग्रवाल)",
+                        "बचपन (संस्मरण - कृष्णा सोबती)",
+                        "नादान दोस्त (कहानी - मुंशी प्रेमचंद)",
+                        "चाँद से थोड़ी सी गप्पें (कविता - शमशेर बहादुर सिंह)",
+                        "साथी हाथ बढ़ाना (गीत - साहिर लुधियानवी)",
+                        "ऐसे-ऐसे (एकांकी - विष्णु प्रभाकर)",
+                        "टिकट अलबम (कहानी - सुंदरा रामस्वामी)",
+                        "झाँसी की रानी (कविता - सुभद्रा कुमारी चौहान)",
+                        "जो देखकर भी नहीं देखते (निबंध - हेलेन केलर)",
+                        "संसार पुस्तक है (पत्र - पं. जवाहरलाल नेहरू)",
+                        "मैं सबसे छोटी होऊँ (कविता - सुमित्रानंदन पंत)",
+                        "लोकगीत (निबंध - भगवतशरण उपाध्याय)",
+                        "नौकर (निबंध - अनुबंधोपाध्याय)",
+                        "वन के मार्ग में (सवैया - तुलसीदास)",
+                        "साँस-साँस में बाँस (निबंध - एलेक्स एम जॉर्ज)"
+                    ]
+                },
+                {
+                    "name": "Chapter 2: बाल रामकथा (पूरक पाठ्यपुस्तक)",
+                    "topics": [
+                        "अवधपुरी में राम (दशरथ, ऋषि विश्वामित्र व बालकांड)",
+                        "जंगल और जनकपुर (ताड़का वध व धनुष भंग)",
+                        "दो वरदान (मंथरा की कुटिलता व कैकेयी के वरदान)",
+                        "राम का वन गमन (राम, सीता और लक्ष्मण का प्रस्थान)",
+                        "चित्रकूट में भरत (भरत मिलाप व पादुका स्थापना)",
+                        "दंडक वन में दस वर्ष व शूर्पणखा प्रसंग",
+                        "सोने का हिरण (मारीच वध व सीता हरण)",
+                        "सीता की खोज (जटायु व शबरी से भेंट)",
+                        "राम और सुग्रीव (किष्किंधा कांड व बालि वध)",
+                        "लंका में हनुमान (समुद्र लंघन व अशोक वाटिका)",
+                        "लंका विजय (सेतु निर्माण व रावण वध)",
+                        "राम का राज्याभिषेक (अयोध्या वापसी)"
+                    ]
+                },
+                {
+                    "name": "Chapter 3: हिन्दी व्याकरण एवं रचना (Grammar & Writing)",
+                    "topics": [
+                        "भाषा, लिपि और व्याकरण परिचय",
+                        "वर्ण विचार: स्वर, व्यंजन, अनुस्वार व अनुनासिक",
+                        "संज्ञा एवं संज्ञा के भेद (व्यक्तिवाचक, जातिवाचक, भाववाचक)",
+                        "लिंग (पुल्लिंग, स्त्रीलिंग) एवं वचन (एकवचन, बहुवचन)",
+                        "कारक एवं कारक के भेद (परसर्ग / विभक्ति चिन्ह)",
+                        "सर्वनाम एवं सर्वनाम के छह भेद",
+                        "विशेषण एवं विशेषण के चार भेद",
+                        "क्रिया (सकर्मक, अकर्मक) एवं काल (वर्तमान, भूत, भविष्य)",
+                        "विलोम शब्द एवं पर्यायवाची शब्द (समानार्थी)",
+                        "अनेक शब्दों के लिए एक शब्द एवं समरूपी भिन्नार्थक शब्द",
+                        "मुहावरे: अर्थ एवं वाक्य प्रयोग",
+                        "अपठित गद्यांश बोध एवं प्रश्नोत्तर",
+                        "पत्र लेखन (औपचारिक - अवकाश/प्रार्थना पत्र, अनौपचारिक पत्र)",
+                        "अनुच्छेद / निबंध लेखन एवं संवाद लेखन"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Computer Science & IT Basics", "color": "#14B8A6",
+            "chapters": [
+                {"name": "Chapter 1: Computer Fundamentals & Architecture", "topics": ["What is a Computer: IPO Cycle (Input - Process - Output)", "Hardware vs Software: System Software and Application Software", "Input Devices: Keyboard, Mouse, Scanner, Web Camera, Barcode Reader", "Output Devices: Monitor (LED/LCD), Printers (Laser, Inkjet), Speakers", "Storage Devices: Primary Memory (RAM, ROM) & Secondary Memory (HDD, SSD, Pen Drive, Cloud)"]},
+                {"name": "Chapter 2: Operating Systems & GUI", "topics": ["Role of Operating System (Windows / Linux / macOS / Android)", "Windows GUI Interface: Desktop, Taskbar, Start Menu, File Explorer", "Managing Files and Folders (Create, Rename, Copy, Move, Delete)", "Recycle Bin and Storage Management"]},
+                {"name": "Chapter 3: Word Processing Skills (MS Word / Docs)", "topics": ["Creating, Opening, Saving and Exporting Documents (PDF)", "Text Formatting: Font, Size, Color, Bold, Italic, Underline, Highlighting", "Paragraph Formatting: Alignment, Line Spacing, Bullets and Numbering", "Inserting Images, Shapes, SmartArt and Tables", "Page Setup: Margins, Orientation, Headers, Footers, Page Numbers, Print Preview"]},
+                {"name": "Chapter 4: Presentation & Digital Storytelling (MS PowerPoint / Slides)", "topics": ["Introduction to Presentation Software & Slide Layouts", "Adding Text, Bullet Points and Formatting Slide Content", "Inserting Images, Audio, Video and Diagrams", "Applying Slide Themes, Background Styles and Color Palettes", "Slide Transitions and Custom Animations", "Running a Slide Show (F5, Presenter View)"]},
+                {"name": "Chapter 5: Visual Coding & Computational Thinking (Scratch / Blockly)", "topics": ["Introduction to Algorithms & Step-by-Step Problem Solving", "Scratch Interface: Stage, Sprite, Blocks Palette, Scripts Area", "Motion Blocks: Moving and Turning Sprites", "Looks and Sound Blocks: Costumes, Speech Bubbles, Sound Effects", "Events and Control Blocks: When Green Flag Clicked, Repeat Loops, If-Then Conditions", "Creating an Interactive Animation and Mini-Game in Scratch"]},
+                {"name": "Chapter 6: Internet, Cyber Safety & Ethics", "topics": ["What is the Internet: WWW, Web Browser, Search Engines", "Effective Web Searching Techniques and Keywords", "Email Basics: Composing, Sending, Attachments and Netiquette", "Cyber Safety: Strong Passwords, Protecting Personal Information", "Recognizing Scams: Phishing, Viruses, Fake Links & Safe Downloading", "Digital Footprint and Responsible Social Behavior"]}
             ]
         }
     ],
@@ -779,7 +1006,7 @@ def normalize_class_name(raw_class: str) -> str:
 
 def preload_standard_syllabus(user_id: int, board: str, class_name: str) -> bool:
     """
-    Looks up standard syllabus data for (board, class_name) and creates all
+    Looks up standard syllabus data for (board, class_name) and bulk-creates all
     subjects, chapters, and topics in the database for the given user_id.
 
     Returns True if data was successfully loaded, False otherwise.
@@ -797,25 +1024,16 @@ def preload_standard_syllabus(user_id: int, board: str, class_name: str) -> bool
     if not syllabus_list:
         return False
 
-    # Insert subjects, chapters, and topics
-    for sub_data in syllabus_list:
-        sub_id = add_subject(user_id, sub_data["name"], sub_data.get("color", "#6366F1"))
-        if sub_id is None:
-            existing_sub = get_subject_by_name(user_id, sub_data["name"])
-            if existing_sub:
-                sub_id = existing_sub["id"]
+    return bulk_create_syllabus(user_id, syllabus_list)
 
-        if sub_id is None:
-            continue
 
-        existing_chapters = get_chapters_for_subject(user_id, sub_id)
-        if existing_chapters:
-            # Chapters already exist for this subject, skip creating duplicates
-            continue
+def reload_and_replace_syllabus(user_id: int, board: str, class_name: str) -> bool:
+    """
+    Completely replaces a student's syllabus with the official curriculum for (board, class_name).
+    Clears all existing subjects/chapters/topics for this user first, then bulk loads the new syllabus.
+    """
+    from models import clear_user_syllabus
+    clear_user_syllabus(user_id)
+    return preload_standard_syllabus(user_id, board, class_name)
 
-        for chap_data in sub_data.get("chapters", []):
-            chap_id = add_chapter(user_id, sub_id, chap_data["name"])
-            for topic_name in chap_data.get("topics", []):
-                add_topic(user_id, chap_id, topic_name)
 
-    return True

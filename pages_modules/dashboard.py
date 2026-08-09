@@ -9,60 +9,76 @@ import streamlit as st
 import plotly.graph_objects as go
 import datetime
 from models import (
-    get_overall_stats, get_user_profile, get_all_subjects,
-    get_subject_stats, get_all_terms,
+    get_overall_stats, get_user_profile,
+    get_all_subjects_with_stats, get_active_upcoming_terms,
     get_due_revisions, complete_revision, get_user_theme
 )
 from preloaded_syllabi import preload_standard_syllabus
-from styles import render_header, render_metric_card
+from styles import render_header, render_metric_card, render_cinematic_welcome_banner
 
 
 def render_dashboard_page(user_id: int):
     profile = get_user_profile(user_id)
     user_name = profile.get("name", "Student")
-    class_info = f"{profile.get('class_name', '')} • {profile.get('board', '')} • {profile.get('academic_year', '')}"
+    class_name = profile.get("class_name", "Class 10")
+    board = profile.get("board", "CBSE")
+    class_info = f"{class_name} • {board} • {profile.get('academic_year', '')}"
 
-    # Auto-load official board syllabus if user has no subjects or 0 topics
-    subjects = get_all_subjects(user_id)
+    user_theme = get_user_theme(user_id)
+    is_dark = (user_theme.strip().lower() == "dark")
+
+    # Fetch overall stats and all subjects with stats in 2 super-fast indexed queries
     stats = get_overall_stats(user_id)
-    if not subjects or stats["total_topics"] == 0:
+    subjects_with_stats = get_all_subjects_with_stats(user_id)
+
+    # Auto-load official board syllabus if user has no subjects
+    if not subjects_with_stats:
         board = profile.get("board", "CBSE")
         class_name = profile.get("class_name", "Class 10")
         loaded = preload_standard_syllabus(user_id, board, class_name)
         if loaded:
             st.rerun()
         stats = get_overall_stats(user_id)
+        subjects_with_stats = get_all_subjects_with_stats(user_id)
 
-    # ── Welcome Banner ──
-    st.markdown(f"""
-        <div class="welcome-banner">
-            <h2>Welcome back, {user_name}! 👋</h2>
-            <p>{class_info}</p>
-        </div>
-    """, unsafe_allow_html=True)
+
+    # ── Ultra-Smooth Cinematic Animated Welcome Hero ──
+    render_cinematic_welcome_banner(user_name, class_name, board, theme=user_theme)
+
+    # ── Quick Hub Action Bar ──
+    c_act1, c_act2, c_act3 = st.columns([1, 1, 1])
+    with c_act1:
+        if st.button("📚 Manage Syllabus & Topics", use_container_width=True, key="dash_go_syllabus_btn"):
+            st.session_state["active_nav_radio"] = "📚 Syllabus Manager"
+            st.rerun()
+    with c_act2:
+        if st.button("🗓️ Study Planner & Timetable", use_container_width=True, key="dash_go_planner_btn"):
+            st.session_state["active_nav_radio"] = "🗓️ Study Planner"
+            st.rerun()
+    with c_act3:
+        if st.button("🖼️ Customize Wallpaper & Theme", use_container_width=True, type="primary", key="dash_go_wallpaper_btn"):
+            st.session_state["active_nav_radio"] = "🖼️ Wallpapers & Themes"
+            st.rerun()
 
     # ── Top Metric Cards ──
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
-        render_metric_card("Subjects", stats["total_subjects"], "#6366F1")
+        render_metric_card("Subjects", stats["total_subjects"], "#6366F1", theme=user_theme)
     with m2:
-        render_metric_card("Chapters", stats["total_chapters"], "#8B5CF6")
+        render_metric_card("Chapters", stats["total_chapters"], "#8B5CF6", theme=user_theme)
     with m3:
-        render_metric_card("Topics", stats["total_topics"], "#A855F7")
+        render_metric_card("Topics", stats["total_topics"], "#A855F7", theme=user_theme)
     with m4:
         render_metric_card("Completed", stats["completed"], "#22C55E",
-                          f"of {stats['total_topics']}")
+                          f"of {stats['total_topics']}", theme=user_theme)
     with m5:
         render_metric_card("Progress", f"{stats['percent_completed']}%", "#6366F1",
-                          f"{stats['remaining']} remaining")
+                          f"{stats['remaining']} remaining", theme=user_theme)
 
     st.markdown("---")
 
     # ── Main: Donut Chart + Details ──
     col_chart, col_details = st.columns([3, 2])
-
-    user_theme = get_user_theme(user_id)
-    is_dark = (user_theme.strip().lower() == "dark")
 
     with col_chart:
         st.subheader("📊 Overall Syllabus Progress")
@@ -133,7 +149,7 @@ def render_dashboard_page(user_id: int):
     st.markdown("---")
 
     # ── Exam Countdown ──
-    _render_exam_countdown(user_id)
+    _render_exam_countdown(user_id, user_theme)
 
     st.markdown("---")
 
@@ -142,31 +158,29 @@ def render_dashboard_page(user_id: int):
 
     st.markdown("---")
 
-    # ── Subject-wise Breakdown ──
+    # ── Subject-wise Breakdown (Batch Rendered) ──
     st.subheader("📚 Subject Summary")
-    subjects = get_all_subjects(user_id)
 
-    if subjects:
+    if subjects_with_stats:
         # Create rows of 3 columns
-        for row_start in range(0, len(subjects), 3):
-            row_subjects = subjects[row_start:row_start + 3]
+        for row_start in range(0, len(subjects_with_stats), 3):
+            row_subjects = subjects_with_stats[row_start:row_start + 3]
             cols = st.columns(3)
             for idx, sub in enumerate(row_subjects):
-                sub_stats = get_subject_stats(user_id, sub["id"])
-                pct = sub_stats["percent_completed"]
+                pct = sub["percent_completed"]
                 color = sub["color"]
 
                 with cols[idx]:
                     st.markdown(f"""
                         <div class="nexus-card" style="border-left: 4px solid {color};">
-                            <h4 style="margin: 0; color: #F8FAFC;">{sub['name']}</h4>
-                            <p style="color: #94A3B8; font-size: 0.85rem; margin: 4px 0 8px 0;">
-                                {sub_stats['total_chapters']} Chapters • {sub_stats['total_topics']} Topics
+                            <h4 style="margin: 0;">{sub['name']}</h4>
+                            <p style="font-size: 0.85rem; margin: 4px 0 8px 0;">
+                                {sub['total_chapters']} Chapters • {sub['total_topics']} Topics
                             </p>
                             <h3 style="color: {color}; margin: 0;">{pct}% Done</h3>
-                            <p style="color: #CBD5E1; font-size: 0.82rem; margin: 4px 0 0 0;">
-                                {sub_stats['completed']} of {sub_stats['total_topics']} completed
-                                {f' • Avg: {sub_stats["avg_understanding"]}/5' if sub_stats['total_topics'] > 0 else ''}
+                            <p style="font-size: 0.82rem; margin: 4px 0 0 0;">
+                                {sub['completed']} of {sub['total_topics']} completed
+                                {f' • Avg: {sub["avg_understanding"]}/5' if sub['total_topics'] > 0 else ''}
                             </p>
                         </div>
                     """, unsafe_allow_html=True)
@@ -180,9 +194,9 @@ def render_dashboard_page(user_id: int):
                 st.rerun()
 
 
-def _render_exam_countdown(user_id: int):
-    """Show a countdown to the next upcoming exam."""
-    terms = get_all_terms(user_id)
+def _render_exam_countdown(user_id: int, theme: str = "Light"):
+    """Show a countdown to the next upcoming active exam (filters out completed/already-done terms)."""
+    terms = get_active_upcoming_terms(user_id)
     if not terms:
         return
 
@@ -216,13 +230,15 @@ def _render_exam_countdown(user_id: int):
         render_metric_card(
             "Next Exam",
             next_exam["name"],
-            "#EC4899"
+            "#EC4899",
+            theme=theme
         )
     with c2:
         render_metric_card(
             "Exam Date",
             next_exam["date"].strftime("%d %B %Y"),
-            "#F8FAFC"
+            "#38BDF8" if theme.lower() == "dark" else "#4F46E5",
+            theme=theme
         )
     with c3:
         days = next_exam["days_left"]
@@ -231,12 +247,13 @@ def _render_exam_countdown(user_id: int):
             "Days Remaining",
             f"{days}",
             urgency_color,
-            "days left" if days != 1 else "day left"
+            "days left" if days != 1 else "day left",
+            theme=theme
         )
 
     # Show all upcoming exams if more than one
     if len(upcoming) > 1:
-        with st.expander("📅 All Upcoming Exams"):
+        with st.expander("📅 All Active Upcoming Exams"):
             for exam in upcoming:
                 e_col1, e_col2 = st.columns([3, 1])
                 with e_col1:
@@ -273,8 +290,8 @@ def _render_revision_reminders(user_id: int):
         with c1:
             overdue_badge = " <span style='color: #EF4444; font-size: 0.75rem;'>⚠️ OVERDUE</span>" if is_overdue else ""
             st.markdown(
-                f"<span style='color: #94A3B8; font-size: 0.8rem;'>{subject_name}</span> • "
-                f"<strong style='color: #F8FAFC;'>{item_name}</strong>{overdue_badge}",
+                f"<span style='font-size: 0.85rem;'>{subject_name}</span> • "
+                f"<strong>{item_name}</strong>{overdue_badge}",
                 unsafe_allow_html=True
             )
         with c2:
@@ -286,3 +303,4 @@ def _render_revision_reminders(user_id: int):
                 complete_revision(user_id, rev["id"])
                 st.toast(f"✅ Revision completed for '{item_name}'", icon="🌟")
                 st.rerun()
+

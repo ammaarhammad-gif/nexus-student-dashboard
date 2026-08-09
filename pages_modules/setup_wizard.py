@@ -1,38 +1,15 @@
 """
 setup_wizard.py — First-time onboarding setup page.
 
-Collects: Name, Class (1 to 10), Board (ICSE, CBSE, State Board), and Academic Year (auto 2026-2027).
+Collects: Name, Class (1 to 10), Board (ICSE, CBSE, Other), and Academic Year (auto 2026-2027).
 Automatically pre-loads the full official syllabus so students don't need to type anything!
 """
 
 import streamlit as st
 import datetime
-from models import save_user_profile, add_term, clear_all_terms
+from models import save_user_profile, add_term, clear_all_terms, set_user_theme, set_user_wallpaper_config
 from preloaded_syllabi import preload_standard_syllabus
-from styles import render_header
-
-STATE_BOARDS = [
-    "UPMSP — Uttar Pradesh Madhyamik Shiksha Parishad",
-    "BSEB — Bihar School Examination Board",
-    "MPBSE — Madhya Pradesh Board of Secondary Education",
-    "MSBSHSE — Maharashtra State Board of Secondary and Higher Secondary Education",
-    "GSHSEB — Gujarat Secondary and Higher Secondary Education Board",
-    "TNBSE — Tamil Nadu State Board of School Examination",
-    "KSEEB — Karnataka School Examination and Assessment Board",
-    "BIEAP — Board of Intermediate Education, Andhra Pradesh",
-    "TSBIE — Telangana State Board of Intermediate Education",
-    "WBBSE — West Bengal Board of Secondary Education",
-    "AHSEC — Assam Higher Secondary Education Council",
-    "HPBOSE — Himachal Pradesh Board of School Education",
-    "JKBOSE — Jammu and Kashmir State Board of School Education",
-    "CHSE — Council of Higher Secondary Education, Odisha",
-    "PSEB — Punjab School Education Board",
-    "RBSE — Rajasthan Board of Secondary Education",
-    "CGBSE — Chhattisgarh Board of Secondary Education",
-    "UBSE — Uttarakhand Board of School Education",
-    "GBSHSE — Goa Board of Secondary and Higher Secondary Education",
-    "Other State Board"
-]
+from styles import render_header, WALLPAPER_PRESETS
 
 CLASS_OPTIONS = [
     "Class 1", "Class 2", "Class 3", "Class 4", "Class 5",
@@ -86,20 +63,12 @@ def render_setup_wizard(user_id: int):
     with col2:
         board_type = st.selectbox(
             "📜 Select Your Board / Curriculum *",
-            ["ICSE", "CBSE", "State Board", "Other"],
+            ["ICSE", "CBSE", "Other"],
             index=0,  # Default to ICSE
             key="setup_board_type"
         )
 
         final_board = board_type
-        if board_type == "State Board":
-            selected_sb = st.selectbox(
-                "Select State Board *",
-                STATE_BOARDS,
-                key="setup_state_board_specific"
-            )
-            acronym = selected_sb.split(" — ")[0]
-            final_board = f"State Board ({acronym})"
 
         current_year = datetime.date.today().year
         academic_year = st.text_input(
@@ -112,8 +81,8 @@ def render_setup_wizard(user_id: int):
     st.markdown("---")
     st.markdown("""
         <div class="nexus-card" style="border-left: 4px solid #A855F7;">
-            <h3 style="color: #F8FAFC; margin-top: 0;">📅 2. Exam Terms & Milestones</h3>
-            <p style="color: #94A3B8; font-size: 0.9rem;">We've set up smart exam dates for your academic year. You can customize them anytime.</p>
+            <h3 style="margin-top: 0;">📅 2. Exam Terms & Milestones</h3>
+            <p style="font-size: 0.9rem;">We've set up smart exam dates for your academic year. If an exam is already completed, check <strong>Already done</strong> so your countdown starts from your next active term.</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -153,7 +122,40 @@ def render_setup_wizard(user_id: int):
                 value=default_date,
                 key=f"setup_t_date_{num_terms}_{i}"
             )
-            term_data.append((t_name, t_date.strftime("%Y-%m-%d")))
+            t_done = st.checkbox(
+                "☑️ Already done",
+                value=False,
+                key=f"setup_t_done_{num_terms}_{i}",
+                help="Check if this term is already over"
+            )
+            term_data.append((t_name, t_date.strftime("%Y-%m-%d"), 1 if t_done else 0))
+
+    # ── Step 3: Choose Starting Study Vibe & Wallpaper ──
+    st.markdown("---")
+    st.markdown("""
+        <div class="nexus-card" style="border-left: 4px solid #10B981;">
+            <h3 style="margin-top: 0;">🎨 3. Study Space Vibe & Wallpaper (Optional)</h3>
+            <p style="font-size: 0.9rem;">Choose your visual study ambience. You can change this anytime from the <strong>Wallpapers & Themes</strong> studio!</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_w1, col_w2 = st.columns(2)
+    with col_w1:
+        setup_theme = st.radio(
+            "Color Mode:",
+            ["☀️ Light Mode", "🌙 Dark Glassmorphism"],
+            index=0,
+            horizontal=True,
+            key="setup_theme_choice"
+        )
+    with col_w2:
+        wp_choice_names = ["Solid Minimalist (No Wallpaper)"] + [p["name"] for p in WALLPAPER_PRESETS[:8]]
+        chosen_wp = st.selectbox(
+            "Study Wallpaper:",
+            wp_choice_names,
+            index=1,
+            key="setup_wp_choice"
+        )
 
     st.markdown("---")
 
@@ -182,15 +184,28 @@ def render_setup_wizard(user_id: int):
             class_name=class_name
         )
 
+        # Save theme & wallpaper choices
+        th_val = "Dark" if "Dark" in setup_theme else "Light"
+        set_user_theme(user_id, th_val)
+        st.session_state["theme_mode"] = th_val
+
+        if chosen_wp != "Solid Minimalist (No Wallpaper)":
+            target_p = next((p for p in WALLPAPER_PRESETS if p["name"] == chosen_wp), None)
+            if target_p:
+                set_user_wallpaper_config(user_id, mode="preset", preset_id=target_p["id"], blur=0, opacity=0.82)
+
         # Save terms
         clear_all_terms(user_id=user_id)
-        for idx, (t_name, t_date_str) in enumerate(term_data):
+        for idx, (t_name, t_date_str, t_done) in enumerate(term_data):
             if t_name.strip():
-                add_term(user_id=user_id, name=t_name.strip(), exam_date=t_date_str, display_order=idx + 1)
+                add_term(user_id=user_id, name=t_name.strip(), exam_date=t_date_str, display_order=idx + 1, is_already_done=t_done)
 
         # Pre-load official CBSE/ICSE syllabus automatically
         with st.spinner(f"⚡ Loading official {final_board} ({class_name}) syllabus into your dashboard..."):
             preload_standard_syllabus(user_id=user_id, board=final_board, class_name=class_name)
 
+        st.session_state["show_welcome_splash"] = True
         st.success("✅ Setup complete & official syllabus loaded! Loading your dashboard...")
         st.rerun()
+
+

@@ -108,19 +108,28 @@ def save_user_profile(user_id: int, name: str, academic_year: str, board: str, c
     st.cache_data.clear()
 
 
-@st.cache_data(ttl=15, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def get_user_profile(user_id: int) -> dict:
-    """Retrieve user profile as a dictionary."""
-    return {
-        "name": get_setting(user_id, "user_name", ""),
-        "academic_year": get_setting(user_id, "academic_year", ""),
-        "board": get_setting(user_id, "board", ""),
-        "class_name": get_setting(user_id, "class_name", ""),
-        "theme_mode": get_setting(user_id, "theme_mode", "Light"),
-        "is_setup_completed": is_setup_complete(user_id)
-    }
+    """Retrieve all user profile fields in a single fast query."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT key, value FROM settings WHERE user_id = %s", (user_id,))
+            rows = cursor.fetchall()
+            st_dict = dict(rows)
+            return {
+                "name": st_dict.get("user_name", ""),
+                "academic_year": st_dict.get("academic_year", ""),
+                "board": st_dict.get("board", ""),
+                "class_name": st_dict.get("class_name", ""),
+                "theme_mode": st_dict.get("theme_mode", "Light"),
+                "is_setup_completed": st_dict.get("is_setup_completed", "0") == "1"
+            }
+    finally:
+        conn.close()
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_user_theme(user_id: int) -> str:
     """Return user's preferred theme mode: 'Light', 'Dark', or 'Default' (defaults to 'Light')."""
     return get_setting(user_id, "theme_mode", "Light")
@@ -132,10 +141,60 @@ def set_user_theme(user_id: int, theme: str):
     st.cache_data.clear()
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def get_user_wallpaper_config(user_id: int) -> dict:
+    """Retrieve user's active wallpaper mode, URL, blur, and opacity configuration."""
+    mode = get_setting(user_id, "wallpaper_mode", "none")
+    preset_id = get_setting(user_id, "wallpaper_preset_id", "")
+    custom_url = get_setting(user_id, "wallpaper_custom_url", "")
+    blur = int(get_setting(user_id, "wallpaper_blur", "0") or 0)
+    opacity = float(get_setting(user_id, "wallpaper_opacity", "0.82") or 0.82)
+
+    url = None
+    if mode == "preset" and preset_id:
+        from styles import WALLPAPER_PRESETS
+        for wp in WALLPAPER_PRESETS:
+            if wp["id"] == preset_id:
+                url = wp["url"]
+                break
+    elif mode == "custom" and custom_url:
+        url = custom_url
+
+    return {
+        "mode": mode,
+        "preset_id": preset_id,
+        "custom_url": custom_url,
+        "url": url,
+        "blur": blur,
+        "opacity": opacity
+    }
+
+
+def set_user_wallpaper_config(user_id: int, mode: str, preset_id: str = "", custom_url: str = "", blur: int = 0, opacity: float = 0.82):
+    """Save user's wallpaper settings."""
+    set_setting(user_id, "wallpaper_mode", mode)
+    set_setting(user_id, "wallpaper_preset_id", preset_id)
+    if custom_url:
+        set_setting(user_id, "wallpaper_custom_url", custom_url)
+    set_setting(user_id, "wallpaper_blur", str(blur))
+    set_setting(user_id, "wallpaper_opacity", str(opacity))
+    st.cache_data.clear()
+
+
+def clear_user_wallpaper_config(user_id: int):
+    """Reset user's wallpaper back to solid theme mode."""
+    set_setting(user_id, "wallpaper_mode", "none")
+    set_setting(user_id, "wallpaper_preset_id", "")
+    set_setting(user_id, "wallpaper_custom_url", "")
+    st.cache_data.clear()
+
+
+
 # ══════════════════════════════════════════════
 # TERMS MANAGEMENT
 # ══════════════════════════════════════════════
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_all_terms(user_id: int):
     """Return all terms for a user sorted by display_order."""
     conn = get_connection()
@@ -148,14 +207,32 @@ def get_all_terms(user_id: int):
         conn.close()
 
 
-def add_term(user_id: int, name: str, exam_date: str, display_order: int = 0):
-    """Create a new academic term."""
+@st.cache_data(ttl=60, show_spinner=False)
+def get_active_upcoming_terms(user_id: int):
+    """Return all active (not marked as already done) terms for a user."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT * FROM terms 
+                WHERE user_id = %s AND COALESCE(is_already_done, 0) = 0 
+                ORDER BY display_order ASC, id ASC
+            """, (user_id,))
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+
+def add_term(user_id: int, name: str, exam_date: str, display_order: int = 0, is_already_done: int = 0):
+    """Create a new academic term with optional is_already_done status."""
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO terms (user_id, name, exam_date, display_order) VALUES (%s, %s, %s, %s) RETURNING id",
-                (user_id, name, exam_date, display_order)
+                "INSERT INTO terms (user_id, name, exam_date, display_order, is_already_done) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                (user_id, name, exam_date, display_order, 1 if is_already_done else 0)
             )
             term_id = cursor.fetchone()[0]
             conn.commit()
@@ -167,14 +244,14 @@ def add_term(user_id: int, name: str, exam_date: str, display_order: int = 0):
         conn.close()
 
 
-def update_term(user_id: int, term_id: int, name: str, exam_date: str):
-    """Update an existing term's name and exam date."""
+def update_term(user_id: int, term_id: int, name: str, exam_date: str, is_already_done: int = 0):
+    """Update an existing term's name, exam date, and is_already_done status."""
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "UPDATE terms SET name = %s, exam_date = %s WHERE user_id = %s AND id = %s",
-                (name, exam_date, user_id, term_id)
+                "UPDATE terms SET name = %s, exam_date = %s, is_already_done = %s WHERE user_id = %s AND id = %s",
+                (name, exam_date, 1 if is_already_done else 0, user_id, term_id)
             )
             conn.commit()
     except Exception:
@@ -216,6 +293,7 @@ def clear_all_terms(user_id: int):
 # SUBJECTS
 # ══════════════════════════════════════════════
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_all_subjects(user_id: int):
     """Return all subjects for a user sorted by display_order then name."""
     conn = get_connection()
@@ -225,6 +303,7 @@ def get_all_subjects(user_id: int):
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
     finally:
+
         conn.close()
 
 
@@ -323,6 +402,31 @@ def update_subject_color(user_id: int, subject_id: int, color: str):
         raise
     finally:
         conn.close()
+
+
+def clear_user_syllabus(user_id: int):
+    """
+    Cleans up all subjects, chapters, topics, subtopics, topic_progress, and term_chapters
+    for a user, enabling clean switching to a new class or board curriculum without orphaned subjects.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM topic_progress WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM term_chapters WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM subtopics WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM topics WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM chapters WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM subjects WHERE user_id = %s", (user_id,))
+            conn.commit()
+            st.cache_data.clear()
+            return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 
 # ══════════════════════════════════════════════
@@ -734,131 +838,351 @@ def set_term_chapters(user_id: int, term_id: int, chapter_ids: list):
 
 
 # ══════════════════════════════════════════════
-# OVERALL SYLLABUS STATISTICS
+# HIGH-SPEED SYLLABUS STATISTICS & BATCH QUERIES
 # ══════════════════════════════════════════════
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_overall_stats(user_id: int) -> dict:
-    """Calculate overall syllabus progress statistics."""
+    """Calculate overall syllabus progress statistics in a single high-speed database call."""
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) FROM subjects WHERE user_id = %s", (user_id,))
-            total_subjects = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM chapters WHERE user_id = %s", (user_id,))
-            total_chapters = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM topics WHERE user_id = %s", (user_id,))
-            total_topics = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM subtopics WHERE user_id = %s", (user_id,))
-            total_subtopics = cursor.fetchone()[0]
-
-            # Count by status across topics
             cursor.execute("""
-                SELECT status, COUNT(*) as cnt
-                FROM topic_progress
-                WHERE user_id = %s AND item_type = 'topic'
-                GROUP BY status
-            """, (user_id,))
-            status_rows = cursor.fetchall()
-            status_map = {r[0]: r[1] for r in status_rows}
+                SELECT
+                    (SELECT COUNT(*) FROM subjects WHERE user_id = %(uid)s) AS total_subjects,
+                    (SELECT COUNT(*) FROM chapters WHERE user_id = %(uid)s) AS total_chapters,
+                    (SELECT COUNT(*) FROM topics WHERE user_id = %(uid)s) AS total_topics,
+                    (SELECT COUNT(*) FROM subtopics WHERE user_id = %(uid)s) AS total_subtopics,
+                    COALESCE(SUM(CASE WHEN tp.status IN ('Completed', 'Revision Done') THEN 1 ELSE 0 END), 0) AS completed,
+                    COALESCE(SUM(CASE WHEN tp.status = 'In Progress' THEN 1 ELSE 0 END), 0) AS in_progress,
+                    COALESCE(SUM(CASE WHEN tp.status = 'Not Started' THEN 1 ELSE 0 END), 0) AS not_started,
+                    COALESCE(SUM(CASE WHEN tp.status = 'Revision Done' THEN 1 ELSE 0 END), 0) AS revision_done,
+                    COALESCE(AVG(tp.understanding), 0.0) AS avg_understanding
+                FROM topics t
+                LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = t.user_id
+                WHERE t.user_id = %(uid)s
+            """, {"uid": user_id})
+            row = cursor.fetchone()
+            if not row or row[0] == 0:
+                total_subs = row[0] if row else 0
+                return {
+                    "total_subjects": total_subs, "total_chapters": 0, "total_topics": 0, "total_subtopics": 0,
+                    "completed": 0, "in_progress": 0, "not_started": 0, "revision_done": 0,
+                    "remaining": 0, "percent_completed": 0.0, "avg_understanding": 0.0
+                }
 
-            completed = status_map.get("Completed", 0) + status_map.get("Revision Done", 0)
-            in_progress = status_map.get("In Progress", 0)
-            not_started = status_map.get("Not Started", 0)
-            revision_done = status_map.get("Revision Done", 0)
-            remaining = max(0, total_topics - completed)
-
-            cursor.execute(
-                "SELECT AVG(understanding) FROM topic_progress WHERE user_id = %s AND item_type = 'topic'", (user_id,)
-            )
-            avg_und_val = cursor.fetchone()[0]
-            avg_understanding = round(float(avg_und_val), 1) if avg_und_val is not None else 0.0
-
-            percent_completed = round((completed / total_topics * 100), 1) if total_topics > 0 else 0.0
+            tot_subs, tot_chaps, tot_topics, tot_subtops, comp, in_prog, not_start, rev_done, avg_und = row
+            actual_not_started = not_start + max(0, tot_topics - (comp + in_prog + not_start))
+            pct = round((comp / tot_topics * 100), 1) if tot_topics > 0 else 0.0
 
             return {
-                "total_subjects": total_subjects,
-                "total_chapters": total_chapters,
-                "total_topics": total_topics,
-                "total_subtopics": total_subtopics,
-                "completed": completed,
-                "in_progress": in_progress,
-                "not_started": not_started,
-                "revision_done": revision_done,
-                "remaining": remaining,
-                "percent_completed": percent_completed,
-                "avg_understanding": avg_understanding
+                "total_subjects": tot_subs,
+                "total_chapters": tot_chaps,
+                "total_topics": tot_topics,
+                "total_subtopics": tot_subtops,
+                "completed": comp,
+                "in_progress": in_prog,
+                "not_started": actual_not_started,
+                "revision_done": rev_done,
+                "remaining": max(0, tot_topics - comp),
+                "percent_completed": pct,
+                "avg_understanding": round(float(avg_und), 1) if avg_und else 0.0
             }
     finally:
         conn.close()
 
 
-def get_subject_stats(user_id: int, subject_id: int) -> dict:
-    """Calculate progress statistics for a single subject."""
+@st.cache_data(ttl=30, show_spinner=False)
+def get_all_subjects_with_stats(user_id: int) -> list:
+    """
+    High-speed single query to get all subjects for a user along with full aggregated statistics:
+    total_chapters, total_topics, completed, in_progress, not_started, revision_done, percent_completed, avg_understanding.
+    Replaces 50+ individual queries with 1 single high-speed database roundtrip.
+    """
     conn = get_connection()
     try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT id FROM chapters WHERE user_id = %s AND subject_id = %s", (user_id, subject_id))
-            chapter_ids = [c[0] for c in cursor.fetchall()]
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    s.id,
+                    s.name,
+                    s.color,
+                    s.display_order,
+                    COUNT(DISTINCT c.id) AS total_chapters,
+                    COUNT(DISTINCT t.id) AS total_topics,
+                    COUNT(DISTINCT CASE WHEN tp.status IN ('Completed', 'Revision Done') THEN t.id END) AS completed,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'In Progress' THEN t.id END) AS in_progress,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'Not Started' OR tp.status IS NULL THEN t.id END) AS not_started,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'Revision Done' THEN t.id END) AS revision_done,
+                    COALESCE(AVG(CASE WHEN tp.understanding IS NOT NULL THEN tp.understanding END), 0.0) AS avg_understanding
+                FROM subjects s
+                LEFT JOIN chapters c ON c.subject_id = s.id AND c.user_id = s.user_id
+                LEFT JOIN topics t ON t.chapter_id = c.id AND t.user_id = s.user_id
+                LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = s.user_id
+                WHERE s.user_id = %s
+                GROUP BY s.id, s.name, s.color, s.display_order
+                ORDER BY s.display_order ASC, s.name ASC
+            """, (user_id,))
+            rows = cursor.fetchall()
+            result = []
+            for r in rows:
+                tot_topics = r["total_topics"]
+                comp = r["completed"]
+                pct = round((comp / tot_topics * 100), 1) if tot_topics > 0 else 0.0
+                avg_und = round(float(r["avg_understanding"]), 1) if r["avg_understanding"] else 0.0
+                result.append({
+                    "id": r["id"],
+                    "name": r["name"],
+                    "color": r["color"] or "#6366F1",
+                    "display_order": r["display_order"],
+                    "total_chapters": r["total_chapters"],
+                    "total_topics": tot_topics,
+                    "completed": comp,
+                    "in_progress": r["in_progress"],
+                    "not_started": r["not_started"],
+                    "revision_done": r["revision_done"],
+                    "remaining": max(0, tot_topics - comp),
+                    "percent_completed": pct,
+                    "avg_understanding": avg_und
+                })
+            return result
+    finally:
+        conn.close()
 
-            if not chapter_ids:
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_subject_stats(user_id: int, subject_id: int) -> dict:
+    """Calculate progress statistics for a single subject using 1 single query."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    COUNT(DISTINCT c.id) AS total_chapters,
+                    COUNT(DISTINCT t.id) AS total_topics,
+                    COUNT(DISTINCT CASE WHEN tp.status IN ('Completed', 'Revision Done') THEN t.id END) AS completed,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'In Progress' THEN t.id END) AS in_progress,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'Not Started' OR tp.status IS NULL THEN t.id END) AS not_started,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'Revision Done' THEN t.id END) AS revision_done,
+                    COALESCE(AVG(tp.understanding), 0.0) AS avg_understanding
+                FROM chapters c
+                LEFT JOIN topics t ON t.chapter_id = c.id AND t.user_id = c.user_id
+                LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = c.user_id
+                WHERE c.user_id = %s AND c.subject_id = %s
+            """, (user_id, subject_id))
+            r = cursor.fetchone()
+            if not r or r["total_chapters"] == 0:
                 return {
                     "total_chapters": 0, "total_topics": 0, "completed": 0,
                     "in_progress": 0, "not_started": 0, "revision_done": 0,
                     "remaining": 0, "percent_completed": 0.0, "avg_understanding": 0.0
                 }
-
-            cursor.execute(
-                "SELECT COUNT(*) FROM topics WHERE user_id = %s AND chapter_id = ANY(%s)",
-                (user_id, chapter_ids)
-            )
-            total_topics = cursor.fetchone()[0]
-
-            cursor.execute(
-                "SELECT id FROM topics WHERE user_id = %s AND chapter_id = ANY(%s)",
-                (user_id, chapter_ids)
-            )
-            topic_ids = [t[0] for t in cursor.fetchall()]
-
-            if not topic_ids:
-                return {
-                    "total_chapters": len(chapter_ids), "total_topics": 0, "completed": 0,
-                    "in_progress": 0, "not_started": 0, "revision_done": 0,
-                    "remaining": 0, "percent_completed": 0.0, "avg_understanding": 0.0
-                }
-
-            cursor.execute("""
-                SELECT status, COUNT(*) as cnt
-                FROM topic_progress
-                WHERE user_id = %s AND item_type = 'topic' AND item_id = ANY(%s)
-                GROUP BY status
-            """, (user_id, topic_ids))
-            status_rows = cursor.fetchall()
-            status_map = {r[0]: r[1] for r in status_rows}
-            
-            completed = status_map.get("Completed", 0) + status_map.get("Revision Done", 0)
-            in_progress = status_map.get("In Progress", 0)
-            not_started = status_map.get("Not Started", 0)
-            revision_done = status_map.get("Revision Done", 0)
-
-            cursor.execute("""
-                SELECT AVG(understanding) FROM topic_progress
-                WHERE user_id = %s AND item_type = 'topic' AND item_id = ANY(%s)
-            """, (user_id, topic_ids))
-            avg_und = cursor.fetchone()[0]
-
+            tot_topics = r["total_topics"]
+            comp = r["completed"]
+            pct = round((comp / tot_topics * 100), 1) if tot_topics > 0 else 0.0
+            avg_und = round(float(r["avg_understanding"]), 1) if r["avg_understanding"] else 0.0
             return {
-                "total_chapters": len(chapter_ids),
-                "total_topics": total_topics,
-                "completed": completed,
-                "in_progress": in_progress,
-                "not_started": not_started,
-                "revision_done": revision_done,
-                "remaining": max(0, total_topics - completed),
-                "percent_completed": round((completed / total_topics * 100), 1) if total_topics > 0 else 0.0,
-                "avg_understanding": round(float(avg_und), 1) if avg_und is not None else 0.0
+                "total_chapters": r["total_chapters"],
+                "total_topics": tot_topics,
+                "completed": comp,
+                "in_progress": r["in_progress"],
+                "not_started": r["not_started"],
+                "revision_done": r["revision_done"],
+                "remaining": max(0, tot_topics - comp),
+                "percent_completed": pct,
+                "avg_understanding": avg_und
             }
     finally:
         conn.close()
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_subject_hierarchy(user_id: int, subject_id: int) -> list:
+    """
+    Returns the complete list of chapters with embedded topics, subtopics, and progress
+    in a structured tree using a single high-speed database call.
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # 1. Fetch all chapters, topics, and their progress in one shot
+            cursor.execute("""
+                SELECT 
+                    c.id AS chapter_id,
+                    c.name AS chapter_name,
+                    c.display_order AS chapter_order,
+                    t.id AS topic_id,
+                    t.name AS topic_name,
+                    t.display_order AS topic_order,
+                    COALESCE(tp.status, 'Not Started') AS status,
+                    COALESCE(tp.understanding, 3) AS understanding,
+                    COALESCE(tp.notes, '') AS notes,
+                    COALESCE(tp.is_important, 0) AS is_important,
+                    COALESCE(tp.is_difficult, 0) AS is_difficult,
+                    COALESCE(tp.needs_practice, 0) AS needs_practice,
+                    tp.updated_at
+                FROM chapters c
+                LEFT JOIN topics t ON t.chapter_id = c.id AND t.user_id = c.user_id
+                LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = c.user_id
+                WHERE c.user_id = %s AND c.subject_id = %s
+                ORDER BY c.display_order ASC, c.id ASC, t.display_order ASC, t.id ASC
+            """, (user_id, subject_id))
+            rows = cursor.fetchall()
+
+            # 2. Fetch all subtopics for these topics in one shot
+            cursor.execute("""
+                SELECT 
+                    st.id AS subtopic_id,
+                    st.topic_id,
+                    st.name AS subtopic_name,
+                    st.display_order,
+                    COALESCE(tp.status, 'Not Started') AS status,
+                    COALESCE(tp.understanding, 3) AS understanding,
+                    COALESCE(tp.notes, '') AS notes,
+                    COALESCE(tp.is_important, 0) AS is_important,
+                    COALESCE(tp.is_difficult, 0) AS is_difficult,
+                    COALESCE(tp.needs_practice, 0) AS needs_practice
+                FROM subtopics st
+                JOIN topics t ON t.id = st.topic_id AND t.user_id = st.user_id
+                JOIN chapters c ON c.id = t.chapter_id AND c.user_id = st.user_id
+                LEFT JOIN topic_progress tp ON tp.item_id = st.id AND tp.item_type = 'subtopic' AND tp.user_id = st.user_id
+                WHERE st.user_id = %s AND c.subject_id = %s
+                ORDER BY st.display_order ASC, st.id ASC
+            """, (user_id, subject_id))
+            subtopic_rows = cursor.fetchall()
+            subtopics_by_topic = {}
+            for str_row in subtopic_rows:
+                tid = str_row["topic_id"]
+                if tid not in subtopics_by_topic:
+                    subtopics_by_topic[tid] = []
+                subtopics_by_topic[tid].append(dict(str_row))
+
+            chapters_map = {}
+            for r in rows:
+                cid = r["chapter_id"]
+                if cid not in chapters_map:
+                    chapters_map[cid] = {
+                        "id": cid,
+                        "name": r["chapter_name"],
+                        "display_order": r["chapter_order"],
+                        "topics": [],
+                        "total_topics": 0,
+                        "completed_topics": 0
+                    }
+
+                tid = r["topic_id"]
+                if tid is not None:
+                    chapters_map[cid]["total_topics"] += 1
+                    is_done = (r["status"] in ["Completed", "Revision Done"])
+                    if is_done:
+                        chapters_map[cid]["completed_topics"] += 1
+
+                    topic_dict = {
+                        "id": tid,
+                        "chapter_id": cid,
+                        "name": r["topic_name"],
+                        "display_order": r["topic_order"],
+                        "status": r["status"],
+                        "understanding": r["understanding"],
+                        "notes": r["notes"],
+                        "is_important": r["is_important"],
+                        "is_difficult": r["is_difficult"],
+                        "needs_practice": r["needs_practice"],
+                        "updated_at": r["updated_at"],
+                        "subtopics": subtopics_by_topic.get(tid, [])
+                    }
+                    chapters_map[cid]["topics"].append(topic_dict)
+
+            return list(chapters_map.values())
+    finally:
+        conn.close()
+
+
+def bulk_create_syllabus(user_id: int, syllabus_list: list) -> bool:
+    """
+    High-speed transactional bulk syllabus preloader using execute_values batching.
+    Creates all subjects, chapters, topics, and initial topic_progress rows
+    in a single database transaction in seconds.
+    """
+    if not syllabus_list:
+        return False
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            for s_idx, sub_data in enumerate(syllabus_list):
+                sub_name = sub_data["name"].strip()
+                sub_color = sub_data.get("color", "#6366F1")
+                cursor.execute("""
+                    INSERT INTO subjects (user_id, name, color, display_order)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT(user_id, name) DO UPDATE SET color = EXCLUDED.color
+                    RETURNING id
+                """, (user_id, sub_name, sub_color, s_idx + 1))
+                sub_id = cursor.fetchone()[0]
+
+                # Fetch existing chapters for this subject
+                cursor.execute("SELECT id, name FROM chapters WHERE user_id = %s AND subject_id = %s", (user_id, sub_id))
+                existing_chap_map = {r[1]: r[0] for r in cursor.fetchall()}
+
+                chaps_data = sub_data.get("chapters", [])
+                if not chaps_data:
+                    continue
+
+                chap_tuples = [
+                    (user_id, sub_id, ch["name"].strip(), c_idx + 1)
+                    for c_idx, ch in enumerate(chaps_data)
+                    if ch["name"].strip() not in existing_chap_map
+                ]
+                if chap_tuples:
+                    inserted_chaps = psycopg2.extras.execute_values(
+                        cursor,
+                        "INSERT INTO chapters (user_id, subject_id, name, display_order) VALUES %s RETURNING id, name",
+                        chap_tuples,
+                        fetch=True
+                    )
+                    for r in inserted_chaps:
+                        existing_chap_map[r[1]] = r[0]
+
+                # Collect and batch insert all topics across all chapters for this subject
+                all_topic_tuples = []
+                for ch in chaps_data:
+                    chap_name = ch["name"].strip()
+                    chap_id = existing_chap_map.get(chap_name)
+                    if chap_id:
+                        for t_idx, t_name in enumerate(ch.get("topics", [])):
+                            if t_name.strip():
+                                all_topic_tuples.append((user_id, chap_id, t_name.strip(), t_idx + 1))
+
+                if all_topic_tuples:
+                    inserted_topics = psycopg2.extras.execute_values(
+                        cursor,
+                        "INSERT INTO topics (user_id, chapter_id, name, display_order) VALUES %s RETURNING id",
+                        all_topic_tuples,
+                        fetch=True
+                    )
+                    new_topic_ids = [r[0] for r in inserted_topics]
+
+                    if new_topic_ids:
+                        prog_tuples = [(user_id, 'topic', tid, 'Not Started', 3, '', 0, 0, 0) for tid in new_topic_ids]
+                        psycopg2.extras.execute_values(
+                            cursor,
+                            """INSERT INTO topic_progress (user_id, item_type, item_id, status, understanding, notes, is_important, is_difficult, needs_practice, updated_at)
+                               VALUES %s ON CONFLICT (user_id, item_type, item_id) DO NOTHING""",
+                            prog_tuples,
+                            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)"
+                        )
+
+            conn.commit()
+            st.cache_data.clear()
+            return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 
 
 # ══════════════════════════════════════════════
@@ -866,56 +1190,41 @@ def get_subject_stats(user_id: int, subject_id: int) -> dict:
 # ══════════════════════════════════════════════
 
 def get_term_stats(user_id: int, term_id: int) -> dict:
-    """Calculate progress statistics for chapters assigned to a term."""
+    """Calculate progress statistics for chapters assigned to a term in 1 single query."""
     conn = get_connection()
     try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT chapter_id FROM term_chapters WHERE user_id = %s AND term_id = %s", (user_id, term_id))
-            chapter_ids = [c[0] for c in cursor.fetchall()]
-
-            if not chapter_ids:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    COUNT(DISTINCT tc.chapter_id) AS total_chapters,
+                    COUNT(DISTINCT t.id) AS total_topics,
+                    COUNT(DISTINCT CASE WHEN tp.status IN ('Completed', 'Revision Done') THEN t.id END) AS completed,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'In Progress' THEN t.id END) AS in_progress,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'Not Started' OR tp.status IS NULL THEN t.id END) AS not_started,
+                    COUNT(DISTINCT CASE WHEN tp.status = 'Revision Done' THEN t.id END) AS revision_done
+                FROM term_chapters tc
+                LEFT JOIN topics t ON t.chapter_id = tc.chapter_id AND t.user_id = tc.user_id
+                LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = tc.user_id
+                WHERE tc.user_id = %s AND tc.term_id = %s
+            """, (user_id, term_id))
+            r = cursor.fetchone()
+            if not r or r["total_chapters"] == 0:
                 return {
                     "total_chapters": 0, "total_topics": 0, "completed": 0,
                     "in_progress": 0, "not_started": 0, "revision_done": 0,
                     "percent_completed": 0.0
                 }
-
-            cursor.execute(
-                "SELECT id FROM topics WHERE user_id = %s AND chapter_id = ANY(%s)",
-                (user_id, chapter_ids)
-            )
-            topic_ids = [t[0] for t in cursor.fetchall()]
-
-            if not topic_ids:
-                return {
-                    "total_chapters": len(chapter_ids), "total_topics": 0, "completed": 0,
-                    "in_progress": 0, "not_started": 0, "revision_done": 0,
-                    "percent_completed": 0.0
-                }
-
-            cursor.execute("""
-                SELECT status, COUNT(*) as cnt
-                FROM topic_progress
-                WHERE user_id = %s AND item_type = 'topic' AND item_id = ANY(%s)
-                GROUP BY status
-            """, (user_id, topic_ids))
-            status_rows = cursor.fetchall()
-            status_map = {r[0]: r[1] for r in status_rows}
-            
-            completed = status_map.get("Completed", 0) + status_map.get("Revision Done", 0)
-            in_progress = status_map.get("In Progress", 0)
-            not_started = status_map.get("Not Started", 0)
-            revision_done = status_map.get("Revision Done", 0)
-            total_topics = len(topic_ids)
-
+            tot_topics = r["total_topics"]
+            comp = r["completed"]
+            pct = round((comp / tot_topics * 100), 1) if tot_topics > 0 else 0.0
             return {
-                "total_chapters": len(chapter_ids),
-                "total_topics": total_topics,
-                "completed": completed,
-                "in_progress": in_progress,
-                "not_started": not_started,
-                "revision_done": revision_done,
-                "percent_completed": round((completed / total_topics * 100), 1) if total_topics > 0 else 0.0
+                "total_chapters": r["total_chapters"],
+                "total_topics": tot_topics,
+                "completed": comp,
+                "in_progress": r["in_progress"],
+                "not_started": r["not_started"],
+                "revision_done": r["revision_done"],
+                "percent_completed": pct
             }
     finally:
         conn.close()
@@ -925,6 +1234,7 @@ def get_term_stats(user_id: int, term_id: int) -> dict:
 # DAILY STUDY PLANS
 # ══════════════════════════════════════════════
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_daily_plans(user_id: int, plan_date: str):
     """Retrieve daily study plan tasks for a given date (YYYY-MM-DD)."""
     conn = get_connection()
@@ -962,6 +1272,7 @@ def add_daily_plan(user_id: int, plan_date: str, description: str, duration_minu
             """, (user_id, plan_date, subject_id, chapter_id, topic_id, description.strip(), duration_minutes, max_order + 1))
             plan_id = cursor.fetchone()[0]
             conn.commit()
+            st.cache_data.clear()
             return plan_id
     except Exception:
         conn.rollback()
@@ -980,6 +1291,7 @@ def toggle_daily_plan(user_id: int, plan_id: int, is_completed: bool):
                 (1 if is_completed else 0, user_id, plan_id)
             )
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -994,6 +1306,7 @@ def delete_daily_plan(user_id: int, plan_id: int):
         with conn.cursor() as cursor:
             cursor.execute("DELETE FROM daily_plans WHERE user_id = %s AND id = %s", (user_id, plan_id))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -1005,6 +1318,7 @@ def delete_daily_plan(user_id: int, plan_id: int):
 # GOALS
 # ══════════════════════════════════════════════
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_all_goals(user_id: int):
     """Retrieve all study goals for a user."""
     conn = get_connection()
@@ -1028,6 +1342,7 @@ def add_goal(user_id: int, title: str, goal_type: str = "Daily", target: int = 1
             """, (user_id, title.strip(), goal_type, target, deadline))
             goal_id = cursor.fetchone()[0]
             conn.commit()
+            st.cache_data.clear()
             return goal_id
     except Exception:
         conn.rollback()
@@ -1045,6 +1360,7 @@ def update_goal_progress(user_id: int, goal_id: int, progress: int, is_completed
                 UPDATE goals SET progress = %s, is_completed = %s WHERE user_id = %s AND id = %s
             """, (progress, 1 if is_completed else 0, user_id, goal_id))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -1059,11 +1375,13 @@ def delete_goal(user_id: int, goal_id: int):
         with conn.cursor() as cursor:
             cursor.execute("DELETE FROM goals WHERE user_id = %s AND id = %s", (user_id, goal_id))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+
 
 
 # ══════════════════════════════════════════════
@@ -1166,6 +1484,7 @@ def add_study_session(user_id: int, subject_id: int = None, chapter_id: int = No
                   session_date, notes.strip() if notes else ""))
             session_id = cursor.fetchone()[0]
             conn.commit()
+            st.cache_data.clear()
             return session_id
     except Exception:
         conn.rollback()
@@ -1174,6 +1493,7 @@ def add_study_session(user_id: int, subject_id: int = None, chapter_id: int = No
         conn.close()
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_study_sessions(user_id: int, limit: int = 20):
     """Retrieve recent study sessions with subject/chapter/topic names."""
     conn = get_connection()
@@ -1204,6 +1524,7 @@ def delete_study_session(user_id: int, session_id: int):
             cursor.execute("DELETE FROM study_sessions WHERE user_id = %s AND id = %s",
                            (user_id, session_id))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -1211,6 +1532,7 @@ def delete_study_session(user_id: int, session_id: int):
         conn.close()
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_weekly_study_summary(user_id: int):
     """Return total minutes studied per day for the last 7 days."""
     import datetime
@@ -1272,6 +1594,7 @@ def schedule_revisions(user_id: int, item_type: str, item_id: int):
                     VALUES (%s, %s, %s, %s, %s, 0)
                 """, (user_id, item_type, item_id, due.strftime("%Y-%m-%d"), interval))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -1279,6 +1602,7 @@ def schedule_revisions(user_id: int, item_type: str, item_id: int):
         conn.close()
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_due_revisions(user_id: int, date_str: str):
     """Return revisions that are due on or before the given date and not yet completed.
     Includes the topic/subtopic name for display.
@@ -1324,6 +1648,7 @@ def complete_revision(user_id: int, revision_id: int):
                 WHERE user_id = %s AND id = %s
             """, (datetime.date.today().strftime("%Y-%m-%d"), user_id, revision_id))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -1348,8 +1673,10 @@ def reset_all_data(user_id: int):
             for table in tables:
                 cursor.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+

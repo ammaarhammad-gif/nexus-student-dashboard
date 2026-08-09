@@ -10,15 +10,16 @@ import csv
 import io
 from models import (
     get_all_subjects, add_subject, rename_subject, delete_subject,
-    get_chapters_for_subject, add_chapter, rename_chapter, delete_chapter,
-    move_chapter,
-    get_topics_for_chapter, add_topic, rename_topic, delete_topic,
-    get_subtopics_for_topic, add_subtopic, rename_subtopic, delete_subtopic,
-    get_progress, save_progress, get_user_profile,
-    import_syllabus_from_csv, schedule_revisions, get_user_theme
+    add_chapter, rename_chapter, delete_chapter, move_chapter,
+    add_topic, rename_topic, delete_topic,
+    add_subtopic, delete_subtopic,
+    save_progress, get_user_profile,
+    import_syllabus_from_csv, schedule_revisions, get_user_theme,
+    get_subject_hierarchy
 )
-from preloaded_syllabi import preload_standard_syllabus
+from preloaded_syllabi import preload_standard_syllabus, reload_and_replace_syllabus
 from styles import render_header
+
 
 STATUS_OPTIONS = ["Not Started", "In Progress", "Completed", "Revision Done"]
 STATUS_ICONS = {
@@ -134,7 +135,7 @@ def _render_csv_import_tab(user_id: int):
 
 
 def _render_manage_syllabus_tab(user_id: int, board: str, class_name: str):
-    """Main syllabus management tab with 1-click topic completion."""
+    """Main syllabus management tab with instant single-query hierarchy and 1-click topic completion."""
     subjects = get_all_subjects(user_id)
 
     # ── Auto-load official syllabus if user has no subjects ──
@@ -165,11 +166,12 @@ def _render_manage_syllabus_tab(user_id: int, board: str, class_name: str):
                             st.error("Subject already exists.")
             
             st.markdown("---")
-            if st.button(f"⚡ Reload Full {board} ({class_name}) Syllabus", use_container_width=True):
-                with st.spinner("Reloading official syllabus..."):
-                    preload_standard_syllabus(user_id, board, class_name)
+            if st.button(f"🔄 Reload Full {board} ({class_name}) Syllabus", use_container_width=True):
+                with st.spinner("Replacing syllabus with official curriculum..."):
+                    reload_and_replace_syllabus(user_id, board, class_name)
                 st.success("Official syllabus reloaded!")
                 st.rerun()
+
 
     if not subjects:
         st.info("📝 Loading your syllabus... Please refresh if it does not load automatically.")
@@ -185,19 +187,15 @@ def _render_manage_syllabus_tab(user_id: int, board: str, class_name: str):
     )
     selected_subject = subjects[selected_idx]
 
-    # ── Subject Banner & Quick Progress ──
-    chapters = get_chapters_for_subject(user_id, selected_subject["id"])
+    # ── Fetch entire subject hierarchy in ONE fast indexed query ──
+    chapters = get_subject_hierarchy(user_id, selected_subject["id"])
     
     # Calculate subject completion
-    total_subject_topics = 0
-    completed_subject_topics = 0
-    for ch in chapters:
-        top_list = get_topics_for_chapter(user_id, ch["id"])
-        total_subject_topics += len(top_list)
-        for t in top_list:
-            p = get_progress(user_id, "topic", t["id"])
-            if p["status"] == "Completed" or p["status"] == "Revision Done":
-                completed_subject_topics += 1
+    total_subject_topics = sum(len(ch["topics"]) for ch in chapters)
+    completed_subject_topics = sum(
+        1 for ch in chapters for t in ch["topics"]
+        if t["status"] in ["Completed", "Revision Done"]
+    )
 
     sub_pct = round((completed_subject_topics / total_subject_topics * 100)) if total_subject_topics > 0 else 0
 
@@ -205,12 +203,12 @@ def _render_manage_syllabus_tab(user_id: int, board: str, class_name: str):
         <div class="nexus-card" style="border-top: 4px solid {selected_subject['color']}; margin-top: 10px; margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>
-                    <h2 style="margin: 0; color: #FFFFFF; font-size: 1.6rem;">{selected_subject['name']}</h2>
-                    <span style="color: #94A3B8; font-size: 0.9rem;">{len(chapters)} Chapters • {total_subject_topics} Topics</span>
+                    <h2 style="margin: 0; font-size: 1.6rem;">{selected_subject['name']}</h2>
+                    <span style="font-size: 0.9rem;">{len(chapters)} Chapters • {total_subject_topics} Topics</span>
                 </div>
                 <div style="text-align: right;">
                     <span style="font-size: 1.8rem; font-weight: 700; color: {selected_subject['color']};">{sub_pct}%</span>
-                    <span style="color: #CBD5E1; font-size: 0.85rem; display: block;">{completed_subject_topics}/{total_subject_topics} Done</span>
+                    <span style="font-size: 0.85rem; display: block;">{completed_subject_topics}/{total_subject_topics} Done</span>
                 </div>
             </div>
         </div>
@@ -232,10 +230,10 @@ def _render_manage_syllabus_tab(user_id: int, board: str, class_name: str):
 
     # ── Render Chapters & Topics ──
     for chap_idx, chap in enumerate(chapters):
-        topics = get_topics_for_chapter(user_id, chap["id"])
+        topics = chap["topics"]
         
         # Calculate chapter completion
-        ch_done = sum(1 for t in topics if get_progress(user_id, "topic", t["id"])["status"] in ["Completed", "Revision Done"])
+        ch_done = sum(1 for t in topics if t["status"] in ["Completed", "Revision Done"])
         ch_total = len(topics)
         ch_badge = f"{ch_done}/{ch_total} Done" if ch_total > 0 else "0 Topics"
         is_all_done = (ch_done == ch_total and ch_total > 0)
@@ -294,10 +292,9 @@ def _render_manage_syllabus_tab(user_id: int, board: str, class_name: str):
                 _render_topic_card(user_id, topic)
 
 
-def _render_topic_card(user_id: int, topic):
+def _render_topic_card(user_id: int, topic: dict):
     """Render a single topic with instant 1-click ticking and rich controls."""
-    prog = get_progress(user_id, "topic", topic["id"])
-    is_completed = (prog["status"] == "Completed" or prog["status"] == "Revision Done")
+    is_completed = (topic["status"] in ["Completed", "Revision Done"])
 
     # ── Top Row: 1-Click Checkbox + Topic Name + Status Badge ──
     col_check, col_details_btn = st.columns([5, 1])
@@ -319,7 +316,7 @@ def _render_topic_card(user_id: int, topic):
             new_status_select = st.selectbox(
                 "Status",
                 STATUS_OPTIONS,
-                index=STATUS_OPTIONS.index(prog["status"]) if prog["status"] in STATUS_OPTIONS else 0,
+                index=STATUS_OPTIONS.index(topic["status"]) if topic["status"] in STATUS_OPTIONS else 0,
                 key=f"status_sel_{topic['id']}"
             )
 
@@ -328,23 +325,23 @@ def _render_topic_card(user_id: int, topic):
                 "Understanding Level",
                 options=[1, 2, 3, 4, 5],
                 format_func=lambda x: UNDERSTANDING_LABELS[x],
-                index=max(0, min(4, prog["understanding"] - 1)),
+                index=max(0, min(4, topic["understanding"] - 1)),
                 key=f"und_sel_{topic['id']}"
             )
 
             # Flags
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
-                is_imp = st.checkbox("⭐ Important", value=bool(prog["is_important"]), key=f"imp_{topic['id']}")
+                is_imp = st.checkbox("⭐ Important", value=bool(topic["is_important"]), key=f"imp_{topic['id']}")
             with col_f2:
-                is_diff = st.checkbox("⚠️ Difficult", value=bool(prog["is_difficult"]), key=f"diff_{topic['id']}")
+                is_diff = st.checkbox("⚠️ Difficult", value=bool(topic["is_difficult"]), key=f"diff_{topic['id']}")
             with col_f3:
-                is_prac = st.checkbox("🔄 Practice", value=bool(prog["needs_practice"]), key=f"prac_{topic['id']}")
+                is_prac = st.checkbox("🔄 Practice", value=bool(topic["needs_practice"]), key=f"prac_{topic['id']}")
 
             # Notes
             edit_notes = st.text_input(
                 "Notes / Key Formulae",
-                value=prog.get("notes", ""),
+                value=topic.get("notes", "") or "",
                 key=f"notes_input_{topic['id']}"
             )
 
@@ -360,7 +357,7 @@ def _render_topic_card(user_id: int, topic):
                     is_difficult=int(is_diff),
                     needs_practice=int(is_prac)
                 )
-                if new_status_select == "Completed" and prog["status"] != "Completed":
+                if new_status_select == "Completed" and topic["status"] != "Completed":
                     schedule_revisions(user_id, "topic", topic["id"])
                 st.toast("Saved changes!", icon="✅")
                 st.rerun()
@@ -384,11 +381,11 @@ def _render_topic_card(user_id: int, topic):
             item_type="topic",
             item_id=topic["id"],
             status=new_status,
-            understanding=prog.get("understanding", 3),
-            notes=prog.get("notes", ""),
-            is_important=prog.get("is_important", 0),
-            is_difficult=prog.get("is_difficult", 0),
-            needs_practice=prog.get("needs_practice", 0)
+            understanding=topic.get("understanding", 3),
+            notes=topic.get("notes", "") or "",
+            is_important=topic.get("is_important", 0),
+            is_difficult=topic.get("is_difficult", 0),
+            needs_practice=topic.get("needs_practice", 0)
         )
         if checked:
             schedule_revisions(user_id, "topic", topic["id"])
@@ -397,24 +394,23 @@ def _render_topic_card(user_id: int, topic):
 
     # ── Display Badges and Notes if present ──
     flags_html = []
-    if prog.get("is_important"):
+    if topic.get("is_important"):
         flags_html.append("<span style='color: #FDE047; font-size: 0.78rem;'>⭐ Important</span>")
-    if prog.get("is_difficult"):
+    if topic.get("is_difficult"):
         flags_html.append("<span style='color: #F87171; font-size: 0.78rem;'>⚠️ Difficult</span>")
-    if prog.get("needs_practice"):
+    if topic.get("needs_practice"):
         flags_html.append("<span style='color: #60A5FA; font-size: 0.78rem;'>🔄 Needs Practice</span>")
-    if prog.get("notes"):
-        flags_html.append(f"<span style='color: #94A3B8; font-size: 0.78rem; font-style: italic;'>📝 {prog['notes']}</span>")
+    if topic.get("notes"):
+        flags_html.append(f"<span style='font-size: 0.78rem; font-style: italic;'>📝 {topic['notes']}</span>")
 
     if flags_html:
         st.markdown(f"<div style='margin-left: 28px; margin-bottom: 6px; display: flex; gap: 12px; flex-wrap: wrap;'>{' • '.join(flags_html)}</div>", unsafe_allow_html=True)
 
     # ── Subtopics ──
-    subtopics = get_subtopics_for_topic(user_id, topic["id"])
+    subtopics = topic.get("subtopics", [])
     if subtopics:
         for sub in subtopics:
-            sub_prog = get_progress(user_id, "subtopic", sub["id"])
-            sub_done = (sub_prog["status"] == "Completed")
+            sub_done = (sub["status"] == "Completed")
             
             sub_c1, sub_c2 = st.columns([5, 1])
             with sub_c1:
@@ -426,7 +422,7 @@ def _render_topic_card(user_id: int, topic):
                 if sub_checked != sub_done:
                     new_sub_stat = "Completed" if sub_checked else "Not Started"
                     save_progress(user_id, "subtopic", sub["id"], status=new_sub_stat,
-                                understanding=sub_prog["understanding"])
+                                understanding=sub["understanding"])
                     if sub_checked:
                         schedule_revisions(user_id, "subtopic", sub["id"])
                     st.rerun()
@@ -443,4 +439,5 @@ def _render_topic_card(user_id: int, topic):
                 add_subtopic(user_id, topic["id"], new_subtop.strip())
                 st.rerun()
 
-    st.markdown("<hr style='margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+

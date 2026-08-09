@@ -67,6 +67,7 @@ def get_connection():
     return PooledConnectionWrapper(pool, conn)
 
 
+@st.cache_resource
 def init_db():
     """Initializes all required database tables for the Student Dashboard in PostgreSQL."""
     try:
@@ -74,6 +75,7 @@ def init_db():
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
         return False
+
         
     cursor = conn.cursor()
 
@@ -106,8 +108,14 @@ def init_db():
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             name VARCHAR(255) NOT NULL,
             exam_date VARCHAR(50),
-            display_order INTEGER DEFAULT 0
+            display_order INTEGER DEFAULT 0,
+            is_already_done INTEGER DEFAULT 0
         );
+        """)
+
+        # Migration: ensure is_already_done exists if table was created previously
+        cursor.execute("""
+        ALTER TABLE terms ADD COLUMN IF NOT EXISTS is_already_done INTEGER DEFAULT 0;
         """)
 
         # ── 4. Subjects ──
@@ -261,6 +269,20 @@ def init_db():
             is_completed INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        """)
+
+        # ── 15. Performance Indexes for Instant Screen Transitions (<100ms) ──
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_topic_prog_user_item ON topic_progress (user_id, item_type, item_id);
+        CREATE INDEX IF NOT EXISTS idx_topic_prog_user_status ON topic_progress (user_id, status);
+        CREATE INDEX IF NOT EXISTS idx_chapters_user_sub ON chapters (user_id, subject_id, display_order);
+        CREATE INDEX IF NOT EXISTS idx_topics_user_chap ON topics (user_id, chapter_id, display_order);
+        CREATE INDEX IF NOT EXISTS idx_subtopics_user_top ON subtopics (user_id, topic_id, display_order);
+        CREATE INDEX IF NOT EXISTS idx_daily_plans_user_date ON daily_plans (user_id, plan_date);
+        CREATE INDEX IF NOT EXISTS idx_terms_user_order ON terms (user_id, display_order);
+        CREATE INDEX IF NOT EXISTS idx_term_chaps_user_term ON term_chapters (user_id, term_id);
+        CREATE INDEX IF NOT EXISTS idx_revisions_user_due ON revisions (user_id, is_completed, due_date);
+        CREATE INDEX IF NOT EXISTS idx_study_sess_user ON study_sessions (user_id, session_date);
         """)
 
         conn.commit()

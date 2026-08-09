@@ -116,7 +116,7 @@ def _render_daily_planner_tab(user_id: int):
                 color = task.get("subject_color") or "#475569"
                 sub_name = task.get("subject_name")
                 tag = f"<span style='background: {color}; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; color: #fff;'>{sub_name}</span> " if sub_name else ""
-                style = "text-decoration: line-through; color: #64748B;" if task["is_completed"] else "color: #F8FAFC;"
+                style = "text-decoration: line-through; opacity: 0.6;" if task["is_completed"] else ""
                 st.markdown(f"{tag}<span style='{style} font-weight: 500;'>{task['description']}</span>", unsafe_allow_html=True)
 
             with c_dur:
@@ -234,8 +234,8 @@ def _render_goals_tab(user_id: int):
                         st.rerun()
 
                 with c2:
-                    style = "text-decoration: line-through; color: #64748B;" if is_done else "color: #F8FAFC;"
-                    st.markdown(f"<strong style='{style} font-size: 1.05rem;'>{g['title']}</strong><br><span style='color: #94A3B8; font-size: 0.8rem;'>{g['goal_type']} • Due: {g.get('deadline', 'N/A')}</span>", unsafe_allow_html=True)
+                    style = "text-decoration: line-through; opacity: 0.6;" if is_done else ""
+                    st.markdown(f"<strong style='{style} font-size: 1.05rem;'>{g['title']}</strong><br><span style='font-size: 0.8rem;'>{g['goal_type']} • Due: {g.get('deadline', 'N/A')}</span>", unsafe_allow_html=True)
 
                 with c3:
                     new_prog = st.number_input(
@@ -364,10 +364,11 @@ def _render_study_sessions_tab(user_id: int):
                     f"<span style='background: {color}; padding: 2px 8px; "
                     f"border-radius: 4px; font-size: 0.75rem; color: #fff;'>"
                     f"{sub_name}</span> "
-                    f"<span style='color: #F8FAFC; font-weight: 500;'>"
+                    f"<span style='font-weight: 500;'>"
                     f"{sess.get('notes') or ''}</span>",
                     unsafe_allow_html=True
                 )
+
             with c2:
                 st.caption(f"⏱️ {sess['duration_minutes']} min")
             with c3:

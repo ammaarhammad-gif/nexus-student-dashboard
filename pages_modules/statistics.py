@@ -7,7 +7,7 @@ and detailed stat cards for every subject.
 
 import streamlit as st
 import plotly.graph_objects as go
-from models import get_all_subjects, get_subject_stats, get_user_theme
+from models import get_all_subjects_with_stats, get_user_theme
 from styles import render_header, render_metric_card
 
 
@@ -16,34 +16,21 @@ def render_statistics_page(user_id: int):
     is_dark = (user_theme.strip().lower() == "dark")
     render_header("📊 Statistics & Analytics", "Visual breakdown of your progress across all subjects.", theme=user_theme)
 
-    subjects = get_all_subjects(user_id)
+    subjects = get_all_subjects_with_stats(user_id)
 
     if not subjects:
         st.info("📝 Add subjects in the **Syllabus Manager** to see statistics here.")
         return
 
-    # Gather data (cache stats to avoid duplicate DB calls)
-    names = []
-    pcts = []
-    completed_counts = []
-    total_counts = []
-    remaining_counts = []
-    avg_understandings = []
-    revision_counts = []
-    colors = []
-    stats_cache = {}  # subject_id -> stats dict
-
-    for sub in subjects:
-        stats = get_subject_stats(user_id, sub["id"])
-        stats_cache[sub["id"]] = stats
-        names.append(sub["name"])
-        pcts.append(stats["percent_completed"])
-        completed_counts.append(stats["completed"])
-        total_counts.append(stats["total_topics"])
-        remaining_counts.append(stats["remaining"])
-        avg_understandings.append(stats["avg_understanding"])
-        revision_counts.append(stats["revision_done"])
-        colors.append(sub["color"])
+    # Gather data from single-query subject stats
+    names = [s["name"] for s in subjects]
+    pcts = [s["percent_completed"] for s in subjects]
+    completed_counts = [s["completed"] for s in subjects]
+    total_counts = [s["total_topics"] for s in subjects]
+    remaining_counts = [s["remaining"] for s in subjects]
+    avg_understandings = [s["avg_understanding"] for s in subjects]
+    revision_counts = [s["revision_done"] for s in subjects]
+    colors = [s["color"] for s in subjects]
 
     # Guard: if every subject has 0 topics, show helpful message instead of empty charts
     if sum(total_counts) == 0:
@@ -54,7 +41,7 @@ def render_statistics_page(user_id: int):
     st.subheader("📈 Completion by Subject")
 
     text_col = "#FFFFFF" if is_dark else "#0F172A"
-    grid_col = "rgba(255,255,255,0.06)" if is_dark else "rgba(0,0,0,0.06)"
+    grid_col = "rgba(255,255,255,0.08)" if is_dark else "rgba(0,0,0,0.06)"
     axis_col = "#CBD5E1" if is_dark else "#64748B"
 
     fig_bar = go.Figure()
@@ -138,30 +125,30 @@ def render_statistics_page(user_id: int):
 
     st.markdown("---")
 
-    # ── Per-Subject Stat Cards (reuse cached stats) ──
+    # ── Per-Subject Stat Cards ──
     st.subheader("📋 Detailed Subject Stats")
 
     for row_start in range(0, len(subjects), 2):
         row_subs = subjects[row_start:row_start + 2]
         cols = st.columns(2)
         for idx, sub in enumerate(row_subs):
-            stats = stats_cache[sub["id"]]
             with cols[idx]:
                 st.markdown(f"""
                     <div class="nexus-card" style="border-top: 3px solid {sub['color']};">
-                        <h4 style="color: #F8FAFC; margin: 0 0 12px 0;">{sub['name']}</h4>
-                        <table style="width: 100%; color: #CBD5E1; font-size: 0.88rem;">
-                            <tr><td>📖 Chapters</td><td style="text-align:right;"><b>{stats['total_chapters']}</b></td></tr>
-                            <tr><td>📝 Total Topics</td><td style="text-align:right;"><b>{stats['total_topics']}</b></td></tr>
-                            <tr><td>✅ Completed</td><td style="text-align:right; color: #22C55E;"><b>{stats['completed']}</b></td></tr>
-                            <tr><td>🟡 In Progress</td><td style="text-align:right; color: #EAB308;"><b>{stats['in_progress']}</b></td></tr>
-                            <tr><td>⚪ Not Started</td><td style="text-align:right;"><b>{stats['not_started']}</b></td></tr>
-                            <tr><td>🔵 Revision Done</td><td style="text-align:right; color: #3B82F6;"><b>{stats['revision_done']}</b></td></tr>
-                            <tr><td>🧠 Avg Understanding</td><td style="text-align:right;"><b>{stats['avg_understanding']}/5</b></td></tr>
+                        <h4 style="margin: 0 0 12px 0;">{sub['name']}</h4>
+                        <table style="width: 100%; font-size: 0.88rem;">
+                            <tr><td>📖 Chapters</td><td style="text-align:right;"><b>{sub['total_chapters']}</b></td></tr>
+                            <tr><td>📝 Total Topics</td><td style="text-align:right;"><b>{sub['total_topics']}</b></td></tr>
+                            <tr><td>✅ Completed</td><td style="text-align:right; color: #22C55E;"><b>{sub['completed']}</b></td></tr>
+                            <tr><td>🟡 In Progress</td><td style="text-align:right; color: #EAB308;"><b>{sub['in_progress']}</b></td></tr>
+                            <tr><td>⚪ Not Started</td><td style="text-align:right;"><b>{sub['not_started']}</b></td></tr>
+                            <tr><td>🔵 Revision Done</td><td style="text-align:right; color: #3B82F6;"><b>{sub['revision_done']}</b></td></tr>
+                            <tr><td>🧠 Avg Understanding</td><td style="text-align:right;"><b>{sub['avg_understanding']}/5</b></td></tr>
                             <tr><td style="padding-top: 8px;">📊 <b>Progress</b></td>
                                 <td style="text-align:right; padding-top: 8px; color: {sub['color']}; font-size: 1.1rem;">
-                                    <b>{stats['percent_completed']}%</b>
+                                    <b>{sub['percent_completed']}%</b>
                                 </td></tr>
                         </table>
                     </div>
                 """, unsafe_allow_html=True)
+
