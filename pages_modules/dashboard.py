@@ -49,21 +49,18 @@ def render_dashboard_page(user_id: int):
     c_act1, c_act2, c_act3 = st.columns([1, 1, 1])
     with c_act1:
         if st.button("📚 Manage Syllabus & Topics", use_container_width=True, key="dash_go_syllabus_btn"):
-            st.session_state["main_nav_target"] = "📚 Syllabus Manager"
-            if "active_nav_radio" in st.session_state:
-                del st.session_state["active_nav_radio"]
+            st.session_state["current_page"] = "📚 Syllabus Manager"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act2:
         if st.button("🗓️ Study Planner & Timetable", use_container_width=True, key="dash_go_planner_btn"):
-            st.session_state["main_nav_target"] = "🗓️ Study Planner"
-            if "active_nav_radio" in st.session_state:
-                del st.session_state["active_nav_radio"]
+            st.session_state["current_page"] = "🗓️ Study Planner"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act3:
         if st.button("🖼️ Customize Wallpaper & Theme", use_container_width=True, type="primary", key="dash_go_wallpaper_btn"):
-            st.session_state["main_nav_target"] = "🖼️ Wallpapers & Themes"
-            if "active_nav_radio" in st.session_state:
-                del st.session_state["active_nav_radio"]
+            st.session_state["current_page"] = "🖼️ Wallpapers & Themes"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
 
     # ── Top Metric Cards ──

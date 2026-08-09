@@ -252,24 +252,21 @@ def main():
             "⚙️ Settings"
         ]
 
-        # Handle programmatic navigation requests
-        current_nav_index = 0
-        if "main_nav_target" in st.session_state:
-            target = st.session_state.pop("main_nav_target")
-            if target in page_options:
-                current_nav_index = page_options.index(target)
-                if "active_nav_radio" in st.session_state:
-                    del st.session_state["active_nav_radio"]
-        elif "active_nav_radio" in st.session_state and st.session_state["active_nav_radio"] in page_options:
-            current_nav_index = page_options.index(st.session_state["active_nav_radio"])
+        if "current_page" not in st.session_state or st.session_state["current_page"] not in page_options:
+            st.session_state["current_page"] = page_options[0]
 
-        page = st.radio(
+        nav_epoch = st.session_state.get("nav_epoch", 0)
+        current_nav_index = page_options.index(st.session_state["current_page"])
+
+        page_selection = st.radio(
             "Go to page",
             page_options,
             index=current_nav_index,
-            key="active_nav_radio",
+            key=f"nav_selector_{nav_epoch}",
             label_visibility="collapsed"
         )
+        st.session_state["current_page"] = page_selection
+        page = page_selection
         
         # ── Quick Wallpaper & Theme Switcher in Sidebar ──
         st.markdown("---")
@@ -326,15 +323,14 @@ def main():
             st.rerun()
 
         if st.button("🎨 Open Full Wallpaper Studio ➔", use_container_width=True, key="sb_open_studio_btn"):
-            st.session_state["main_nav_target"] = "🖼️ Wallpapers & Themes"
-            if "active_nav_radio" in st.session_state:
-                del st.session_state["active_nav_radio"]
+            st.session_state["current_page"] = "🖼️ Wallpapers & Themes"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
 
         st.markdown("---")
         if st.button("🚪 Log Out", use_container_width=True):
             clear_session_param()
-            for key in ["user_id", "username", "active_nav_radio"]:
+            for key in ["user_id", "username", "current_page", "nav_epoch"]:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
