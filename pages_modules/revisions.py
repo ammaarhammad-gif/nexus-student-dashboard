@@ -12,9 +12,11 @@ from models import (
     get_chapters_for_subject,
     get_topics_for_chapter,
     award_user_xp
-)
+from styles import render_breadcrumbs
+
 
 def render_revisions_page(user_id: int):
+    render_breadcrumbs(["🏠 Dashboard", "🧠 Revision Queue"])
     st.markdown("""
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px;">
             <div>

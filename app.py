@@ -18,6 +18,7 @@ from pages_modules.planner import render_planner_page
 from pages_modules.wallpapers import render_wallpapers_page
 from pages_modules.settings import render_settings_page
 from pages_modules.search import render_search_page
+from pages_modules.revisions import render_revisions_page
 from auth_utils import (
     create_session_token, verify_session_token,
     set_session_param, get_session_param, clear_session_param
@@ -307,6 +308,7 @@ def main():
             "🏠 Dashboard",
             "🔍 Global Search",
             "📚 Syllabus Manager",
+            "🧠 Revision Queue",
             "🗓️ Study Planner",
             "📊 Statistics",
             "🖼️ Wallpapers & Themes",
@@ -416,6 +418,8 @@ def main():
         render_search_page(user_id)
     elif page == "📚 Syllabus Manager":
         render_syllabus_page(user_id)
+    elif page == "🧠 Revision Queue":
+        render_revisions_page(user_id)
     elif page == "🗓️ Study Planner":
         render_planner_page(user_id)
     elif page == "📊 Statistics":

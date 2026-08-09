@@ -80,23 +80,23 @@ def render_dashboard_page(user_id: int):
     # ── Quick Hub Action Bar ──
     c_act1, c_act2, c_act3, c_act4 = st.columns([1, 1, 1, 1])
     with c_act1:
-        if st.button("📚 Manage Syllabus & Topics", use_container_width=True, key="dash_go_syllabus_btn"):
+        if st.button("📚 Syllabus Manager", use_container_width=True, key="dash_go_syllabus_btn"):
             st.session_state["current_page"] = "📚 Syllabus Manager"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act2:
-        if st.button("🔍 Global Search", use_container_width=True, key="dash_go_search_btn"):
-            st.session_state["current_page"] = "🔍 Global Search"
+        if st.button("🧠 Revision Queue", use_container_width=True, type="primary", key="dash_go_revisions_btn"):
+            st.session_state["current_page"] = "🧠 Revision Queue"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act3:
-        if st.button("🗓️ Study Planner & Timetable", use_container_width=True, key="dash_go_planner_btn"):
+        if st.button("🗓️ Study Planner", use_container_width=True, key="dash_go_planner_btn"):
             st.session_state["current_page"] = "🗓️ Study Planner"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act4:
-        if st.button("🖼️ Wallpapers & Themes", use_container_width=True, type="primary", key="dash_go_wallpaper_btn"):
-            st.session_state["current_page"] = "🖼️ Wallpapers & Themes"
+        if st.button("🔍 Global Search", use_container_width=True, key="dash_go_search_btn"):
+            st.session_state["current_page"] = "🔍 Global Search"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
 

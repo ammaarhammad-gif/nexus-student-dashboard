@@ -742,7 +742,7 @@ def get_progress(user_id: int, item_type: str, item_id: int) -> dict:
 def save_progress(user_id: int, item_type: str, item_id: int, status: str = "Not Started",
                   understanding: int = 3, notes: str = "",
                   is_important: int = 0, is_difficult: int = 0, needs_practice: int = 0):
-    """Save or update progress for a topic or subtopic."""
+    """Save or update progress for a topic or subtopic, and automatically schedule spaced revisions."""
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
@@ -761,11 +761,21 @@ def save_progress(user_id: int, item_type: str, item_id: int, status: str = "Not
             """, (user_id, item_type, item_id, status, understanding, notes,
                   is_important, is_difficult, needs_practice))
             conn.commit()
+            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+
+    # Automatically schedule adaptive spaced repetition revisions & award XP on completion
+    if status in ["Completed", "Revision Done"]:
+        try:
+            schedule_adaptive_revisions(user_id, item_type, item_id, understanding)
+            award_user_xp(user_id, 30, f"Completed topic #{item_id}")
+            update_user_streak(user_id)
+        except Exception:
+            pass
 
 
 # ══════════════════════════════════════════════
@@ -1307,6 +1317,207 @@ def delete_daily_plan(user_id: int, plan_id: int):
             cursor.execute("DELETE FROM daily_plans WHERE user_id = %s AND id = %s", (user_id, plan_id))
             conn.commit()
             st.cache_data.clear()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def auto_generate_study_plan(user_id: int, term_id: int = None, days_count: int = 14,
+                             topics_per_day: int = 3, start_date: str = None) -> dict:
+    """
+    Intelligent Auto-Scheduler:
+    - Finds all unfinished/in-progress topics (or topics belonging to chapters mapped to a specific term).
+    - Sorts topics using Priority Engine (weak understanding, high importance, exam proximity).
+    - Distributes topics across upcoming days starting from start_date (default today), balancing subjects.
+    - Adds tasks to daily_plans avoiding duplicates.
+    - Returns summary dictionary.
+    """
+    import datetime
+    start = datetime.datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else datetime.date.today()
+    
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # 1. Fetch relevant unfinished topics
+            if term_id:
+                cursor.execute("""
+                    SELECT t.id as topic_id, t.name as topic_name, c.id as chapter_id, c.name as chapter_name,
+                           s.id as subject_id, s.name as subject_name,
+                           COALESCE(tp.status, 'Not Started') as status,
+                           COALESCE(tp.understanding, 3) as understanding,
+                           COALESCE(tp.is_important, 0) as is_important,
+                           COALESCE(tp.is_difficult, 0) as is_difficult
+                    FROM topics t
+                    JOIN chapters c ON t.chapter_id = c.id
+                    JOIN subjects s ON c.subject_id = s.id
+                    JOIN term_chapters tc ON c.id = tc.chapter_id AND tc.term_id = %s
+                    LEFT JOIN topic_progress tp ON tp.user_id = %s AND tp.item_type = 'topic' AND tp.item_id = t.id
+                    WHERE t.user_id = %s AND COALESCE(tp.status, 'Not Started') != 'Completed'
+                """, (term_id, user_id, user_id))
+            else:
+                cursor.execute("""
+                    SELECT t.id as topic_id, t.name as topic_name, c.id as chapter_id, c.name as chapter_name,
+                           s.id as subject_id, s.name as subject_name,
+                           COALESCE(tp.status, 'Not Started') as status,
+                           COALESCE(tp.understanding, 3) as understanding,
+                           COALESCE(tp.is_important, 0) as is_important,
+                           COALESCE(tp.is_difficult, 0) as is_difficult
+                    FROM topics t
+                    JOIN chapters c ON t.chapter_id = c.id
+                    JOIN subjects s ON c.subject_id = s.id
+                    LEFT JOIN topic_progress tp ON tp.user_id = %s AND tp.item_type = 'topic' AND tp.item_id = t.id
+                    WHERE t.user_id = %s AND COALESCE(tp.status, 'Not Started') != 'Completed'
+                """, (user_id, user_id))
+            
+            topics = [dict(r) for r in cursor.fetchall()]
+            
+            if not topics:
+                return {"scheduled_count": 0, "days_used": 0, "message": "All topics in this scope are already completed! 🎉"}
+            
+            # Fetch existing planned topic IDs to avoid duplicate planning
+            cursor.execute("""
+                SELECT topic_id FROM daily_plans 
+                WHERE user_id = %s AND topic_id IS NOT NULL AND plan_date >= %s AND is_completed = 0
+            """, (user_id, start.strftime("%Y-%m-%d")))
+            already_planned = {r[0] for r in cursor.fetchall()}
+            
+            # Filter out already planned topics
+            unplanned_topics = [t for t in topics if t["topic_id"] not in already_planned]
+            if not unplanned_topics:
+                return {"scheduled_count": 0, "days_used": 0, "message": "All remaining topics are already scheduled in your planner!"}
+            
+            # 2. Sort by intelligent priority (low understanding first, high importance first, difficult first)
+            def topic_sort_key(t):
+                u_score = 5 - t["understanding"]
+                imp = t["is_important"] * 10
+                diff = t["is_difficult"] * 5
+                return -(u_score * 10 + imp + diff)
+            
+            unplanned_topics.sort(key=topic_sort_key)
+            
+            # 3. Distribute across days (interleaving subjects for balanced cognitive load)
+            by_subject = {}
+            for t in unplanned_topics:
+                by_subject.setdefault(t["subject_name"], []).append(t)
+            
+            interleaved = []
+            while any(by_subject.values()):
+                for sub_name in list(by_subject.keys()):
+                    if by_subject[sub_name]:
+                        interleaved.append(by_subject[sub_name].pop(0))
+            
+            scheduled_count = 0
+            curr_day_offset = 0
+            day_topic_count = 0
+            
+            for t in interleaved:
+                target_date = start + datetime.timedelta(days=curr_day_offset)
+                date_str = target_date.strftime("%Y-%m-%d")
+                
+                cursor.execute(
+                    "SELECT COALESCE(MAX(display_order), 0) FROM daily_plans WHERE user_id = %s AND plan_date = %s",
+                    (user_id, date_str)
+                )
+                max_order = cursor.fetchone()[0]
+                
+                desc = f"Study: {t['topic_name']} ({t['subject_name']})"
+                cursor.execute("""
+                    INSERT INTO daily_plans (user_id, plan_date, subject_id, chapter_id, topic_id, description, duration_minutes, display_order)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (user_id, date_str, t["subject_id"], t["chapter_id"], t["topic_id"], desc, 45, max_order + 1))
+                
+                scheduled_count += 1
+                day_topic_count += 1
+                
+                if day_topic_count >= topics_per_day:
+                    day_topic_count = 0
+                    curr_day_offset += 1
+                    if curr_day_offset >= days_count:
+                        curr_day_offset = days_count - 1
+            
+            conn.commit()
+            st.cache_data.clear()
+            return {
+                "scheduled_count": scheduled_count,
+                "days_used": min(days_count, curr_day_offset + 1),
+                "message": f"Successfully scheduled {scheduled_count} topics across {min(days_count, curr_day_offset + 1)} days!"
+            }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_overdue_study_tasks(user_id: int) -> list:
+    """Returns all daily study tasks scheduled for dates prior to today that remain uncompleted."""
+    import datetime
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT dp.*, s.name as subject_name, s.color as subject_color
+                FROM daily_plans dp
+                LEFT JOIN subjects s ON dp.subject_id = s.id
+                WHERE dp.user_id = %s AND dp.plan_date < %s AND dp.is_completed = 0
+                ORDER BY dp.plan_date ASC, dp.display_order ASC
+            """, (user_id, today_str))
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def reschedule_overdue_tasks(user_id: int, target_strategy: str = "today_forward", max_per_day: int = 3) -> int:
+    """
+    Intelligently reschedules all uncompleted past study tasks to today and upcoming days.
+    """
+    import datetime
+    today = datetime.date.today()
+    today_str = today.strftime("%Y-%m-%d")
+    
+    overdue = get_overdue_study_tasks(user_id)
+    if not overdue:
+        return 0
+    
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            day_offset = 0
+            
+            # Count existing uncompleted tasks on today
+            cursor.execute("SELECT COUNT(*) FROM daily_plans WHERE user_id = %s AND plan_date = %s AND is_completed = 0", (user_id, today_str))
+            count_in_day = cursor.fetchone()[0]
+            
+            for task in overdue:
+                if target_strategy == "today":
+                    new_date_str = today_str
+                else:
+                    if count_in_day >= max_per_day:
+                        day_offset += 1
+                        count_in_day = 0
+                    target_date = today + datetime.timedelta(days=day_offset)
+                    new_date_str = target_date.strftime("%Y-%m-%d")
+                
+                cursor.execute(
+                    "SELECT COALESCE(MAX(display_order), 0) FROM daily_plans WHERE user_id = %s AND plan_date = %s",
+                    (user_id, new_date_str)
+                )
+                max_order = cursor.fetchone()[0]
+                
+                cursor.execute("""
+                    UPDATE daily_plans 
+                    SET plan_date = %s, display_order = %s
+                    WHERE user_id = %s AND id = %s
+                """, (new_date_str, max_order + 1, user_id, task["id"]))
+                
+                count_in_day += 1
+                
+            conn.commit()
+            st.cache_data.clear()
+            return len(overdue)
     except Exception:
         conn.rollback()
         raise

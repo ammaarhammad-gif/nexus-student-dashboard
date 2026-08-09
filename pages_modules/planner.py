@@ -54,25 +54,110 @@ def render_planner_page(user_id: int):
 def _render_daily_planner_tab(user_id: int):
     st.subheader("📅 Daily Study Tasks")
 
-    col_date, col_summary = st.columns([2, 3])
+    # ── 1. Missed Task Rescheduler Alert ──
+    from models import get_overdue_study_tasks, reschedule_overdue_tasks, auto_generate_study_plan, get_top_nexus_priorities
+    overdue_tasks = get_overdue_study_tasks(user_id)
+    if overdue_tasks:
+        st.markdown(f"""
+            <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong style="color: #EF4444; font-size: 0.95rem;">⚠️ {len(overdue_tasks)} Overdue Study Task{'s' if len(overdue_tasks) != 1 else ''}</strong>
+                    <div style="font-size: 0.82rem; color: var(--nexus-text-sub);">Unfinished tasks from past days are waiting to be rescheduled.</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        col_res1, col_res2, _ = st.columns([1.5, 1.5, 2])
+        with col_res1:
+            if st.button("⚡ Rebalance Across Upcoming Days", type="primary", use_container_width=True, key="reschedule_forward_btn"):
+                count = reschedule_overdue_tasks(user_id, target_strategy="today_forward", max_per_day=3)
+                st.toast(f"✅ Rebalanced {count} overdue tasks across upcoming study days!", icon="🚀")
+                st.rerun()
+        with col_res2:
+            if st.button("📅 Move All to Today", use_container_width=True, key="reschedule_today_btn"):
+                count = reschedule_overdue_tasks(user_id, target_strategy="today")
+                st.toast(f"✅ Moved {count} tasks to today's schedule!", icon="📅")
+                st.rerun()
+
+    # ── 2. Top Controls & Intelligent Auto-Scheduler Modal ──
+    col_date, col_actions = st.columns([2, 3])
     with col_date:
         selected_date = st.date_input("Select Date", value=datetime.date.today(), key="planner_date_picker")
         date_str = selected_date.strftime("%Y-%m-%d")
+
+    with col_actions:
+        with st.popover("⚡ Auto-Generate Study Plan", use_container_width=True):
+            st.markdown("### 🤖 Intelligent Study Plan Auto-Scheduler")
+            st.caption("Distributes unfinished & high-priority syllabus topics evenly across study days, interleaved for high retention.")
+            
+            terms = get_all_terms(user_id)
+            term_opts = {"🌟 Full Remaining Syllabus": None}
+            for t in terms:
+                if not t.get("is_already_done"):
+                    term_opts[f"🎯 Exam: {t['name']} ({t.get('exam_date', '')})"] = t["id"]
+                    
+            chosen_term_label = st.selectbox("Target Curriculum Scope:", list(term_opts.keys()), key="auto_plan_scope")
+            chosen_term_id = term_opts[chosen_term_label]
+            
+            c_p1, c_p2 = st.columns(2)
+            with c_p1:
+                horizon_days = st.slider("Planning Horizon (Days)", min_value=3, max_value=45, value=14, step=1, key="auto_plan_days")
+            with c_p2:
+                daily_topics = st.slider("Topics Per Day", min_value=1, max_value=6, value=3, step=1, key="auto_plan_cap")
+                
+            if st.button("🚀 Generate My Study Plan", type="primary", use_container_width=True, key="run_auto_plan_btn"):
+                with st.spinner("Analyzing syllabus, exam proximity, and understanding ratings..."):
+                    res = auto_generate_study_plan(
+                        user_id,
+                        term_id=chosen_term_id,
+                        days_count=horizon_days,
+                        topics_per_day=daily_topics,
+                        start_date=date_str
+                    )
+                if res.get("scheduled_count", 0) > 0:
+                    st.success(res["message"])
+                    st.rerun()
+                else:
+                    st.info(res["message"])
 
     plans = get_daily_plans(user_id, date_str)
     total_plans = len(plans)
     completed_plans = sum(1 for p in plans if p["is_completed"])
     pct = int(completed_plans / total_plans * 100) if total_plans > 0 else 0
 
-    with col_summary:
-        st.markdown(f"### Progress for {selected_date.strftime('%A, %b %d')}")
-        st.progress(pct / 100)
-        st.caption(f"{completed_plans} of {total_plans} tasks completed ({pct}%)")
+    st.markdown(f"""
+        <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 18px; margin: 12px 0 16px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <strong style="font-size: 1.05rem; color: var(--nexus-text-title);">Tasks for {selected_date.strftime('%A, %b %d')}</strong>
+                <span style="font-size: 0.9rem; font-weight: 700; color: #38BDF8;">{completed_plans}/{total_plans} Completed ({pct}%)</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    st.progress(pct / 100)
+
+    # ── 3. Nexus Smart Priority Quick-Add Bar ──
+    top_prios = get_top_nexus_priorities(user_id, limit=3)
+    if top_prios:
+        with st.expander("🔴 Nexus Smart Priority Recommendations for Today", expanded=False):
+            st.caption("High-urgency topics based on upcoming exams and low understanding scores:")
+            for p in top_prios:
+                c_pinfo, c_pbtn = st.columns([4, 1])
+                with c_pinfo:
+                    st.markdown(f"""
+                        <span class="nexus-pill-{p['tier'].lower()}">{p['tier_icon']} {p['tier']}</span>
+                        <strong style="margin-left: 6px; color: var(--nexus-text-title);">{p['topic_name']}</strong> 
+                        <span style="font-size: 0.8rem; color: var(--nexus-text-sub);">({p['subject_name']} › {p['chapter_name']})</span>
+                    """, unsafe_allow_html=True)
+                with c_pbtn:
+                    if st.button("+ Plan Today", key=f"quick_add_prio_{p['topic_id']}", use_container_width=True):
+                        desc = f"Study: {p['topic_name']} ({p['subject_name']})"
+                        add_daily_plan(user_id, date_str, desc, 45, subject_id=p["subject_id"], chapter_id=p["chapter_id"], topic_id=p["topic_id"])
+                        st.toast(f"Added {p['topic_name']} to today's schedule!", icon="✨")
+                        st.rerun()
 
     st.markdown("---")
 
     # Add task form
-    with st.expander("➕ Add Planned Task", expanded=(total_plans == 0)):
+    with st.expander("➕ Add Custom Task", expanded=(total_plans == 0)):
         subjects = get_all_subjects(user_id)
         subject_options = {"None": None}
         for s in subjects:
@@ -88,7 +173,7 @@ def _render_daily_planner_tab(user_id: int):
             selected_sub_name = st.selectbox("Link to Subject (Optional)", list(subject_options.keys()))
             sub_id = subject_options[selected_sub_name]
 
-            if st.form_submit_button("Add Task"):
+            if st.form_submit_button("Add Task", use_container_width=True, type="primary"):
                 if desc.strip():
                     add_daily_plan(user_id, date_str, desc.strip(), duration, subject_id=sub_id)
                     st.success("Task added!")
