@@ -1,7 +1,7 @@
 import streamlit as st
 import logging
 from database import init_db
-from models import is_setup_complete, get_user_profile
+from models import is_setup_complete, get_user_profile, get_user_theme
 from styles import apply_custom_css
 from pages_modules.setup_wizard import render_setup_wizard
 from pages_modules.dashboard import render_dashboard_page
@@ -22,8 +22,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Apply Futuristic Theme Styling First
-apply_custom_css()
+# Apply Theme Styling (Defaults to Light for all users)
+active_theme = "Light"
+if "user_id" in st.session_state:
+    try:
+        active_theme = get_user_theme(st.session_state["user_id"])
+    except Exception:
+        active_theme = "Light"
+
+apply_custom_css(active_theme)
 
 # Google Site Verification for Search Engine Indexing (Injected into top-level <head>)
 import streamlit.components.v1 as components
@@ -152,16 +159,25 @@ def main():
         return
 
     profile = get_user_profile(user_id)
+    user_theme = get_user_theme(user_id)
+    is_dark = (user_theme.strip().lower() == "dark")
 
     # Sidebar Navigation Menu
     with st.sidebar:
+        card_bg = "linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))" if is_dark else "linear-gradient(135deg, #FFFFFF, #F1F5F9)"
+        card_border = "rgba(56, 189, 248, 0.35)" if is_dark else "#CBD5E1"
+        name_color = "#FFFFFF" if is_dark else "#0F172A"
+        badge_bg = "rgba(56, 189, 248, 0.2)" if is_dark else "rgba(79, 70, 229, 0.1)"
+        badge_color = "#38BDF8" if is_dark else "#4F46E5"
+        badge_border = "rgba(56, 189, 248, 0.3)" if is_dark else "rgba(79, 70, 229, 0.2)"
+
         st.markdown(f"""
             <div style="text-align: center; padding: 10px 0 16px 0;">
-                <h2 style="font-family: 'Outfit', sans-serif; color: #38BDF8; font-size: 2rem; font-weight: 800; margin-bottom: 2px; letter-spacing: -0.02em; text-shadow: 0 0 15px rgba(56,189,248,0.4);">⚡ NEXUS</h2>
-                <p style="font-family: 'Plus Jakarta Sans', sans-serif; color: #94A3B8; font-size: 0.95rem; font-weight: 500; margin: 0;">Syllabus & Exam Manager</p>
-                <div style="margin-top: 14px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95)); border: 1px solid rgba(56, 189, 248, 0.35); padding: 12px 14px; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
-                    <strong style="font-family: 'Outfit', sans-serif; color: #FFFFFF; font-size: 1.25rem; font-weight: 700; display: block; margin-bottom: 3px;">{profile.get('name', 'Student')}</strong>
-                    <span style="display: inline-block; background: rgba(56, 189, 248, 0.2); color: #38BDF8; font-size: 0.8rem; font-weight: 600; padding: 2px 10px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                <h2 style="font-family: 'Outfit', sans-serif; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 2rem; font-weight: 800; margin-bottom: 2px; letter-spacing: -0.02em;">⚡ NEXUS</h2>
+                <p style="font-family: 'Plus Jakarta Sans', sans-serif; color: {'#94A3B8' if is_dark else '#64748B'}; font-size: 0.95rem; font-weight: 500; margin: 0;">Syllabus & Exam Manager</p>
+                <div style="margin-top: 14px; background: {card_bg}; border: 1px solid {card_border}; padding: 12px 14px; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,{'0.3' if is_dark else '0.04'});">
+                    <strong style="font-family: 'Outfit', sans-serif; color: {name_color}; font-size: 1.25rem; font-weight: 700; display: block; margin-bottom: 3px;">{profile.get('name', 'Student')}</strong>
+                    <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; font-size: 0.8rem; font-weight: 600; padding: 2px 10px; border-radius: 12px; border: 1px solid {badge_border};">
                         {profile.get('class_name', 'Class 10')} • {profile.get('board', 'ICSE')}
                     </span>
                 </div>

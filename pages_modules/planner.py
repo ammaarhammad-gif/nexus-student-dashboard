@@ -17,13 +17,14 @@ from models import (
     get_all_terms, get_all_subjects, get_chapters_for_subject,
     get_chapters_for_term, set_term_chapters, get_term_stats,
     add_study_session, get_study_sessions, delete_study_session,
-    get_weekly_study_summary
+    get_weekly_study_summary, get_user_theme
 )
 from styles import render_header, render_metric_card
 
 
 def render_planner_page(user_id: int):
-    render_header("🗓️ Study Planner & Exam Allocation", "Schedule daily study tasks, track goals, and allocate chapters to exam terms.")
+    user_theme = get_user_theme(user_id)
+    render_header("🗓️ Study Planner & Exam Allocation", "Schedule daily study tasks, track goals, and allocate chapters to exam terms.", theme=user_theme)
 
     tab_daily, tab_sessions, tab_terms, tab_goals = st.tabs([
         "📋 Daily Study Plan",
@@ -274,25 +275,32 @@ def _render_study_sessions_tab(user_id: int):
         today_mins = day_minutes[-1] if day_minutes else 0
         render_metric_card("Today", f"{today_mins} min", "#22C55E")
 
+    user_theme = get_user_theme(user_id)
+    is_dark = (user_theme.strip().lower() == "dark")
+    text_col = "#FFFFFF" if is_dark else "#0F172A"
+    axis_col = "#CBD5E1" if is_dark else "#64748B"
+    grid_col = "rgba(255,255,255,0.06)" if is_dark else "rgba(0,0,0,0.06)"
+    empty_bar_col = "#334155" if is_dark else "#E2E8F0"
+
     with col_chart:
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=day_labels,
             y=day_minutes,
             marker_color=[
-                "#6366F1" if m > 0 else "#334155" for m in day_minutes
+                "#4F46E5" if m > 0 else empty_bar_col for m in day_minutes
             ],
             text=[f"{m}m" if m > 0 else "" for m in day_minutes],
             textposition="outside",
-            textfont=dict(color="#F8FAFC", size=12)
+            textfont=dict(color=text_col, size=12)
         ))
         fig.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#CBD5E1"),
+            font=dict(color=axis_col),
             xaxis=dict(showgrid=False),
             yaxis=dict(title="Minutes", showgrid=True,
-                       gridcolor="rgba(255,255,255,0.05)"),
+                       gridcolor=grid_col),
             margin=dict(t=10, b=30, l=40, r=20),
             height=250
         )

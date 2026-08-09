@@ -7,12 +7,14 @@ and detailed stat cards for every subject.
 
 import streamlit as st
 import plotly.graph_objects as go
-from models import get_all_subjects, get_subject_stats
+from models import get_all_subjects, get_subject_stats, get_user_theme
 from styles import render_header, render_metric_card
 
 
 def render_statistics_page(user_id: int):
-    render_header("📊 Statistics & Analytics", "Visual breakdown of your progress across all subjects.")
+    user_theme = get_user_theme(user_id)
+    is_dark = (user_theme.strip().lower() == "dark")
+    render_header("📊 Statistics & Analytics", "Visual breakdown of your progress across all subjects.", theme=user_theme)
 
     subjects = get_all_subjects(user_id)
 
@@ -51,6 +53,10 @@ def render_statistics_page(user_id: int):
     # ── Completion Bar Chart ──
     st.subheader("📈 Completion by Subject")
 
+    text_col = "#FFFFFF" if is_dark else "#0F172A"
+    grid_col = "rgba(255,255,255,0.06)" if is_dark else "rgba(0,0,0,0.06)"
+    axis_col = "#CBD5E1" if is_dark else "#64748B"
+
     fig_bar = go.Figure()
     fig_bar.add_trace(go.Bar(
         x=names,
@@ -58,15 +64,15 @@ def render_statistics_page(user_id: int):
         marker_color=colors,
         text=[f"{p}%" for p in pcts],
         textposition="outside",
-        textfont=dict(color="#F8FAFC", size=13)
+        textfont=dict(color=text_col, size=13)
     ))
     fig_bar.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#CBD5E1"),
+        font=dict(color=axis_col),
         xaxis=dict(title="", showgrid=False),
         yaxis=dict(title="Completion %", showgrid=True,
-                   gridcolor="rgba(255,255,255,0.05)", range=[0, 110]),
+                   gridcolor=grid_col, range=[0, 110]),
         margin=dict(t=20, b=40, l=40, r=20),
         height=350
     )
@@ -87,19 +93,19 @@ def render_statistics_page(user_id: int):
         ))
         fig_stack.add_trace(go.Bar(
             name="Remaining", x=names, y=remaining_counts,
-            marker_color="#475569"
+            marker_color="#94A3B8" if not is_dark else "#475569"
         ))
         fig_stack.update_layout(
             barmode="stack",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#CBD5E1"),
+            font=dict(color=axis_col),
             legend=dict(orientation="h", yanchor="bottom", y=-0.3,
                        xanchor="center", x=0.5),
             margin=dict(t=10, b=50, l=40, r=20),
             height=320,
             xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)")
+            yaxis=dict(showgrid=True, gridcolor=grid_col)
         )
         st.plotly_chart(fig_stack, use_container_width=True)
 
@@ -111,20 +117,20 @@ def render_statistics_page(user_id: int):
             x=names,
             y=avg_understandings,
             marker_color=[
-                "#EF4444" if v <= 2 else "#EAB308" if v <= 3 else "#22C55E" if v <= 4 else "#6366F1"
+                "#EF4444" if v <= 2 else "#F59E0B" if v <= 3 else "#22C55E" if v <= 4 else "#4F46E5"
                 for v in avg_understandings
             ],
             text=[f"{v}/5" for v in avg_understandings],
             textposition="outside",
-            textfont=dict(color="#F8FAFC", size=12)
+            textfont=dict(color=text_col, size=12)
         ))
         fig_und.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#CBD5E1"),
+            font=dict(color=axis_col),
             xaxis=dict(showgrid=False),
             yaxis=dict(title="Understanding (1–5)", showgrid=True,
-                       gridcolor="rgba(255,255,255,0.05)", range=[0, 5.5]),
+                       gridcolor=grid_col, range=[0, 5.5]),
             margin=dict(t=10, b=40, l=40, r=20),
             height=320
         )

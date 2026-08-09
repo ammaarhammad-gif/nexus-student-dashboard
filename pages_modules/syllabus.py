@@ -15,7 +15,7 @@ from models import (
     get_topics_for_chapter, add_topic, rename_topic, delete_topic,
     get_subtopics_for_topic, add_subtopic, rename_subtopic, delete_subtopic,
     get_progress, save_progress, get_user_profile,
-    import_syllabus_from_csv, schedule_revisions
+    import_syllabus_from_csv, schedule_revisions, get_user_theme
 )
 from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header
@@ -40,10 +40,12 @@ def render_syllabus_page(user_id: int):
     profile = get_user_profile(user_id)
     board = profile.get("board", "ICSE")
     class_name = profile.get("class_name", "Class 10")
+    user_theme = get_user_theme(user_id)
 
     render_header(
         "📚 Syllabus Manager",
-        f"Official {board} ({class_name}) Syllabus • Tick off topics as you finish studying them."
+        f"Official {board} ({class_name}) Syllabus • Tick off topics as you finish studying them.",
+        theme=user_theme
     )
 
     tab_manage, tab_csv = st.tabs(["📚 My Syllabus", "📥 Import Custom CSV"])

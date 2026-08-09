@@ -1,15 +1,16 @@
 """
 settings.py — Application Settings and Academic Configuration.
 
-Allows editing profile, changing board/class, reloading official syllabus,
-managing exam terms, and data maintenance.
+Allows editing profile, changing board/class, selecting theme (Light, Dark, Default),
+reloading official syllabus, managing exam terms, and data maintenance.
 """
 
 import streamlit as st
 import datetime
 from models import (
     get_user_profile, save_user_profile, get_all_terms, add_term,
-    update_term, delete_term, clear_all_terms, reset_all_data
+    update_term, delete_term, clear_all_terms, reset_all_data,
+    get_user_theme, set_user_theme
 )
 from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header
@@ -17,7 +18,8 @@ from pages_modules.setup_wizard import STATE_BOARDS, CLASS_OPTIONS
 
 
 def render_settings_page(user_id: int):
-    render_header("⚙️ Application Settings", "Manage your profile, academic calendar, syllabus reload, and preferences.")
+    user_theme = get_user_theme(user_id)
+    render_header("⚙️ Application Settings", "Manage your profile, theme appearance, academic calendar, and syllabus.", theme=user_theme)
 
     profile = get_user_profile(user_id)
 
@@ -69,7 +71,44 @@ def render_settings_page(user_id: int):
             st.success("✅ Profile settings updated successfully!")
             st.rerun()
 
-    # ── Section 2: Syllabus Auto-Loader ──
+    # ── Section 2: Theme & Appearance (Light, Dark, Default) ──
+    st.markdown("---")
+    st.subheader("🎨 Appearance & Theme")
+    st.caption("Choose your visual style. Light mode is the default theme for all users.")
+
+    theme_options = ["☀️ Light (Default)", "🌙 Dark", "💻 System Default"]
+    current_theme = get_user_theme(user_id)
+    
+    if current_theme == "Dark":
+        theme_index = 1
+    elif current_theme == "Default":
+        theme_index = 2
+    else:
+        theme_index = 0
+
+    col_th1, col_th2 = st.columns([3, 1])
+    with col_th1:
+        selected_theme_label = st.radio(
+            "Select Dashboard Theme:",
+            theme_options,
+            index=theme_index,
+            horizontal=True,
+            key="theme_radio_selector"
+        )
+    with col_th2:
+        st.write("") # spacer
+        if st.button("Apply Theme", use_container_width=True, type="primary"):
+            if "Dark" in selected_theme_label:
+                new_th = "Dark"
+            elif "System" in selected_theme_label:
+                new_th = "Default"
+            else:
+                new_th = "Light"
+            set_user_theme(user_id, new_th)
+            st.toast(f"✅ Theme set to {selected_theme_label}!", icon="🎨")
+            st.rerun()
+
+    # ── Section 3: Syllabus Auto-Loader ──
     st.markdown("---")
     st.subheader("📚 Reload Official Board Syllabus")
     st.caption("Changed your class or board? Click below to instantly load the official syllabus into your account.")
@@ -86,7 +125,7 @@ def render_settings_page(user_id: int):
             st.success(f"✅ Successfully loaded {board} {cls} syllabus!")
             st.rerun()
 
-    # ── Section 3: Manage Exam Terms ──
+    # ── Section 4: Manage Exam Terms ──
     st.markdown("---")
     st.subheader("📅 Manage Exam Terms & Dates")
     terms = get_all_terms(user_id)
@@ -123,7 +162,7 @@ def render_settings_page(user_id: int):
                     st.success("Term added!")
                     st.rerun()
 
-    # ── Section 4: Data Reset ──
+    # ── Section 5: Data Reset ──
     st.markdown("---")
     st.subheader("⚠️ Reset All Data")
     st.warning("Resetting will wipe all subjects, chapters, topics, study sessions, and progress permanently.")

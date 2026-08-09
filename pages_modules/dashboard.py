@@ -11,7 +11,7 @@ import datetime
 from models import (
     get_overall_stats, get_user_profile, get_all_subjects,
     get_subject_stats, get_all_terms,
-    get_due_revisions, complete_revision
+    get_due_revisions, complete_revision, get_user_theme
 )
 from preloaded_syllabi import preload_standard_syllabus
 from styles import render_header, render_metric_card
@@ -61,6 +61,9 @@ def render_dashboard_page(user_id: int):
     # ── Main: Donut Chart + Details ──
     col_chart, col_details = st.columns([3, 2])
 
+    user_theme = get_user_theme(user_id)
+    is_dark = (user_theme.strip().lower() == "dark")
+
     with col_chart:
         st.subheader("📊 Overall Syllabus Progress")
         if stats["total_topics"] > 0:
@@ -73,29 +76,33 @@ def render_dashboard_page(user_id: int):
                     stats["not_started"]
                 ],
                 hole=0.65,
-                marker=dict(colors=["#22C55E", "#3B82F6", "#EAB308", "#475569"]),
+                marker=dict(colors=["#22C55E", "#0284C7", "#F59E0B", "#94A3B8" if not is_dark else "#475569"]),
                 hoverinfo="label+percent+value",
                 textinfo="percent",
-                textfont=dict(size=13, color="#F8FAFC")
+                textfont=dict(size=13, color="#FFFFFF" if is_dark else "#0F172A")
             )])
+
+            text_color = "#FFFFFF" if is_dark else "#0F172A"
+            sub_text_color = "#94A3B8" if is_dark else "#64748B"
+            legend_color = "#CBD5E1" if is_dark else "#334155"
 
             fig.update_layout(
                 annotations=[dict(
                     text=f"<b>{stats['percent_completed']}%</b><br>"
-                         f"<span style='font-size:12px;color:#94A3B8;'>"
+                         f"<span style='font-size:12px;color:{sub_text_color};'>"
                          f"{stats['completed']}/{stats['total_topics']}</span>",
-                    x=0.5, y=0.5, font_size=28, font_color="#F8FAFC",
+                    x=0.5, y=0.5, font_size=28, font_color=text_color,
                     showarrow=False
                 )],
                 showlegend=True,
                 legend=dict(
                     orientation="h", yanchor="bottom", y=-0.2,
                     xanchor="center", x=0.5,
-                    font=dict(color="#CBD5E1")
+                    font=dict(color=legend_color)
                 ),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#F8FAFC"),
+                font=dict(color=text_color),
                 margin=dict(t=10, b=40, l=10, r=10),
                 height=340
             )

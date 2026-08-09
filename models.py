@@ -116,8 +116,20 @@ def get_user_profile(user_id: int) -> dict:
         "academic_year": get_setting(user_id, "academic_year", ""),
         "board": get_setting(user_id, "board", ""),
         "class_name": get_setting(user_id, "class_name", ""),
+        "theme_mode": get_setting(user_id, "theme_mode", "Light"),
         "is_setup_completed": is_setup_complete(user_id)
     }
+
+
+def get_user_theme(user_id: int) -> str:
+    """Return user's preferred theme mode: 'Light', 'Dark', or 'Default' (defaults to 'Light')."""
+    return get_setting(user_id, "theme_mode", "Light")
+
+
+def set_user_theme(user_id: int, theme: str):
+    """Save user's preferred theme mode."""
+    set_setting(user_id, "theme_mode", theme)
+    st.cache_data.clear()
 
 
 # ══════════════════════════════════════════════
