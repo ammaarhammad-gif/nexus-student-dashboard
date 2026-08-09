@@ -8,13 +8,12 @@ and detailed stat cards for every subject.
 import streamlit as st
 import plotly.graph_objects as go
 from models import get_all_subjects_with_stats, get_user_theme
-from styles import render_header, render_metric_card, render_breadcrumbs, render_empty_state
+from styles import render_header, render_metric_card
 
 
 def render_statistics_page(user_id: int):
     user_theme = get_user_theme(user_id)
     is_dark = (user_theme.strip().lower() == "dark")
-    render_breadcrumbs(["🏠 Dashboard", "📊 Statistics"])
     render_header("📊 Statistics & Analytics", "Visual breakdown of your progress across all subjects.", theme=user_theme)
 
     subjects = get_all_subjects_with_stats(user_id)

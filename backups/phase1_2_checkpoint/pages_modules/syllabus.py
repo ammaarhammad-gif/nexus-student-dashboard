@@ -18,7 +18,7 @@ from models import (
     get_subject_hierarchy
 )
 from preloaded_syllabi import preload_standard_syllabus, reload_and_replace_syllabus
-from styles import render_header, render_breadcrumbs, render_empty_state
+from styles import render_header
 
 
 STATUS_OPTIONS = ["Not Started", "In Progress", "Completed", "Revision Done"]
@@ -42,8 +42,6 @@ def render_syllabus_page(user_id: int):
     board = profile.get("board", "ICSE")
     class_name = profile.get("class_name", "Class 10")
     user_theme = get_user_theme(user_id)
-
-    render_breadcrumbs(["🏠 Dashboard", "📚 Syllabus Manager", f"{board} {class_name}"])
 
     render_header(
         "📚 Syllabus Manager",

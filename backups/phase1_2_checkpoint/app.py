@@ -17,7 +17,11 @@ from pages_modules.statistics import render_statistics_page
 from pages_modules.planner import render_planner_page
 from pages_modules.wallpapers import render_wallpapers_page
 from pages_modules.settings import render_settings_page
-from pages_modules.search import render_search_page
+from pages_modules.revisions import render_revisions_page
+from pages_modules.mistakes import render_mistakes_page
+from pages_modules.formulas import render_formulas_page
+from pages_modules.notes import render_notes_page
+from pages_modules.focus import render_focus_page
 from auth_utils import (
     create_session_token, verify_session_token,
     set_session_param, get_session_param, clear_session_param
@@ -305,8 +309,12 @@ def main():
         st.markdown("### Navigation")
         page_options = [
             "🏠 Dashboard",
-            "🔍 Global Search",
             "📚 Syllabus Manager",
+            "🧠 Revision Queue",
+            "⏱️ Nexus Focus Studio",
+            "❌ Mistake Vault",
+            "📐 Formula Vault",
+            "📝 Nexus Notes",
             "🗓️ Study Planner",
             "📊 Statistics",
             "🖼️ Wallpapers & Themes",
@@ -412,14 +420,22 @@ def main():
     # Page Router
     if page == "🏠 Dashboard":
         render_dashboard_page(user_id)
-    elif page == "🔍 Global Search":
-        render_search_page(user_id)
     elif page == "📚 Syllabus Manager":
         render_syllabus_page(user_id)
-    elif page == "🗓️ Study Planner":
-        render_planner_page(user_id)
+    elif page == "🧠 Revision Queue":
+        render_revisions_page(user_id)
+    elif page == "⏱️ Nexus Focus Studio":
+        render_focus_page(user_id)
+    elif page == "❌ Mistake Vault":
+        render_mistakes_page(user_id)
+    elif page == "📐 Formula Vault":
+        render_formulas_page(user_id)
+    elif page == "📝 Nexus Notes":
+        render_notes_page(user_id)
     elif page == "📊 Statistics":
         render_statistics_page(user_id)
+    elif page == "🗓️ Study Planner":
+        render_planner_page(user_id)
     elif page == "🖼️ Wallpapers & Themes":
         render_wallpapers_page(user_id)
     elif page == "⚙️ Settings":

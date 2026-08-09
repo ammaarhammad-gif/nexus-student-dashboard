@@ -23,7 +23,7 @@ from models import (
     get_user_theme, set_user_theme,
     get_user_wallpaper_config, set_user_wallpaper_config, clear_user_wallpaper_config
 )
-from styles import render_header, render_breadcrumbs, WALLPAPER_PRESETS
+from styles import render_header, WALLPAPER_PRESETS
 
 
 def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: int = 82):
@@ -38,15 +38,15 @@ def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: in
                 new_height = int(max_width * aspect)
                 image = image.resize((max_width, new_height), Image.Resampling.LANCZOS)
             
-            buf = io.BytesIO()
-            image.save(buf, format="JPEG", quality=quality, optimize=True)
-            encoded = base64.b64encode(buf.getvalue()).decode("utf-8")
-            return f"data:image/jpeg;base64,{encoded}"
+            buffered = io.BytesIO()
+            image.save(buffered, format="JPEG", quality=quality, optimize=True)
+            img_bytes = buffered.getvalue()
         else:
-            raw = uploaded_file.getvalue()
-            encoded = base64.b64encode(raw).decode("utf-8")
-            mime = uploaded_file.type or "image/jpeg"
-            return f"data:{mime};base64,{encoded}"
+            uploaded_file.seek(0)
+            img_bytes = uploaded_file.read()
+
+        b64_str = base64.b64encode(img_bytes).decode("utf-8")
+        return f"data:image/jpeg;base64,{b64_str}"
     except Exception:
         return None
 
@@ -54,8 +54,6 @@ def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: in
 def render_wallpapers_page(user_id: int):
     user_theme = get_user_theme(user_id)
     is_dark = (user_theme.strip().lower() == "dark")
-
-    render_breadcrumbs(["🏠 Dashboard", "🖼️ Wallpapers & Themes"])
 
     render_header(
         "🖼️ Wallpaper & Appearance Studio",

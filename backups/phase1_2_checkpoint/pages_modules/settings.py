@@ -23,7 +23,7 @@ from models import (
     get_user_wallpaper_config, set_user_wallpaper_config, clear_user_wallpaper_config
 )
 from preloaded_syllabi import preload_standard_syllabus, reload_and_replace_syllabus
-from styles import render_header, render_breadcrumbs, WALLPAPER_PRESETS
+from styles import render_header, WALLPAPER_PRESETS
 from pages_modules.setup_wizard import CLASS_OPTIONS
 
 
@@ -54,7 +54,6 @@ def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: in
 
 def render_settings_page(user_id: int):
     user_theme = get_user_theme(user_id)
-    render_breadcrumbs(["🏠 Dashboard", "⚙️ Settings"])
     render_header("⚙️ Application Settings", "Manage your profile, theme appearance, academic calendar, and syllabus.", theme=user_theme)
 
     profile = get_user_profile(user_id)

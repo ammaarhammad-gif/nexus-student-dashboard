@@ -19,12 +19,11 @@ from models import (
     add_study_session, get_study_sessions, delete_study_session,
     get_weekly_study_summary, get_user_theme
 )
-from styles import render_header, render_metric_card, render_breadcrumbs, render_empty_state
+from styles import render_header, render_metric_card
 
 
 def render_planner_page(user_id: int):
     user_theme = get_user_theme(user_id)
-    render_breadcrumbs(["🏠 Dashboard", "🗓️ Study Planner"])
     render_header("🗓️ Study Planner & Exam Allocation", "Schedule daily study tasks, track goals, and allocate chapters to exam terms.", theme=user_theme)
 
     tab_daily, tab_sessions, tab_terms, tab_goals = st.tabs([
