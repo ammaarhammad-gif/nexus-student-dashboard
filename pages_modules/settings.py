@@ -122,7 +122,9 @@ def render_settings_page(user_id: int):
     with c_hdr2:
         st.write("")
         if st.button("🖼️ Open Full Wallpaper Studio ➔", type="primary", use_container_width=True, key="settings_launch_studio_btn"):
-            st.session_state["active_nav_radio"] = "🖼️ Wallpapers & Themes"
+            st.session_state["main_nav_target"] = "🖼️ Wallpapers & Themes"
+            if "active_nav_radio" in st.session_state:
+                del st.session_state["active_nav_radio"]
             st.rerun()
 
     theme_options = ["☀️ Light (Default)", "🌙 Dark", "💻 System Default"]

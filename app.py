@@ -253,13 +253,14 @@ def main():
         ]
 
         # Handle programmatic navigation requests
+        current_nav_index = 0
         if "main_nav_target" in st.session_state:
             target = st.session_state.pop("main_nav_target")
             if target in page_options:
-                st.session_state["active_nav_radio"] = target
-
-        current_nav_index = 0
-        if "active_nav_radio" in st.session_state and st.session_state["active_nav_radio"] in page_options:
+                current_nav_index = page_options.index(target)
+                if "active_nav_radio" in st.session_state:
+                    del st.session_state["active_nav_radio"]
+        elif "active_nav_radio" in st.session_state and st.session_state["active_nav_radio"] in page_options:
             current_nav_index = page_options.index(st.session_state["active_nav_radio"])
 
         page = st.radio(
@@ -325,7 +326,9 @@ def main():
             st.rerun()
 
         if st.button("🎨 Open Full Wallpaper Studio ➔", use_container_width=True, key="sb_open_studio_btn"):
-            st.session_state["active_nav_radio"] = "🖼️ Wallpapers & Themes"
+            st.session_state["main_nav_target"] = "🖼️ Wallpapers & Themes"
+            if "active_nav_radio" in st.session_state:
+                del st.session_state["active_nav_radio"]
             st.rerun()
 
         st.markdown("---")
