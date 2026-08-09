@@ -272,56 +272,61 @@ def main():
         
         # ── Quick Wallpaper & Theme Switcher in Sidebar ──
         st.markdown("---")
-        with st.expander("🖼️ Quick Wallpaper & Theme", expanded=False):
-            wp_cfg = get_user_wallpaper_config(user_id)
-            curr_mode = wp_cfg.get("mode", "none")
-            curr_preset = wp_cfg.get("preset_id")
-            
-            # Theme fast switch
-            c_th1, c_th2 = st.columns(2)
-            with c_th1:
-                if st.button("☀️ Light", use_container_width=True, type="primary" if not is_dark else "secondary", key="sb_light_btn"):
-                    set_user_theme(user_id, "Light")
-                    st.session_state["theme_mode"] = "Light"
-                    st.rerun()
-            with c_th2:
-                if st.button("🌙 Dark", use_container_width=True, type="primary" if is_dark else "secondary", key="sb_dark_btn"):
+        st.markdown("""
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--nexus-text-title); margin-bottom: 8px; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 6px;">
+                <span>🎨</span> <span>Quick Theme & Wallpaper</span>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        wp_cfg = get_user_wallpaper_config(user_id)
+        curr_mode = wp_cfg.get("mode", "none")
+        curr_preset = wp_cfg.get("preset_id")
+        
+        # Theme fast switch
+        c_th1, c_th2 = st.columns(2)
+        with c_th1:
+            if st.button("☀️ Light", use_container_width=True, type="primary" if not is_dark else "secondary", key="sb_light_btn"):
+                set_user_theme(user_id, "Light")
+                st.session_state["theme_mode"] = "Light"
+                st.rerun()
+        with c_th2:
+            if st.button("🌙 Dark", use_container_width=True, type="primary" if is_dark else "secondary", key="sb_dark_btn"):
+                set_user_theme(user_id, "Dark")
+                st.session_state["theme_mode"] = "Dark"
+                st.rerun()
+        
+        # Quick preset select
+        quick_options = ["Solid (No Wallpaper)"] + [p["name"] for p in WALLPAPER_PRESETS[:8]]
+        curr_selection_idx = 0
+        if curr_mode == "preset":
+            for i, p in enumerate(WALLPAPER_PRESETS[:8]):
+                if p["id"] == curr_preset:
+                    curr_selection_idx = i + 1
+                    break
+        
+        chosen_wp_label = st.selectbox(
+            "Quick Wallpaper:",
+            quick_options,
+            index=curr_selection_idx,
+            key="sb_quick_wp_select"
+        )
+        
+        if st.button("✨ Apply Quick Wallpaper", use_container_width=True, key="sb_apply_quick_wp_btn"):
+            if chosen_wp_label == "Solid (No Wallpaper)":
+                clear_user_wallpaper_config(user_id)
+                st.toast("Reset to solid theme!", icon="✨")
+            else:
+                target_preset = next((p for p in WALLPAPER_PRESETS if p["name"] == chosen_wp_label), None)
+                if target_preset:
+                    set_user_wallpaper_config(user_id, mode="preset", preset_id=target_preset["id"], blur=wp_cfg.get("blur", 0), opacity=0.30)
                     set_user_theme(user_id, "Dark")
                     st.session_state["theme_mode"] = "Dark"
-                    st.rerun()
-            
-            # Quick preset select
-            quick_options = ["Solid (No Wallpaper)"] + [p["name"] for p in WALLPAPER_PRESETS[:8]]
-            curr_selection_idx = 0
-            if curr_mode == "preset":
-                for i, p in enumerate(WALLPAPER_PRESETS[:8]):
-                    if p["id"] == curr_preset:
-                        curr_selection_idx = i + 1
-                        break
-            
-            chosen_wp_label = st.selectbox(
-                "Quick Wallpaper:",
-                quick_options,
-                index=curr_selection_idx,
-                key="sb_quick_wp_select"
-            )
-            
-            if st.button("✨ Apply Quick Wallpaper", use_container_width=True, key="sb_apply_quick_wp_btn"):
-                if chosen_wp_label == "Solid (No Wallpaper)":
-                    clear_user_wallpaper_config(user_id)
-                    st.toast("Reset to solid theme!", icon="✨")
-                else:
-                    target_preset = next((p for p in WALLPAPER_PRESETS if p["name"] == chosen_wp_label), None)
-                    if target_preset:
-                        set_user_wallpaper_config(user_id, mode="preset", preset_id=target_preset["id"], blur=wp_cfg.get("blur", 0), opacity=0.30)
-                        set_user_theme(user_id, "Dark")
-                        st.session_state["theme_mode"] = "Dark"
-                        st.toast(f"Applied {target_preset['name']} in Dark Glassmorphism!", icon="🖼️")
-                st.rerun()
+                    st.toast(f"Applied {target_preset['name']} in Dark Glassmorphism!", icon="🖼️")
+            st.rerun()
 
-            if st.button("🎨 Open Full Wallpaper Studio ➔", use_container_width=True, key="sb_open_studio_btn"):
-                st.session_state["active_nav_radio"] = "🖼️ Wallpapers & Themes"
-                st.rerun()
+        if st.button("🎨 Open Full Wallpaper Studio ➔", use_container_width=True, key="sb_open_studio_btn"):
+            st.session_state["active_nav_radio"] = "🖼️ Wallpapers & Themes"
+            st.rerun()
 
         st.markdown("---")
         if st.button("🚪 Log Out", use_container_width=True):

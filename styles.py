@@ -692,38 +692,103 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             box-shadow: 0 0 0 3px var(--nexus-glow) !important;
         }
 
-        .stSelectbox [data-baseweb="select"] {
+        /* Selectbox Container */
+        .stSelectbox [data-baseweb="select"],
+        .stSelectbox [data-baseweb="select"] > div {
             background-color: var(--nexus-input-bg) !important;
             color: var(--nexus-text-title) !important;
             border: 1px solid var(--nexus-input-border) !important;
             border-radius: 10px !important;
         }
 
-        .stSelectbox [data-baseweb="select"] div {
+        .stSelectbox [data-baseweb="select"] div,
+        .stSelectbox [data-baseweb="select"] span,
+        .stSelectbox [data-baseweb="select"] p {
             color: var(--nexus-text-title) !important;
         }
 
-        div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
-            background-color: var(--nexus-input-bg) !important;
-            color: var(--nexus-text-title) !important;
+        /* BaseWeb Selectbox Dropdown Popover & Listbox Dark Mode */
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] > div,
+        div[data-baseweb="menu"],
+        ul[role="listbox"],
+        ul[data-baseweb="menu"] {
+            background-color: #0F172A !important;
+            background: #0F172A !important;
+            color: #FFFFFF !important;
             border: 1px solid var(--nexus-card-border) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7) !important;
+            overflow: hidden !important;
         }
 
+        li[role="option"],
+        li[data-baseweb="menu-item"],
+        [data-baseweb="menu"] li,
         ul[role="listbox"] li {
-            color: var(--nexus-text-main) !important;
+            background-color: #0F172A !important;
+            background: #0F172A !important;
+            color: #F8FAFC !important;
+            padding: 10px 14px !important;
+            font-size: 0.88rem !important;
+            font-weight: 500 !important;
+            transition: all 0.15s ease !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
         }
 
+        li[role="option"] *,
+        li[data-baseweb="menu-item"] *,
+        [data-baseweb="menu"] li *,
+        ul[role="listbox"] li * {
+            background-color: transparent !important;
+            background: transparent !important;
+            color: #F8FAFC !important;
+        }
+
+        li[role="option"]:hover,
+        li[role="option"][aria-selected="true"],
+        li[data-baseweb="menu-item"]:hover,
+        ul[role="listbox"] li:hover {
+            background-color: rgba(56, 189, 248, 0.22) !important;
+            background: rgba(56, 189, 248, 0.22) !important;
+            color: var(--nexus-accent) !important;
+        }
+
+        li[role="option"]:hover *,
+        li[role="option"][aria-selected="true"] *,
+        ul[role="listbox"] li:hover * {
+            color: var(--nexus-accent) !important;
+            font-weight: 600 !important;
+        }
+
+        /* Expanders Dark */
         details[data-testid="stExpander"] {
             background: var(--nexus-expander-bg) !important;
             border: 1px solid var(--nexus-expander-border) !important;
             border-radius: 14px !important;
             backdrop-filter: blur(14px) !important;
             -webkit-backdrop-filter: blur(14px) !important;
+            overflow: hidden !important;
         }
 
-        details[data-testid="stExpander"] summary {
+        details[data-testid="stExpander"] summary,
+        details[data-testid="stExpander"] > summary:first-of-type,
+        .streamlit-expanderHeader {
+            background: var(--nexus-card-bg) !important;
             color: var(--nexus-text-title) !important;
-            font-weight: 600;
+            font-weight: 600 !important;
+            border-bottom: 1px solid var(--nexus-card-border) !important;
+        }
+
+        details[data-testid="stExpander"] summary *,
+        .streamlit-expanderHeader * {
+            color: var(--nexus-text-title) !important;
+        }
+
+        details[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+            background: transparent !important;
+            color: var(--nexus-text-main) !important;
+            padding: 14px 16px !important;
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -922,18 +987,77 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
         }
 
-        .stSelectbox [data-baseweb="select"] {
+        /* Selectbox Container Light */
+        .stSelectbox [data-baseweb="select"],
+        .stSelectbox [data-baseweb="select"] > div {
             background-color: #FFFFFF !important;
             color: #0F172A !important;
             border: 1px solid #CBD5E1 !important;
             border-radius: 10px !important;
         }
 
-        .stSelectbox [data-baseweb="select"] div {
+        .stSelectbox [data-baseweb="select"] div,
+        .stSelectbox [data-baseweb="select"] span,
+        .stSelectbox [data-baseweb="select"] p {
             color: #0F172A !important;
             font-weight: 500;
         }
 
+        /* BaseWeb Selectbox Dropdown Popover & Listbox Light Mode */
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] > div,
+        div[data-baseweb="menu"],
+        ul[role="listbox"],
+        ul[data-baseweb="menu"] {
+            background-color: #FFFFFF !important;
+            background: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08) !important;
+            overflow: hidden !important;
+        }
+
+        li[role="option"],
+        li[data-baseweb="menu-item"],
+        [data-baseweb="menu"] li,
+        ul[role="listbox"] li {
+            background-color: #FFFFFF !important;
+            background: #FFFFFF !important;
+            color: #0F172A !important;
+            padding: 10px 14px !important;
+            font-size: 0.88rem !important;
+            font-weight: 500 !important;
+            transition: all 0.15s ease !important;
+            border-bottom: 1px solid #F1F5F9 !important;
+        }
+
+        li[role="option"] *,
+        li[data-baseweb="menu-item"] *,
+        [data-baseweb="menu"] li *,
+        ul[role="listbox"] li * {
+            background-color: transparent !important;
+            background: transparent !important;
+            color: #0F172A !important;
+        }
+
+        li[role="option"]:hover,
+        li[role="option"][aria-selected="true"],
+        li[data-baseweb="menu-item"]:hover,
+        ul[role="listbox"] li:hover {
+            background-color: #EEF2FF !important;
+            background: #EEF2FF !important;
+            color: #4F46E5 !important;
+        }
+
+        li[role="option"]:hover *,
+        li[role="option"][aria-selected="true"] *,
+        ul[role="listbox"] li:hover * {
+            color: #4F46E5 !important;
+            font-weight: 600 !important;
+        }
+
+        /* Expanders Light */
         details[data-testid="stExpander"] {
             background: var(--nexus-expander-bg) !important;
             border: 1px solid var(--nexus-expander-border) !important;
@@ -941,10 +1065,27 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
             backdrop-filter: blur(14px) !important;
             -webkit-backdrop-filter: blur(14px) !important;
+            overflow: hidden !important;
         }
 
-        details[data-testid="stExpander"] summary {
+        details[data-testid="stExpander"] summary,
+        details[data-testid="stExpander"] > summary:first-of-type,
+        .streamlit-expanderHeader {
+            background: var(--nexus-card-bg) !important;
             color: #0F172A !important;
+            font-weight: 600 !important;
+            border-bottom: 1px solid #E2E8F0 !important;
+        }
+
+        details[data-testid="stExpander"] summary *,
+        .streamlit-expanderHeader * {
+            color: #0F172A !important;
+        }
+
+        details[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+            background: transparent !important;
+            color: #334155 !important;
+            padding: 14px 16px !important;
         }
 
         .stTabs [data-baseweb="tab-list"] {
