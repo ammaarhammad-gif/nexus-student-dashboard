@@ -20,11 +20,20 @@ def run_priority_planner_revision_tests():
     init_db()
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, username FROM users LIMIT 1;")
+            cur.execute("""
+                SELECT u.id, u.username, COUNT(t.id) as topic_count
+                FROM users u
+                LEFT JOIN subjects s ON s.user_id = u.id
+                LEFT JOIN chapters c ON c.subject_id = s.id
+                LEFT JOIN topics t ON t.chapter_id = c.id
+                GROUP BY u.id, u.username
+                ORDER BY topic_count DESC
+                LIMIT 1;
+            """)
             row = cur.fetchone()
     assert row is not None, "No user found in DB"
     user_id = row[0]
-    print(f"  --> PASSED: User ID={user_id} ({row[1]})")
+    print(f"  --> PASSED: User ID={user_id} ({row[1]} with {row[2]} topics)")
 
     print("\n[TEST 2] Priority Engine Real User Data Computation")
     priorities = get_top_nexus_priorities(user_id, limit=6)
