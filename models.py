@@ -1884,7 +1884,7 @@ def reset_all_data(user_id: int):
                 "recall_responses", "user_xp_events", "settings"
             ]
             for table in tables:
-                cursor.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
+                cursor.execute(psycopg2.sql.SQL("DELETE FROM {} WHERE user_id = %s").format(psycopg2.sql.Identifier(table)), (user_id,))
             conn.commit()
             st.cache_data.clear()
     except Exception:
@@ -3474,15 +3474,22 @@ def get_question_bank_for_topic(user_id: int, subject_id: int = None, chapter_id
 
 def create_quiz(user_id: int, title: str, subject_id: int = None,
                 chapter_id: int = None, topic_id: int = None,
-                difficulty: str = "Mixed", questions_json: str = "[]") -> int:
+                difficulty: str = "Mixed", questions_json = "[]", questions = None) -> int:
     """Creates a new quiz record and returns its ID."""
+    if questions is not None:
+        q_payload = json.dumps(questions) if isinstance(questions, (list, dict)) else str(questions)
+    elif isinstance(questions_json, (list, dict)):
+        q_payload = json.dumps(questions_json)
+    else:
+        q_payload = str(questions_json or "[]")
+
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO quizzes (user_id, title, subject_id, chapter_id, topic_id, difficulty, questions_json)
                 VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (user_id, title.strip(), subject_id, chapter_id, topic_id, difficulty, questions_json))
+            """, (user_id, title.strip(), subject_id, chapter_id, topic_id, difficulty, q_payload))
             quiz_id = cursor.fetchone()[0]
             conn.commit()
             st.cache_data.clear()
@@ -3511,6 +3518,9 @@ def save_quiz_attempt(user_id: int, quiz_id: int, score: int, total_questions: i
             conn.commit()
             st.cache_data.clear()
             return attempt_id
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
