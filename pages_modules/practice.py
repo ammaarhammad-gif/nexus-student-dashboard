@@ -396,16 +396,17 @@ def _render_active_recall_view(user_id: int):
 
                 reveal_rubric = st.checkbox("👁️ Reveal Key Concept Rubric Checklist", value=False, key="prac_reveal_rubric")
                 if reveal_rubric:
-                    st.markdown("""
+                    li_items = "".join([f"<li>{pt}</li>" for pt in prompt_info["rubric_points"]])
+                    if prompt_info.get("formulas_text"):
+                        li_items += f"<li><strong>Key Formulas:</strong> {prompt_info['formulas_text']}</li>"
+                    st.markdown(f"""
                         <div style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
                             <strong style="color: #A855F7; font-size: 0.9rem;">📌 Core Verification Rubric:</strong>
                             <ul style="margin: 6px 0 0 0; padding-left: 20px; font-size: 0.85rem; color: var(--nexus-text-title);">
+                                {li_items}
+                            </ul>
+                        </div>
                     """, unsafe_allow_html=True)
-                    for pt in prompt_info["rubric_points"]:
-                        st.markdown(f"<li>{pt}</li>", unsafe_allow_html=True)
-                    if prompt_info.get("formulas_text"):
-                        st.markdown(f"<li><strong>Key Formulas:</strong> {prompt_info['formulas_text']}</li>", unsafe_allow_html=True)
-                    st.markdown("</ul></div>", unsafe_allow_html=True)
 
                 st.markdown("### 🌟 Self-Evaluation Understanding Score")
                 st.caption("How accurately and completely were you able to retrieve this concept from memory?")

@@ -269,9 +269,6 @@ def render_onboarding_guide(user_id: int):
         </style>
     """, unsafe_allow_html=True)
 
-    # Main Guide Container
-    st.markdown("<div class='nexus-guide-container'>", unsafe_allow_html=True)
-
     # Top Header & Step Progress Capsules
     step_dots_html = "".join([
         f"<span class='nexus-guide-step-dot {'active' if i == current_idx else 'inactive'}'></span>"
@@ -409,5 +406,3 @@ def render_onboarding_guide(user_id: int):
             st.session_state["show_onboarding_guide"] = False
             st.session_state["current_page"] = "🏠 Dashboard"
             st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)

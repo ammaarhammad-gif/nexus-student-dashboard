@@ -122,23 +122,6 @@ def render_dashboard_page(user_id: int):
     due_today_count = len(queue.get("due_today", []))
     pending_tasks_count = len([t for t in today_plans if not t["is_completed"]])
 
-    st.markdown("""
-        <div class="nexus-mission-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <div style="font-size: 0.78rem; font-weight: 700; color: var(--nexus-accent); text-transform: uppercase; letter-spacing: 0.08em;">
-                        ⚡ STRATEGIC FOCUS
-                    </div>
-                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--nexus-text-title); margin: 2px 0 0 0;">
-                        Today's Mission
-                    </h2>
-                </div>
-                <div style="font-size: 0.85rem; color: var(--nexus-text-sub);">
-                    Curated actions for maximum retention & score acceleration
-                </div>
-            </div>
-    """, unsafe_allow_html=True)
-
     # Mission items list
     mission_items = []
     if overdue_count > 0:
@@ -183,8 +166,9 @@ def render_dashboard_page(user_id: int):
             "learn_hub"
         ))
 
+    items_html = ""
     for m_title, m_desc, m_col, m_page, m_key in mission_items[:4]:
-        st.markdown(f"""
+        items_html += f"""
             <div class="nexus-mission-item">
                 <div>
                     <strong style="color: {m_col}; font-size: 0.95rem;">{m_title}</strong>
@@ -196,9 +180,26 @@ def render_dashboard_page(user_id: int):
                     </span>
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        """
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(f"""
+        <div class="nexus-mission-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <div style="font-size: 0.78rem; font-weight: 700; color: var(--nexus-accent); text-transform: uppercase; letter-spacing: 0.08em;">
+                        ⚡ STRATEGIC FOCUS
+                    </div>
+                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--nexus-text-title); margin: 2px 0 0 0;">
+                        Today's Mission
+                    </h2>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--nexus-text-sub);">
+                    Curated actions for maximum retention & score acceleration
+                </div>
+            </div>
+            {items_html}
+        </div>
+    """, unsafe_allow_html=True)
 
     # Primary Action CTA Button
     c_cta1, c_cta2 = st.columns([2, 1])
@@ -280,7 +281,13 @@ def render_dashboard_page(user_id: int):
                 st.rerun()
         else:
             for t in active_terms[:3]:
-                days = t["days_remaining"]
+                days = t.get("days_remaining", 0)
+                if "days_remaining" not in t and t.get("exam_date"):
+                    try:
+                        ex_dt = datetime.datetime.strptime(str(t["exam_date"])[:10], "%Y-%m-%d").date()
+                        days = max(0, (ex_dt - datetime.date.today()).days)
+                    except Exception:
+                        days = 0
                 badge_bg = "#EF4444" if days <= 7 else ("#F97316" if days <= 21 else "#38BDF8")
                 st.markdown(f"""
                     <div class="priority-item-card" style="border-left-color: {badge_bg}; margin-bottom: 10px;">

@@ -114,7 +114,13 @@ def _render_daily_planner_tab(user_id: int):
 
             if st.form_submit_button("Add Task to Schedule", use_container_width=True):
                 if task_name.strip():
-                    add_daily_plan(user_id, date_str, task_name.strip(), s_opts[sel_subj], est_dur)
+                    add_daily_plan(
+                        user_id=user_id,
+                        plan_date=date_str,
+                        description=task_name.strip(),
+                        duration_minutes=int(est_dur),
+                        subject_id=s_opts[sel_subj]
+                    )
                     st.success("Task added!")
                     st.rerun()
 
@@ -124,25 +130,27 @@ def _render_daily_planner_tab(user_id: int):
         for p in plans:
             c1, c2, c3 = st.columns([5, 1.2, 0.8])
             with c1:
-                done = bool(p["is_completed"])
+                t_name = p.get("description") or p.get("task_name") or p.get("topic_name") or "Study Task"
+                t_dur = p.get("duration_minutes") or p.get("estimated_minutes") or 30
+                done = bool(p.get("is_completed", False))
                 sub_label = f" <span style='font-size: 0.75rem; color: {p.get('subject_color', '#38BDF8')}; background: rgba(56,189,248,0.1); padding: 2px 8px; border-radius: 10px; font-weight: 700;'>{p.get('subject_name')}</span>" if p.get("subject_name") else ""
                 
                 checked = st.checkbox(
-                    f"**{p['task_name']}**",
+                    f"**{t_name}**",
                     value=done,
                     key=f"plan_item_chk_{p['id']}"
                 )
                 if checked != done:
                     toggle_daily_plan(user_id, p["id"], 1 if checked else 0)
                     if checked:
-                        st.toast(f"Completed '{p['task_name']}'! +15 XP", icon="⭐")
+                        st.toast(f"Completed '{t_name}'! +15 XP", icon="⭐")
                     st.rerun()
 
                 if sub_label:
                     st.markdown(f"<div style='margin-left: 28px; margin-top: -4px;'>{sub_label}</div>", unsafe_allow_html=True)
 
             with c2:
-                st.caption(f"⏱️ {p['estimated_minutes']} min")
+                st.caption(f"⏱️ {t_dur} min")
 
             with c3:
                 if st.button("🗑️", key=f"plan_item_del_{p['id']}", help="Delete task"):

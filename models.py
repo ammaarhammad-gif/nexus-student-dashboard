@@ -242,7 +242,7 @@ def get_all_terms(user_id: int):
 
 @st.cache_data(ttl=60, show_spinner=False)
 def get_active_upcoming_terms(user_id: int):
-    """Return all active (not marked as already done) terms for a user."""
+    """Return all active (not marked as already done) terms for a user with calculated days_remaining."""
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -252,7 +252,26 @@ def get_active_upcoming_terms(user_id: int):
                 ORDER BY display_order ASC, id ASC
             """, (user_id,))
             rows = cursor.fetchall()
-            return [dict(r) for r in rows]
+            today = datetime.date.today()
+            res = []
+            for r in rows:
+                d = dict(r)
+                exam_date_val = d.get("exam_date")
+                days_left = 0
+                if exam_date_val:
+                    if isinstance(exam_date_val, str):
+                        try:
+                            exam_dt = datetime.datetime.strptime(exam_date_val[:10], "%Y-%m-%d").date()
+                            days_left = (exam_dt - today).days
+                        except Exception:
+                            days_left = 0
+                    elif isinstance(exam_date_val, (datetime.date, datetime.datetime)):
+                        exam_dt = exam_date_val if isinstance(exam_date_val, datetime.date) else exam_date_val.date()
+                        days_left = (exam_dt - today).days
+                d["days_remaining"] = max(0, days_left)
+                d["days_left"] = max(0, days_left)
+                res.append(d)
+            return res
     finally:
         conn.close()
 

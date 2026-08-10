@@ -298,6 +298,10 @@ def render_ai_command_center_page(user_id: int):
                 st.success(f"Successfully synced {synced_count} AI-scheduled tasks directly into your Study Planner!")
 
             for day in p_data.get("daily_plans", []):
+                tasks_html = "".join([
+                    f"<div style='margin-bottom: 4px; font-size: 0.9rem;'>• <strong>{t.get('subject_name', 'General')}:</strong> {t.get('task')} <em>({t.get('duration_minutes', 30)} min — {t.get('task_type', 'Study')})</em></div>"
+                    for t in day.get("tasks", [])
+                ])
                 st.markdown(f"""
                     <div class="priority-item-card" style="border-left-color: #F97316; margin-bottom: 12px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -307,10 +311,11 @@ def render_ai_command_center_page(user_id: int):
                         <div style="font-size: 0.85rem; color: #38BDF8; margin-bottom: 8px;">
                             🎯 <strong>Daily Milestone:</strong> {day.get('daily_goal')}
                         </div>
+                        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06);">
+                            {tasks_html}
+                        </div>
+                    </div>
                 """, unsafe_allow_html=True)
-                for t in day.get("tasks", []):
-                    st.markdown(f"• **{t.get('subject_name', 'General')}:** {t.get('task')} *({t.get('duration_minutes', 30)} min — {t.get('task_type', 'Study')})*")
-                st.markdown("</div>", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════
     # TAB 5: DEEP PROGRESS DIAGNOSTIC

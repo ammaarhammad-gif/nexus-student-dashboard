@@ -987,9 +987,9 @@ $$\\Delta Y = k \\cdot \\Delta X$$
 """
         return {"status": "success", "content": diagnostic, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
 
-    # ══════════════════════════════════════════════════════════
+    # ----------------------------------------------------------
     # CAPABILITY 6: SPACED REVISION OPTIMIZATION
-    # ══════════════════════════════════════════════════════════
+    # ----------------------------------------------------------
     def generate_revision_recommendations(self, user_id: int) -> dict:
         rev_ctx = NexusContextBuilder.get_revision_queue_context(user_id)
         overdue_cnt = rev_ctx.get("overdue_count", 0)
