@@ -12,6 +12,8 @@ from models import (
     get_topics_for_chapter
 )
 
+from components.math_keyboard import render_latex_math_keyboard
+
 def render_notes_page(user_id: int):
     st.markdown("""
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px;">
@@ -55,20 +57,24 @@ def render_notes_page(user_id: int):
                 sel_t_name = st.selectbox("Topic", list(t_map.keys()) if t_map else ["None"], key="note_add_t")
             sel_t_id = t_map.get(sel_t_name)
 
-            with st.form("create_note_form", clear_on_submit=True):
-                title = st.text_input("Note Title", placeholder="e.g. Key Theorems, Summary of French Revolution, Cell Organelles")
-                tags = st.text_input("Tags (comma separated)", placeholder="e.g. formula, high_weightage, quick_revision")
-                content = st.text_area("Note Content (Supports Markdown)", height=220, placeholder="Write your notes here with **bold text**, bullet points, definitions...")
-                is_pinned = st.checkbox("📌 Pin note to top", value=False)
-                
-                submitted = st.form_submit_button("⚡ Save Note (+25 XP)", type="primary", use_container_width=True)
-                if submitted:
-                    if not title or not content or not sel_t_id:
-                        st.error("Please provide Title, Content, and select a Topic.")
-                    else:
-                        add_note(user_id, sel_s_id, sel_c_id, sel_t_id, title, content, tags, 1 if is_pinned else 0)
-                        st.success(f"Note '{title}' saved successfully! +25 XP")
-                        st.rerun()
+            # Visual LaTeX Math Keyboard for mathematical and scientific note taking
+            render_latex_math_keyboard("note_add_content", label="LaTeX & Equation Symbol Palette")
+
+            title = st.text_input("Note Title", placeholder="e.g. Key Theorems, Summary of French Revolution, Cell Organelles", key="note_add_title")
+            tags = st.text_input("Tags (comma separated)", placeholder="e.g. formula, high_weightage, quick_revision", key="note_add_tags")
+            content = st.text_area("Note Content (Supports Markdown & LaTeX)", height=220, placeholder="Write your notes here with **bold text**, bullet points, definitions, equations like $$E = mc^2$$...", key="note_add_content")
+            is_pinned = st.checkbox("📌 Pin note to top", value=False, key="note_add_pinned")
+            
+            if st.button("⚡ Save Note (+25 XP)", type="primary", use_container_width=True, key="save_note_btn"):
+                if not title or not content or not sel_t_id:
+                    st.error("Please provide Title, Content, and select a Topic.")
+                else:
+                    add_note(user_id, sel_s_id, sel_c_id, sel_t_id, title, content, tags, 1 if is_pinned else 0)
+                    st.success(f"Note '{title}' saved successfully! +25 XP")
+                    st.session_state["note_add_content"] = ""
+                    st.session_state["note_add_title"] = ""
+                    st.session_state["note_add_tags"] = ""
+                    st.rerun()
 
     with tab_notes:
         subjects = get_all_subjects(user_id)

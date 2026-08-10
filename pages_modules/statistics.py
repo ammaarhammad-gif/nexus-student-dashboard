@@ -9,6 +9,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from models import get_all_subjects_with_stats, get_user_theme
 from styles import render_header, render_metric_card, render_breadcrumbs, render_empty_state
+from pdf_generator import generate_weekly_progress_pdf
 
 
 def render_statistics_page(user_id: int):
@@ -16,6 +17,47 @@ def render_statistics_page(user_id: int):
     is_dark = (user_theme.strip().lower() == "dark")
     render_breadcrumbs(["🏠 Dashboard", "📊 Statistics"])
     render_header("📊 Statistics & Analytics", "Visual breakdown of your progress across all subjects.", theme=user_theme)
+
+    # ══════════════════════════════════════════════════════════
+    # 📄 1-CLICK WEEKLY PROGRESS PDF EXPORT BANNER
+    # ══════════════════════════════════════════════════════════
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.14) 0%, rgba(67, 56, 202, 0.08) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(99, 102, 241, 0.2); color: #818CF8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 10px; border-radius: 12px; margin-bottom: 6px;">
+                        <span>📄</span> <span>ACADEMIC PERFORMANCE AUDIT</span>
+                    </div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--nexus-text-title); font-family: 'Outfit', sans-serif;">
+                        Weekly Progress & Exam Readiness PDF Report
+                    </div>
+                    <div style="font-size: 0.88rem; color: var(--nexus-text-sub); margin-top: 2px;">
+                        Export a publication-grade vector PDF containing your study hours, error patterns, subject completion matrix, and AI pedagogical action plan.
+                    </div>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    c_pdf1, c_pdf2, c_pdf3 = st.columns([1.2, 1.5, 1.3])
+    with c_pdf1:
+        pdf_days = st.selectbox("Report Timeframe", [7, 14, 30], format_func=lambda x: f"Last {x} Days", key="stat_pdf_days")
+    with c_pdf2:
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        pdf_bytes = generate_weekly_progress_pdf(user_id, days=pdf_days)
+        st.download_button(
+            label=f"⬇️ Download {pdf_days}-Day Report (PDF)",
+            data=pdf_bytes,
+            file_name=f"Nexus_Academic_Report_{pdf_days}Days.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+            key="dl_weekly_pdf_btn"
+        )
+    with c_pdf3:
+        st.markdown("<div style='margin-top: 34px; font-size: 0.8rem; color: #10B981; font-weight: 600;'>✅ Vector PDF Ready</div>", unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
     subjects = get_all_subjects_with_stats(user_id)
 

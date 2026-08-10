@@ -374,7 +374,72 @@ def render_settings_page(user_id: int):
                     st.success("Term added!")
                     st.rerun()
 
-    # ── Section 5: Data Reset ──
+    # ── Section 5: Flashcard Decks & Academic PDF Reports Export ──
+    st.markdown("---")
+    st.subheader("📦 Flashcard Decks & Academic Reports Export")
+    st.caption("Export your complete flashcard library directly into Anki or download comprehensive academic audit reports.")
+
+    from anki_export import export_all_to_anki
+    from pdf_generator import generate_weekly_progress_pdf
+
+    c_exp_a, c_exp_b, c_exp_c = st.columns(3)
+    with c_exp_a:
+        st.markdown("""
+            <div class="metric-box" style="border-left: 4px solid #6366F1; padding: 12px;">
+                <div style="font-weight: 700; color: #6366F1; font-size: 0.9rem;">🗂️ Master Anki Deck</div>
+                <div style="font-size: 0.75rem; color: var(--nexus-text-sub); margin: 4px 0 10px 0;">
+                    Mistakes, Active Recall, and Formulas with LaTeX & prevention heuristics.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        master_tsv = export_all_to_anki(user_id, format_type="tsv")
+        st.download_button(
+            label="📥 Download Master Anki (.tsv)",
+            data=master_tsv,
+            file_name="Nexus_Master_Flashcards.tsv",
+            mime="text/tab-separated-values",
+            use_container_width=True,
+            key="dl_master_anki_tsv"
+        )
+    with c_exp_b:
+        st.markdown("""
+            <div class="metric-box" style="border-left: 4px solid #38BDF8; padding: 12px;">
+                <div style="font-weight: 700; color: #38BDF8; font-size: 0.9rem;">📊 Universal CSV Deck</div>
+                <div style="font-size: 0.75rem; color: var(--nexus-text-sub); margin: 4px 0 10px 0;">
+                    Ready for Notion, Quizlet, RemNote, or spreadsheet revision trackers.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        master_csv = export_all_to_anki(user_id, format_type="csv")
+        st.download_button(
+            label="📊 Download CSV Deck (.csv)",
+            data=master_csv,
+            file_name="Nexus_Master_Flashcards.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="dl_master_anki_csv"
+        )
+    with c_exp_c:
+        st.markdown("""
+            <div class="metric-box" style="border-left: 4px solid #10B981; padding: 12px;">
+                <div style="font-weight: 700; color: #10B981; font-size: 0.9rem;">📄 Academic PDF Report</div>
+                <div style="font-size: 0.75rem; color: var(--nexus-text-sub); margin: 4px 0 10px 0;">
+                    Full performance audit with syllabus matrix, focus hours & AI plan.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        pdf_rep = generate_weekly_progress_pdf(user_id, days=7)
+        st.download_button(
+            label="📄 Export 7-Day PDF Report",
+            data=pdf_rep,
+            file_name="Nexus_Academic_Report_7Days.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+            key="dl_settings_pdf_btn"
+        )
+
+    # ── Section 6: Data Reset ──
     st.markdown("---")
     st.subheader("⚠️ Reset All Data")
     st.warning("Resetting will wipe all subjects, chapters, topics, study sessions, and progress permanently.")

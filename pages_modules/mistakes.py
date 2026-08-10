@@ -17,6 +17,8 @@ from models import (
     get_mistake_trend
 )
 from styles import render_breadcrumbs
+from components.math_keyboard import render_latex_math_keyboard
+from anki_export import export_mistakes_to_anki
 
 MISTAKE_TYPES = [
     "Conceptual",
@@ -159,42 +161,48 @@ def render_mistakes_page(user_id: int):
             sel_chap_id = c_map.get(sel_chap_name)
             sel_top_id = t_map.get(sel_top_name) if sel_top_name != "None" else None
 
-            with st.form("add_mistake_form", clear_on_submit=True):
-                question_txt = st.text_area("Question / Problem Prompt", placeholder="e.g. Find the focal length of a concave lens if power is -2.0 D...")
+            # Visual LaTeX Math Keyboard for science & math question entry
+            render_latex_math_keyboard("mst_add_question_txt", label="LaTeX & Equation Formula Palette")
+
+            question_txt = st.text_area("Question / Problem Prompt", placeholder="e.g. Find the focal length of a concave lens if power is -2.0 D... or $$E = \\frac{hc}{\\lambda}$$", key="mst_add_question_txt")
+            
+            c_a1, c_a2 = st.columns(2)
+            with c_a1:
+                your_ans = st.text_input("Your Answer / Error Made", placeholder="e.g. +50 cm", key="mst_add_your_ans")
+            with c_a2:
+                corr_ans = st.text_input("Correct Answer", placeholder="e.g. -50 cm or -0.5 m", key="mst_add_corr_ans")
+            
+            c_t1, c_t2 = st.columns(2)
+            with c_t1:
+                m_type = st.selectbox("Mistake Root Cause", MISTAKE_TYPES, key="mst_add_m_type")
+            with c_t2:
+                prev_strat = st.text_input("Prevention Strategy", placeholder="e.g. Always check sign convention: focal length of concave is negative", key="mst_add_prev_strat")
                 
-                c_a1, c_a2 = st.columns(2)
-                with c_a1:
-                    your_ans = st.text_input("Your Answer / Error Made", placeholder="e.g. +50 cm")
-                with c_a2:
-                    corr_ans = st.text_input("Correct Answer", placeholder="e.g. -50 cm or -0.5 m")
-                
-                c_t1, c_t2 = st.columns(2)
-                with c_t1:
-                    m_type = st.selectbox("Mistake Root Cause", MISTAKE_TYPES)
-                with c_t2:
-                    prev_strat = st.text_input("Prevention Strategy", placeholder="e.g. Always check sign convention: focal length of concave is negative")
-                    
-                expl = st.text_area("Detailed Concept Explanation", placeholder="Power P = 1/f(in meters) -> f = 1/(-2) = -0.5 m = -50 cm.")
-                
-                submit_btn = st.form_submit_button("⚡ Save to Mistake Vault (+20 XP)", use_container_width=True, type="primary")
-                if submit_btn:
-                    if not question_txt.strip():
-                        st.error("Please enter the question text.")
-                    else:
-                        add_mistake(
-                            user_id=user_id,
-                            question=question_txt,
-                            mistake_type=m_type,
-                            subject_id=sel_subj_id,
-                            chapter_id=sel_chap_id,
-                            topic_id=sel_top_id,
-                            your_answer=your_ans,
-                            correct_answer=corr_ans,
-                            explanation=expl,
-                            prevention_strategy=prev_strat
-                        )
-                        st.success("Mistake recorded in Vault! +20 XP awarded.")
-                        st.rerun()
+            expl = st.text_area("Detailed Concept Explanation", placeholder="Power P = 1/f(in meters) -> f = 1/(-2) = -0.5 m = -50 cm.", key="mst_add_expl")
+            
+            if st.button("⚡ Save to Mistake Vault (+20 XP)", use_container_width=True, type="primary", key="mst_save_btn"):
+                if not question_txt.strip():
+                    st.error("Please enter the question text.")
+                else:
+                    add_mistake(
+                        user_id=user_id,
+                        question=question_txt,
+                        mistake_type=m_type,
+                        subject_id=sel_subj_id,
+                        chapter_id=sel_chap_id,
+                        topic_id=sel_top_id,
+                        your_answer=your_ans,
+                        correct_answer=corr_ans,
+                        explanation=expl,
+                        prevention_strategy=prev_strat
+                    )
+                    st.success("Mistake recorded in Vault! +20 XP awarded.")
+                    st.session_state["mst_add_question_txt"] = ""
+                    st.session_state["mst_add_your_ans"] = ""
+                    st.session_state["mst_add_corr_ans"] = ""
+                    st.session_state["mst_add_prev_strat"] = ""
+                    st.session_state["mst_add_expl"] = ""
+                    st.rerun()
 
     with tab_list:
         subjects = get_all_subjects(user_id)
@@ -215,6 +223,41 @@ def render_mistakes_page(user_id: int):
             is_rev_param = False
         elif filt_status == "Mastered Only":
             is_rev_param = True
+
+        # ── 1-Click Anki & CSV Export Action Bar ──
+        c_ank1, c_ank2 = st.columns(2)
+        with c_ank1:
+            anki_mst_tsv = export_mistakes_to_anki(
+                user_id,
+                subject_id=s_filter_map[filt_subj],
+                unreviewed_only=(filt_status == "Unreviewed Only"),
+                format_type="tsv"
+            )
+            st.download_button(
+                label="📥 Export Mistakes to Anki Deck (.tsv)",
+                data=anki_mst_tsv,
+                file_name=f"Nexus_Mistakes_{filt_subj.replace(' ', '_')}.tsv",
+                mime="text/tab-separated-values",
+                use_container_width=True,
+                key="dl_mst_anki_tsv"
+            )
+        with c_ank2:
+            anki_mst_csv = export_mistakes_to_anki(
+                user_id,
+                subject_id=s_filter_map[filt_subj],
+                unreviewed_only=(filt_status == "Unreviewed Only"),
+                format_type="csv"
+            )
+            st.download_button(
+                label="📊 Export Mistakes (CSV for Sheets/Notion)",
+                data=anki_mst_csv,
+                file_name=f"Nexus_Mistakes_{filt_subj.replace(' ', '_')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="dl_mst_anki_csv"
+            )
+
+        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
 
         mistakes = get_all_mistakes(user_id, subject_id=s_filter_map[filt_subj], mistake_type=filt_type, is_reviewed=is_rev_param)
         if not mistakes:

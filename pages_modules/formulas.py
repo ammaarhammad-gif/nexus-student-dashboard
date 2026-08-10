@@ -13,6 +13,9 @@ from models import (
     get_topics_for_chapter
 )
 
+from components.math_keyboard import render_latex_math_keyboard
+from anki_export import export_formulas_to_anki
+
 def render_formulas_page(user_id: int):
     st.markdown("""
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px;">
@@ -51,19 +54,23 @@ def render_formulas_page(user_id: int):
                 sel_chap_name = st.selectbox("Chapter", list(c_map.keys()) if c_map else ["None"], key="form_add_chap")
             sel_chap_id = c_map.get(sel_chap_name)
 
-            with st.form("add_formula_form", clear_on_submit=True):
-                title = st.text_input("Formula Title", placeholder="e.g. Quadratic Formula, Lens Formula, Snell's Law")
-                latex_code = st.text_area("LaTeX / Math Code", placeholder=r"e.g. x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}  or  \frac{1}{f} = \frac{1}{v} - \frac{1}{u}")
-                desc = st.text_input("Description / Notes", placeholder="e.g. For ax^2 + bx + c = 0, where b^2 - 4ac is discriminant")
-                
-                submitted = st.form_submit_button("⚡ Save Formula", type="primary", use_container_width=True)
-                if submitted:
-                    if not title or not latex_code or not sel_chap_id:
-                        st.error("Please provide Title, LaTeX code, and Chapter.")
-                    else:
-                        add_formula(user_id, sel_subj_id, sel_chap_id, title, latex_code, description=desc)
-                        st.success(f"Formula '{title}' saved successfully!")
-                        st.rerun()
+            # Interactive Visual Math Keyboard
+            render_latex_math_keyboard("form_add_latex_code", label="Interactive Equation & LaTeX Builder")
+
+            title = st.text_input("Formula Title", placeholder="e.g. Quadratic Formula, Lens Formula, Snell's Law", key="form_add_title")
+            latex_code = st.text_area("LaTeX / Math Code", placeholder=r"e.g. x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}  or  \frac{1}{f} = \frac{1}{v} - \frac{1}{u}", key="form_add_latex_code")
+            desc = st.text_input("Description / Notes", placeholder="e.g. For ax^2 + bx + c = 0, where b^2 - 4ac is discriminant", key="form_add_desc")
+            
+            if st.button("⚡ Save Formula to Vault", type="primary", use_container_width=True, key="save_form_btn"):
+                if not title or not latex_code or not sel_chap_id:
+                    st.error("Please provide Title, LaTeX code, and select a Chapter.")
+                else:
+                    add_formula(user_id, sel_subj_id, sel_chap_id, title, latex_code, description=desc)
+                    st.success(f"Formula '{title}' saved successfully!")
+                    st.session_state["form_add_latex_code"] = ""
+                    st.session_state["form_add_title"] = ""
+                    st.session_state["form_add_desc"] = ""
+                    st.rerun()
 
     with tab_vault:
         subjects = get_all_subjects(user_id)
@@ -71,11 +78,22 @@ def render_formulas_page(user_id: int):
         if subjects:
             s_filt_map.update({s["name"]: s["id"] for s in subjects})
             
-        c_f1, c_f2 = st.columns([1, 2])
+        c_f1, c_f2, c_f3 = st.columns([1, 2, 1])
         with c_f1:
             sel_filt_s = st.selectbox("Filter by Subject", list(s_filt_map.keys()), key="form_filt_subj")
         with c_f2:
             search_txt = st.text_input("🔍 Search Formulas", placeholder="Search title or equation...", key="form_search_q")
+        with c_f3:
+            # 1-Click Anki Deck Export
+            anki_tsv_data = export_formulas_to_anki(user_id, subject_id=s_filt_map[sel_filt_s], format_type="tsv")
+            st.download_button(
+                label="📥 Export to Anki (.tsv)",
+                data=anki_tsv_data,
+                file_name=f"Nexus_Formulas_{sel_filt_s.replace(' ', '_')}.tsv",
+                mime="text/tab-separated-values",
+                use_container_width=True,
+                key="dl_form_anki_tsv"
+            )
             
         formulas = get_all_formulas(user_id, subject_id=s_filt_map[sel_filt_s])
         if search_txt:

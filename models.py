@@ -58,8 +58,26 @@ def verify_user(username: str, password: str) -> dict:
             if bcrypt.checkpw(password.encode('utf-8'), user["password_hash"].encode('utf-8')):
                 return dict(user)
             return None
+        return None
     finally:
         conn.close()
+
+
+def get_user_by_id(user_id: int) -> dict:
+    """Retrieve basic user credentials record by ID."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("SELECT id, username, created_at FROM users WHERE id = %s", (user_id,))
+            r = cursor.fetchone()
+            return dict(r) if r else {"id": user_id, "username": "Student"}
+    finally:
+        conn.close()
+
+
+def get_user_settings(user_id: int) -> dict:
+    """Convenience alias for get_user_profile."""
+    return get_user_profile(user_id)
 
 
 # ══════════════════════════════════════════════
@@ -3982,4 +4000,8 @@ def get_focus_analytics(user_id: int, days: int = None) -> dict:
             }
     finally:
         conn.close()
+
+
+log_focus_session = log_focus_session_and_sync
+get_all_quizzes = get_quiz_history
 

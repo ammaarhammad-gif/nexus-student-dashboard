@@ -13,6 +13,8 @@ from models import (
     get_recall_stats
 )
 from styles import render_breadcrumbs
+from components.math_keyboard import render_latex_math_keyboard
+from anki_export import export_active_recall_to_anki
 
 
 def render_active_recall_page(user_id: int):
@@ -85,65 +87,69 @@ def render_active_recall_page(user_id: int):
                     </div>
                 """, unsafe_allow_html=True)
 
-                with st.form("active_recall_form"):
-                    user_recall_text = st.text_area(
-                        "✍️ Your Recall Explanation (Write from memory without notes):",
-                        placeholder="Start typing your explanation here... Define the term, explain the step-by-step mechanism, state formulas, and list real-world applications or caveats...",
-                        height=200
-                    )
+                # Embed Visual LaTeX Math Keyboard for derivations and science formulas
+                render_latex_math_keyboard("active_recall_input_text", label="LaTeX & Equation Formula Palette")
 
-                    reveal_rubric = st.checkbox("👁️ Reveal Key Concept Rubric Checklist", value=False)
-                    if reveal_rubric:
-                        st.markdown("""
-                            <div style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-                                <strong style="color: #A855F7; font-size: 0.9rem;">📌 Core Verification Rubric:</strong>
-                                <ul style="margin: 6px 0 0 0; padding-left: 20px; font-size: 0.85rem; color: var(--nexus-text-title);">
-                        """, unsafe_allow_html=True)
-                        for pt in prompt_info["rubric_points"]:
-                            st.markdown(f"<li>{pt}</li>", unsafe_allow_html=True)
-                        if prompt_info.get("formulas_text"):
-                            st.markdown(f"<li><strong>Key Formulas:</strong> {prompt_info['formulas_text']}</li>", unsafe_allow_html=True)
-                        st.markdown("</ul></div>", unsafe_allow_html=True)
+                user_recall_text = st.text_area(
+                    "✍️ Your Recall Explanation (Write from memory without notes):",
+                    placeholder="Start typing your explanation here... Define the term, explain the step-by-step mechanism, state formulas like $$F = G \\frac{m_1 m_2}{r^2}$$, and list real-world applications...",
+                    height=200,
+                    key="active_recall_input_text"
+                )
 
-                    st.markdown("### 🌟 Self-Evaluation Understanding Score")
-                    st.caption("How accurately and completely were you able to recall this concept?")
-                    
-                    understanding_slider = st.select_slider(
-                        "Understanding Rating:",
-                        options=[1, 2, 3, 4, 5],
-                        value=3,
-                        format_func=lambda x: {
-                            1: "⭐ 1 - Blank / Severe Gaps (Auto-Schedules 1d Revision)",
-                            2: "⭐⭐ 2 - Weak / Struggled with core steps (Auto-Schedules 1d Revision)",
-                            3: "⭐⭐⭐ 3 - Moderate / Grasped main idea (Schedules Standard Revision)",
-                            4: "⭐⭐⭐⭐ 4 - Strong / Minor details missing (Advances Mastery)",
-                            5: "⭐⭐⭐⭐⭐ 5 - Flawless / Mastered & Complete (Mastery Locked)"
-                        }[x]
-                    )
+                reveal_rubric = st.checkbox("👁️ Reveal Key Concept Rubric Checklist", value=False)
+                if reveal_rubric:
+                    st.markdown("""
+                        <div style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+                            <strong style="color: #A855F7; font-size: 0.9rem;">📌 Core Verification Rubric:</strong>
+                            <ul style="margin: 6px 0 0 0; padding-left: 20px; font-size: 0.85rem; color: var(--nexus-text-title);">
+                    """, unsafe_allow_html=True)
+                    for pt in prompt_info["rubric_points"]:
+                        st.markdown(f"<li>{pt}</li>", unsafe_allow_html=True)
+                    if prompt_info.get("formulas_text"):
+                        st.markdown(f"<li><strong>Key Formulas:</strong> {prompt_info['formulas_text']}</li>", unsafe_allow_html=True)
+                    st.markdown("</ul></div>", unsafe_allow_html=True)
 
-                    feedback_notes = st.text_input("Self-Reflection / What did you miss?", placeholder="e.g. Remembered formula but missed the sign convention condition.")
+                st.markdown("### 🌟 Self-Evaluation Understanding Score")
+                st.caption("How accurately and completely were you able to recall this concept?")
+                
+                understanding_slider = st.select_slider(
+                    "Understanding Rating:",
+                    options=[1, 2, 3, 4, 5],
+                    value=3,
+                    format_func=lambda x: {
+                        1: "⭐ 1 - Blank / Severe Gaps (Auto-Schedules 1d Revision)",
+                        2: "⭐⭐ 2 - Weak / Struggled with core steps (Auto-Schedules 1d Revision)",
+                        3: "⭐⭐⭐ 3 - Moderate / Grasped main idea (Schedules Standard Revision)",
+                        4: "⭐⭐⭐⭐ 4 - Strong / Minor details missing (Advances Mastery)",
+                        5: "⭐⭐⭐⭐⭐ 5 - Flawless / Mastered & Complete (Mastery Locked)"
+                    }[x]
+                )
 
-                    submit_recall_btn = st.form_submit_button("⚡ Save Active Recall & Update Topic Mastery", type="primary", use_container_width=True)
-                    if submit_recall_btn:
-                        if not user_recall_text.strip():
-                            st.error("Please write your recall response before submitting.")
+                feedback_notes = st.text_input("Self-Reflection / What did you miss?", placeholder="e.g. Remembered formula but missed the sign convention condition.", key="active_recall_fb_notes")
+
+                if st.button("⚡ Save Active Recall & Update Topic Mastery", type="primary", use_container_width=True, key="save_recall_btn"):
+                    if not user_recall_text.strip():
+                        st.error("Please write your recall response before submitting.")
+                    else:
+                        rec_id = save_active_recall_session(
+                            user_id=user_id,
+                            topic_id=sel_top_id,
+                            prompt_text=prompt_info["prompt_text"],
+                            user_response=user_recall_text,
+                            evaluation_feedback=feedback_notes,
+                            understanding_score=understanding_slider
+                        )
+                        if understanding_slider >= 4:
+                            st.balloons()
+                            st.success(f"Excellent recall! Topic understanding updated to {understanding_slider}/5 stars. +35 XP awarded!")
+                        elif understanding_slider <= 2:
+                            st.warning(f"Recall recorded. Topic marked for urgent review. Adaptive Spaced Revision automatically scheduled for tomorrow!")
                         else:
-                            rec_id = save_active_recall_session(
-                                user_id=user_id,
-                                topic_id=sel_top_id,
-                                prompt_text=prompt_info["prompt_text"],
-                                user_response=user_recall_text,
-                                evaluation_feedback=feedback_notes,
-                                understanding_score=understanding_slider
-                            )
-                            if understanding_slider >= 4:
-                                st.balloons()
-                                st.success(f"Excellent recall! Topic understanding updated to {understanding_slider}/5 stars. +35 XP awarded!")
-                            elif understanding_slider <= 2:
-                                st.warning(f"Recall recorded. Topic marked for urgent review. Adaptive Spaced Revision automatically scheduled for tomorrow!")
-                            else:
-                                st.success(f"Recall session saved! Topic understanding updated to 3/5 stars. +25 XP awarded!")
-                            st.rerun()
+                            st.success(f"Recall session saved! Topic understanding updated to 3/5 stars. +25 XP awarded!")
+                        st.session_state["active_recall_input_text"] = ""
+                        st.session_state["active_recall_fb_notes"] = ""
+                        st.rerun()
 
     # ══════════════════════════════════════════════════════════
     # TAB 2: RECALL LOGS & INSIGHTS
@@ -187,7 +193,32 @@ def render_active_recall_page(user_id: int):
                 </div>
             """, unsafe_allow_html=True)
 
-        st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+
+        # ── 1-Click Anki & CSV Export Action Bar ──
+        c_exp1, c_exp2 = st.columns([1, 1])
+        with c_exp1:
+            anki_recall_tsv = export_active_recall_to_anki(user_id, format_type="tsv")
+            st.download_button(
+                label="📥 Export Active Recall Deck to Anki (.tsv)",
+                data=anki_recall_tsv,
+                file_name="Nexus_Active_Recall_Deck.tsv",
+                mime="text/tab-separated-values",
+                use_container_width=True,
+                key="dl_recall_anki_tsv"
+            )
+        with c_exp2:
+            anki_recall_csv = export_active_recall_to_anki(user_id, format_type="csv")
+            st.download_button(
+                label="📊 Export Active Recall (CSV for Notion/Sheets)",
+                data=anki_recall_csv,
+                file_name="Nexus_Active_Recall_Deck.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="dl_recall_anki_csv"
+            )
+
+        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
 
         if not history:
             st.info("No active recall logs recorded yet. Practice your first topic in the session tab above!")
