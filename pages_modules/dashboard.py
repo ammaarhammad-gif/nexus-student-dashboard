@@ -166,40 +166,24 @@ def render_dashboard_page(user_id: int):
             "learn_hub"
         ))
 
-    items_html = ""
-    for m_title, m_desc, m_col, m_page, m_key in mission_items[:4]:
-        items_html += f"""
-            <div class="nexus-mission-item">
-                <div>
-                    <strong style="color: {m_col}; font-size: 0.95rem;">{m_title}</strong>
-                    <div style="font-size: 0.82rem; color: var(--nexus-text-sub); margin-top: 2px;">{m_desc}</div>
-                </div>
-                <div>
-                    <span style="background: rgba(56, 189, 248, 0.12); color: #38BDF8; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 12px;">
-                        {m_page}
-                    </span>
-                </div>
-            </div>
-        """
+    items_html = "".join([
+        f'<div class="nexus-mission-item"><div><strong style="color: {m_col}; font-size: 0.95rem;">{m_title}</strong><div style="font-size: 0.82rem; color: var(--nexus-text-sub); margin-top: 2px;">{m_desc}</div></div><div><span style="background: rgba(56, 189, 248, 0.12); color: #38BDF8; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 12px;">{m_page}</span></div></div>'
+        for m_title, m_desc, m_col, m_page, m_key in mission_items[:4]
+    ])
 
-    st.markdown(f"""
-        <div class="nexus-mission-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <div style="font-size: 0.78rem; font-weight: 700; color: var(--nexus-accent); text-transform: uppercase; letter-spacing: 0.08em;">
-                        ⚡ STRATEGIC FOCUS
-                    </div>
-                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--nexus-text-title); margin: 2px 0 0 0;">
-                        Today's Mission
-                    </h2>
-                </div>
-                <div style="font-size: 0.85rem; color: var(--nexus-text-sub);">
-                    Curated actions for maximum retention & score acceleration
-                </div>
-            </div>
-            {items_html}
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="nexus-mission-card">'
+        f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">'
+        f'<div>'
+        f'<div style="font-size: 0.78rem; font-weight: 700; color: var(--nexus-accent); text-transform: uppercase; letter-spacing: 0.08em;">⚡ STRATEGIC FOCUS</div>'
+        f'<h2 style="font-family: \'Outfit\', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--nexus-text-title); margin: 2px 0 0 0;">Today\'s Mission</h2>'
+        f'</div>'
+        f'<div style="font-size: 0.85rem; color: var(--nexus-text-sub);">Curated actions for maximum retention & score acceleration</div>'
+        f'</div>'
+        f'{items_html}'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 
     # Primary Action CTA Button
     c_cta1, c_cta2 = st.columns([2, 1])
@@ -353,24 +337,25 @@ def render_dashboard_page(user_id: int):
 
     with col_today_strip:
         st.subheader("📊 Today's Momentum")
+        today_done_cnt = len([t for t in today_plans if t.get('is_completed')])
         st.markdown(f"""
             <div class="readiness-container" style="padding: 16px;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
                     <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #38BDF8;">
                         <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Tasks Done</div>
-                        <div style="font-size: 1.5rem; font-weight: 800; color: #38BDF8;">{len([t for t in today_plans if t['is_completed']])}/{len(today_plans)}</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #38BDF8;">{today_done_cnt}/{len(today_plans)}</div>
                     </div>
                     <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #F97316;">
                         <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Streak</div>
-                        <div style="font-size: 1.5rem; font-weight: 800; color: #F97316;">{xp_info['streak']} Days</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #F97316;">{xp_info.get('streak', 0)} Days</div>
                     </div>
                     <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #22C55E;">
                         <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Syllabus</div>
-                        <div style="font-size: 1.5rem; font-weight: 800; color: #22C55E;">{stats['percent_completed']}%</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #22C55E;">{stats.get('percent_completed', 0.0)}%</div>
                     </div>
                     <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #A855F7;">
                         <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Nexus Level</div>
-                        <div style="font-size: 1.5rem; font-weight: 800; color: #A855F7;">Lvl {xp_info['level']}</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #A855F7;">Lvl {xp_info.get('level', 1)}</div>
                     </div>
                 </div>
             </div>
