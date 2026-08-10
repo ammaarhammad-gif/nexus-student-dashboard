@@ -3,9 +3,13 @@ models.py — Data access layer for all database operations using PostgreSQL.
 Includes user authentication and isolates data by user_id.
 """
 
+import json
+import datetime
+import random
 import bcrypt  # type: ignore[import-not-found]
 import psycopg2
 import psycopg2.extras
+import psycopg2.sql
 import streamlit as st
 from database import get_connection
 
@@ -3145,9 +3149,10 @@ def get_unreviewed_mistakes_for_quiz(user_id: int, limit: int = 10) -> list:
         conn.close()
 
 
-def generate_mistake_requiz(user_id: int, limit: int = 5) -> dict:
+def generate_mistake_requiz(user_id: int, limit: int = 5, count: int = None) -> dict:
     """Generates an interactive re-quiz payload directly from unreviewed Mistake Vault items."""
-    mistakes = get_unreviewed_mistakes_for_quiz(user_id, limit=limit)
+    effective_limit = count if count is not None else limit
+    mistakes = get_unreviewed_mistakes_for_quiz(user_id, limit=effective_limit)
     if not mistakes:
         return None
 
@@ -3726,11 +3731,14 @@ def get_active_recall_prompt(user_id: int, topic_id: int) -> dict:
 
 def save_active_recall_session(user_id: int, topic_id: int, prompt_text: str,
                                user_response: str, evaluation_feedback: str = "",
-                               understanding_score: int = 3) -> int:
+                               understanding_score: int = 3, score: int = None,
+                               ai_feedback: str = None) -> int:
     """
     Saves an active recall session, synchronizes topic understanding, triggers
     adaptive spaced repetition for weak scores, awards XP, and updates streak.
     """
+    effective_feedback = ai_feedback if ai_feedback is not None else evaluation_feedback
+    effective_score = score if score is not None else understanding_score
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
@@ -3739,18 +3747,18 @@ def save_active_recall_session(user_id: int, topic_id: int, prompt_text: str,
                                               evaluation_feedback, understanding_score)
                 VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
             """, (user_id, topic_id, prompt_text.strip(), user_response.strip(),
-                  evaluation_feedback.strip(), understanding_score))
+                  effective_feedback.strip(), effective_score))
             recall_id = cursor.fetchone()[0]
             conn.commit()
 
         # 1. Update understanding in topic_progress
-        save_progress(user_id, "topic", topic_id, understanding=understanding_score)
+        save_progress(user_id, "topic", topic_id, understanding=effective_score)
 
         # 2. Adaptive Spaced Repetition trigger
-        if understanding_score <= 2:
+        if effective_score <= 2:
             # Weak recall -> review soon in 1d, 3d, 7d
             try:
-                schedule_adaptive_revisions(user_id, "topic", topic_id, understanding_score)
+                schedule_adaptive_revisions(user_id, "topic", topic_id, effective_score)
             except Exception:
                 pass
         elif understanding_score >= 4:
