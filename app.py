@@ -337,6 +337,64 @@ def main():
         nav_epoch = st.session_state.get("nav_epoch", 0)
         current_nav_index = page_options.index(curr_page)
 
+        render_html("""
+            <style>
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] > div:first-child,
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] input[type="radio"],
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] input + div,
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child,
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label > span:first-child,
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] svg {
+                display: none !important;
+                opacity: 0 !important;
+                width: 0 !important;
+                height: 0 !important;
+                max-width: 0 !important;
+                max-height: 0 !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                visibility: hidden !important;
+                pointer-events: none !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"],
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label {
+                padding: 10px 14px !important;
+                border-radius: 12px !important;
+                margin-bottom: 4px !important;
+                transition: all 0.18s ease !important;
+                cursor: pointer !important;
+                border: 1px solid transparent !important;
+                display: flex !important;
+                align-items: center !important;
+                width: 100% !important;
+                background: transparent !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
+                background: rgba(255, 255, 255, 0.06) !important;
+                transform: translateX(4px) !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked),
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"][aria-checked="true"] {
+                background: rgba(56, 189, 248, 0.14) !important;
+                border: 1px solid rgba(56, 189, 248, 0.38) !important;
+                box-shadow: 0 0 16px rgba(56, 189, 248, 0.22) !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label p,
+            section[data-testid="stSidebar"] div[data-testid="stRadio"] label div[data-testid="stMarkdownContainer"] {
+                font-size: 0.94rem !important;
+                font-weight: 600 !important;
+                margin: 0 !important;
+            }
+            </style>
+        """)
+
         page_selection = st.radio(
             "Navigation Menu",
             page_options,
@@ -347,7 +405,8 @@ def main():
         st.session_state["current_page"] = page_selection
         page = page_selection
 
-        st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
+        render_html("<div style='margin-top: 12px;'></div>")
+
         footer_border = "rgba(255,255,255,0.08)" if is_dark else "#E2E8F0"
         
         col_sync, col_logout = st.columns([1.4, 1])

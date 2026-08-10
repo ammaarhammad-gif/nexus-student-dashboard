@@ -1767,25 +1767,31 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         }
 
         /* ── Modern Sidebar Navigation Styles (Completely Hide Radio Circles) ── */
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child,
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] > div:first-child,
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] input + div,
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label div:first-child,
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] input[type="radio"] {
+        [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child,
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child,
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:nth-child(1),
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] input + div,
+        [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label div:first-child,
+        [data-testid="stSidebar"] [data-testid="stRadio"] input[type="radio"],
+        [data-testid="stSidebar"] [data-testid="stRadio"] label > div:first-child,
+        [data-testid="stSidebar"] [data-testid="stRadio"] label > span:first-child,
+        [data-testid="stSidebar"] [data-testid="stRadio"] svg {
             display: none !important;
             opacity: 0 !important;
             width: 0 !important;
             height: 0 !important;
             min-width: 0 !important;
             min-height: 0 !important;
+            max-width: 0 !important;
+            max-height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
             visibility: hidden !important;
             pointer-events: none !important;
         }
 
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"],
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label {
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"],
+        [data-testid="stSidebar"] [data-testid="stRadio"] label {
             padding: 9px 14px !important;
             border-radius: 10px !important;
             margin-bottom: 3px !important;
@@ -1801,15 +1807,15 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             background: transparent !important;
         }
 
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
+        [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
             background: rgba(255, 255, 255, 0.05) !important;
             color: var(--nexus-text-title) !important;
             transform: translateX(3px) !important;
         }
 
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked),
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"][aria-checked="true"] {
+        [data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked),
+        [data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"],
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"][aria-checked="true"] {
             background: rgba(56, 189, 248, 0.12) !important;
             border: 1px solid rgba(56, 189, 248, 0.32) !important;
             color: #38BDF8 !important;
@@ -1817,13 +1823,15 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             font-weight: 700 !important;
         }
 
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label [data-testid="stMarkdownContainer"],
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
+        [data-testid="stSidebar"] [data-testid="stRadio"] label [data-testid="stMarkdownContainer"],
+        [data-testid="stSidebar"] [data-testid="stRadio"] label p {
             margin: 0 !important;
             color: inherit !important;
             font-weight: inherit !important;
             font-size: inherit !important;
+            width: 100% !important;
         }
+
 
         /* ── Top Header Bar ── */
         .nexus-top-header-bar {
