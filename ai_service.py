@@ -893,7 +893,10 @@ $$\\Delta Y = k \\cdot \\Delta X$$
     # CAPABILITY 4: INTELLIGENT STUDY PLANNER
     # ══════════════════════════════════════════════════════════
     def generate_ai_study_plan(self, user_id: int, term_id: int = None,
-                               daily_hours: float = 3.0, target_days: int = 7) -> dict:
+                               daily_hours: float = 3.0, target_days: int = 7,
+                               days_horizon: int = None, target_exam_id: int = None) -> dict:
+        effective_days = days_horizon if days_horizon is not None else target_days
+        effective_term = target_exam_id if target_exam_id is not None else term_id
         context = NexusContextBuilder.assemble_full_context(user_id)
         prios = context.get("priorities", [])
         subjects = context.get("syllabus", {}).get("subjects_breakdown", [])
@@ -901,7 +904,7 @@ $$\\Delta Y = k \\cdot \\Delta X$$
         daily_plans = []
         today = datetime.date.today()
         
-        for d in range(target_days):
+        for d in range(effective_days):
             day_num = d + 1
             cur_date = today + datetime.timedelta(days=d)
             prio_idx = d % len(prios) if prios else 0
@@ -940,11 +943,11 @@ $$\\Delta Y = k \\cdot \\Delta X$$
             })
 
         plan_data = {
-            "strategy_summary": f"Targeted {target_days}-day sprint allocating {daily_hours}h/day, prioritizing high-yield bottleneck topics and daily active recall checkpoints.",
+            "strategy_summary": f"Targeted {effective_days}-day sprint allocating {daily_hours}h/day, prioritizing high-yield bottleneck topics and daily active recall checkpoints.",
             "daily_plans": daily_plans,
             "exam_readiness_impact": "Projected +18% increase in Exam Readiness Score upon completing all scheduled milestones."
         }
-        return {"status": "success", "plan_data": plan_data}
+        return {"status": "success", "plan_data": plan_data, "schedule": daily_plans}
 
     # ══════════════════════════════════════════════════════════
     # CAPABILITY 5: PROGRESS & VELOCITY DIAGNOSTICS
