@@ -72,18 +72,19 @@ def test_ai_architecture():
     print(f"   - Habits: {len(context['habits']['today_tasks'])} tasks today")
 
     # Step 3: Test Unconfigured Graceful State
-    print("\n[STEP 3] Testing Unconfigured State & Fallback Safety...")
+    print("\n[STEP 3] Testing Autonomous Engine State & Fallback Safety...")
     service_unconf = NexusAIService()
     service_unconf.api_key = None
     service_unconf.provider = None
     
     status = service_unconf.get_status()
-    assert not status["is_configured"], "Should report is_configured = False"
+    assert status["is_configured"], "Autonomous engine is always ready"
+    assert not status.get("is_cloud", False), "Should report is_cloud = False"
     assert "setup_guide" in status, "Setup guide must be present"
-    print("✅ Verified clean unconfigured state reporting without exceptions.")
+    print("✅ Verified clean autonomous cognitive state reporting without exceptions.")
 
-    # Step 4: Test Provider Detection & Key Masking
-    print("\n[STEP 4] Testing Provider Config & Key Masking...")
+    # Step 4: Test Cloud Provider Config & Key Masking
+    print("\n[STEP 4] Testing Cloud Provider Config & Key Masking...")
     service_test = NexusAIService()
     service_test.api_key = "AIzaSyTestKey123456789012345678"
     service_test.provider = "gemini"
@@ -91,6 +92,7 @@ def test_ai_architecture():
     
     st_info = service_test.get_status()
     assert st_info["is_configured"], "Should report is_configured = True"
+    assert st_info.get("is_cloud", False), "Should report is_cloud = True"
     assert st_info["provider"] == "gemini"
     assert st_info["masked_key"] == "AIza...5678", f"Key masking mismatch: {st_info['masked_key']}"
     print(f"✅ Verified masked key format: '{st_info['masked_key']}' (No raw secrets exposed)")
