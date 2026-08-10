@@ -23,6 +23,7 @@ from pages_modules.quiz import render_quiz_page
 from pages_modules.active_recall import render_active_recall_page
 from pages_modules.mistakes import render_mistakes_page
 from pages_modules.focus import render_focus_page
+from pages_modules.ai_command_center import render_ai_command_center_page
 from auth_utils import (
     create_session_token, verify_session_token,
     set_session_param, get_session_param, clear_session_param
@@ -310,6 +311,7 @@ def main():
         st.markdown("### Navigation")
         page_options = [
             "🏠 Dashboard",
+            "🧠 AI Command Center",
             "🎯 Quiz Engine",
             "💡 Active Recall",
             "❌ Mistake Vault",
@@ -422,6 +424,8 @@ def main():
     # Page Router
     if page == "🏠 Dashboard":
         render_dashboard_page(user_id)
+    elif page == "🧠 AI Command Center":
+        render_ai_command_center_page(user_id)
     elif page == "🎯 Quiz Engine":
         render_quiz_page(user_id)
     elif page == "💡 Active Recall":

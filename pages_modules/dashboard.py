@@ -78,9 +78,14 @@ def render_dashboard_page(user_id: int):
     """, unsafe_allow_html=True)
 
     # ── Quick Hub Action Bar ──
-    c_act1, c_act2, c_act3, c_act4, c_act5, c_act6 = st.columns(6)
+    c_act0, c_act1, c_act2, c_act3, c_act4, c_act5, c_act6 = st.columns(7)
+    with c_act0:
+        if st.button("🧠 Nexus AI", use_container_width=True, type="primary", key="dash_go_ai_btn"):
+            st.session_state["current_page"] = "🧠 AI Command Center"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+            st.rerun()
     with c_act1:
-        if st.button("🎯 Quiz Engine", use_container_width=True, type="primary", key="dash_go_quiz_btn"):
+        if st.button("🎯 Quiz Engine", use_container_width=True, key="dash_go_quiz_btn"):
             st.session_state["current_page"] = "🎯 Quiz Engine"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
