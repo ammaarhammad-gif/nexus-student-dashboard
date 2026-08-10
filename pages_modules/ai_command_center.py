@@ -2,11 +2,10 @@
 ai_command_center.py — Nexus AI Command Center UI & Cognitive Workspace.
 
 Features:
-- Dual-Engine AI Support:
-  * Autonomous Cognitive Mode (Instantly active with 100% syllabus intelligence, Feynman explainer & quiz generators)
-  * Cloud LLM Mode (Gemini / OpenAI / Groq / Anthropic)
+- 100% Autonomous Academic Cognitive AI Engine (Zero setup friction, instant results)
+- Integrated Context Bridge with Syllabus, Exams, Mistakes & Spaced Repetitions
 - 7 Interactive Command Tabs:
-  1. 🌟 Daily Intelligence Blueprint
+  1. 🌟 Daily Intelligence Blueprint (Pre-computed on load)
   2. 💡 Concept Mentor & Feynman Explainer
   3. 🎯 AI Quiz Crafter (with 1-click Quiz Engine Export)
   4. 🗓️ Smart Study Planner (with 1-click Daily Planner Sync)
@@ -32,65 +31,23 @@ from styles import render_breadcrumbs
 def render_ai_command_center_page(user_id: int):
     render_breadcrumbs(["🏠 Dashboard", "🧠 AI Command Center"])
 
-    status = nexus_ai.get_status()
-    is_cloud = status.get("is_cloud", False)
-    provider = status["provider"]
-    model = status["model"]
-    masked_key = status["masked_key"]
-
     # Header & Engine Status
-    status_bg = "rgba(34, 197, 94, 0.12)"
-    status_border = "rgba(34, 197, 94, 0.35)"
-    status_color = "#22C55E"
-    status_text = f"🟢 NEXUS COGNITIVE AI ACTIVE ({provider.upper() if is_cloud else 'AUTONOMOUS MODE'})"
-
-    st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 16px;">
+    st.markdown("""
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px;">
             <div>
-                <div style="display: inline-flex; align-items: center; gap: 6px; background: {status_bg}; border: 1px solid {status_border}; color: {status_color}; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; margin-bottom: 8px;">
-                    <span>🧠</span> <span>{status_text}</span>
+                <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.35); color: #22C55E; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 5px 14px; border-radius: 20px; margin-bottom: 10px;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 8px #22C55E;"></span>
+                    <span>NEXUS COGNITIVE AI ENGINE ACTIVE • REAL-TIME SYLLABUS SYNC</span>
                 </div>
-                <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 800; margin: 0; color: var(--nexus-text-title);">
+                <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.3rem; font-weight: 800; margin: 0; color: var(--nexus-text-title);">
                     Nexus AI Command Center
                 </h1>
-                <p style="color: var(--nexus-text-sub); margin: 4px 0 0 0; font-size: 0.95rem;">
-                    Your cognitive copilot powered by real-time syllabus analytics, adaptive diagnostic intelligence, and Feynman pedagogy.
+                <p style="color: var(--nexus-text-sub); margin: 6px 0 0 0; font-size: 0.98rem;">
+                    Your intelligent academic copilot powered by multi-factor curriculum analytics, spaced retrieval curves, and Feynman pedagogy.
                 </p>
             </div>
         </div>
     """, unsafe_allow_html=True)
-
-    # API Configuration Expander (Optional)
-    with st.expander(f"⚙️ Optional: Connect External Cloud LLM {f'(Active: {provider.title()} {masked_key})' if is_cloud else '(Gemini / OpenAI / Groq)'}", expanded=False):
-        c_k1, c_k2 = st.columns([1.5, 1])
-        with c_k1:
-            st.markdown("""
-                **Nexus Cognitive AI runs autonomously out of the box.**
-                If you wish to supercharge it with Google Gemini or OpenAI, configure keys in `.streamlit/secrets.toml` or Streamlit Cloud Secrets.
-            """)
-            st.markdown(status["setup_guide"])
-        with c_k2:
-            st.markdown("**Quick Session-Level Key**")
-            st.caption("Enter an API key for testing during this browser session:")
-            
-            sel_prov = st.selectbox("Select Provider", ["gemini", "openai", "groq", "anthropic"], index=0, key="ai_prov_sel")
-            custom_key_input = st.text_input("Enter API Key", type="password", placeholder="AIzaSy... / sk-...", key="ai_key_input")
-            
-            c_btn1, c_btn2 = st.columns(2)
-            with c_btn1:
-                if st.button("💾 Apply Key", use_container_width=True, type="primary"):
-                    if custom_key_input.strip():
-                        st.session_state["nexus_custom_ai_key"] = custom_key_input.strip()
-                        st.session_state["nexus_custom_ai_provider"] = sel_prov
-                        st.toast(f"Connected {sel_prov.upper()} key for this session!", icon="✨")
-                        st.rerun()
-            with c_btn2:
-                if st.button("🔄 Reset to Default", use_container_width=True):
-                    if "nexus_custom_ai_key" in st.session_state:
-                        del st.session_state["nexus_custom_ai_key"]
-                    st.rerun()
-
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
     # 7 Core Command Tabs
     tab_daily, tab_mentor, tab_quiz, tab_plan, tab_diag, tab_rev, tab_mistakes = st.tabs([
@@ -110,20 +67,24 @@ def render_ai_command_center_page(user_id: int):
         st.subheader("🌟 Daily Academic Intelligence Blueprint")
         st.caption("AI analyzes today's exam proximity, weak understanding topics, and overdue revisions to build your personalized study strategy.")
 
-        if st.button("🚀 Generate Today's AI Study Blueprint", type="primary", use_container_width=True, key="ai_gen_daily_btn"):
-            with st.spinner("🧠 Nexus AI is analyzing your curriculum analytics and building your blueprint..."):
-                try:
+        c_d1, c_d2 = st.columns([3, 1])
+        with c_d2:
+            if st.button("🔄 Refresh Blueprint", type="primary", use_container_width=True, key="ai_regen_daily_btn"):
+                with st.spinner("Analyzing curriculum analytics..."):
                     res = nexus_ai.generate_daily_recommendations(user_id)
                     st.session_state["ai_daily_blueprint"] = res["content"]
-                except Exception as e:
-                    st.error(f"AI Generation Failed: {e}")
+                    st.rerun()
 
-        if "ai_daily_blueprint" in st.session_state:
-            st.markdown(f"""
-                <div class="readiness-container" style="padding: 24px; margin-top: 16px;">
-                    {st.session_state['ai_daily_blueprint']}
-                </div>
-            """, unsafe_allow_html=True)
+        if "ai_daily_blueprint" not in st.session_state:
+            with st.spinner("Generating today's AI study blueprint..."):
+                res = nexus_ai.generate_daily_recommendations(user_id)
+                st.session_state["ai_daily_blueprint"] = res["content"]
+
+        st.markdown(f"""
+            <div class="readiness-container" style="padding: 24px; margin-top: 10px;">
+                {st.session_state['ai_daily_blueprint']}
+            </div>
+        """, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════
     # TAB 2: CONCEPT MENTOR & FEYNMAN EXPLAINER
@@ -168,7 +129,7 @@ def render_ai_command_center_page(user_id: int):
                 if not sel_t_id:
                     st.error("Please select a topic to explain.")
                 else:
-                    with st.spinner(f"🧠 Nexus AI is preparing your {style_choice} explanation for '{sel_t_name}'..."):
+                    with st.spinner(f"Nexus AI is preparing your {style_choice} explanation for '{sel_t_name}'..."):
                         try:
                             res = nexus_ai.generate_explanation(user_id, sel_t_id, style_choice, student_query)
                             st.session_state["ai_explanation_result"] = res
@@ -227,7 +188,7 @@ def render_ai_command_center_page(user_id: int):
                 qz_focus = st.text_input("Custom Focus Prompt", placeholder="e.g. Focus on numerical problem traps", key="ai_qz_focus")
 
             if st.button("⚡ Craft AI Quiz", type="primary", use_container_width=True, key="ai_craft_qz_btn"):
-                with st.spinner(f"🧠 Nexus AI is crafting {qz_cnt} high-rigor questions..."):
+                with st.spinner(f"Nexus AI is crafting {qz_cnt} high-rigor questions..."):
                     try:
                         qz_payload = nexus_ai.generate_ai_quiz(
                             user_id=user_id,
@@ -302,7 +263,7 @@ def render_ai_command_center_page(user_id: int):
             plan_hours = st.slider("Daily Available Study Hours", min_value=1.0, max_value=8.0, value=3.5, step=0.5, key="ai_plan_hrs")
 
         if st.button("📅 Generate Intelligent Study Plan", type="primary", use_container_width=True, key="ai_gen_plan_btn"):
-            with st.spinner(f"🧠 Nexus AI is scheduling your {plan_days}-day curriculum roadmap..."):
+            with st.spinner(f"Nexus AI is scheduling your {plan_days}-day curriculum roadmap..."):
                 try:
                     res = nexus_ai.generate_ai_study_plan(user_id, daily_hours=plan_hours, target_days=plan_days)
                     st.session_state["ai_generated_plan"] = res["plan_data"]
@@ -359,7 +320,7 @@ def render_ai_command_center_page(user_id: int):
         st.caption("AI-powered diagnostic of syllabus coverage velocity, bottleneck chapters, and exam preparedness projection.")
 
         if st.button("📈 Run Deep Progress Audit", type="primary", use_container_width=True, key="ai_run_diag_btn"):
-            with st.spinner("🧠 Nexus AI is analyzing your academic data and running predictive diagnostics..."):
+            with st.spinner("Nexus AI is analyzing your academic data and running predictive diagnostics..."):
                 try:
                     res = nexus_ai.generate_progress_diagnostic(user_id)
                     st.session_state["ai_progress_diagnostic"] = res["content"]
@@ -381,7 +342,7 @@ def render_ai_command_center_page(user_id: int):
         st.caption("AI optimizes your spaced repetition queue using forgetting curve intervals and cognitive priority weights.")
 
         if st.button("🧠 Generate Revision Advisory", type="primary", use_container_width=True, key="ai_gen_rev_btn"):
-            with st.spinner("🧠 Nexus AI is calculating optimal retention intervals..."):
+            with st.spinner("Nexus AI is calculating optimal retention intervals..."):
                 try:
                     res = nexus_ai.generate_revision_recommendations(user_id)
                     st.session_state["ai_revision_advisory"] = res["content"]
@@ -403,7 +364,7 @@ def render_ai_command_center_page(user_id: int):
         st.caption("AI analyzes your recorded quiz errors and common misconceptions to build your customized anti-mistake checklist.")
 
         if st.button("🔍 Diagnose Cognitive Error Traps", type="primary", use_container_width=True, key="ai_diag_mistakes_btn"):
-            with st.spinner("🧠 Nexus AI is diagnosing error root causes across your Mistake Vault..."):
+            with st.spinner("Nexus AI is diagnosing error root causes across your Mistake Vault..."):
                 try:
                     res = nexus_ai.generate_mistake_root_cause_analysis(user_id)
                     st.session_state["ai_mistake_diagnosis"] = res["content"]
