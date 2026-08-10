@@ -26,34 +26,36 @@ from models import (
     get_recall_stats,
     get_user_theme
 )
-from styles import render_header, render_breadcrumbs, render_empty_state
+from styles import render_top_header_bar, render_metric_card, render_breadcrumbs, render_empty_state
 from components.math_keyboard import render_latex_math_keyboard
 from anki_export import export_active_recall_to_anki
 
 
 def render_practice_page(user_id: int):
-    user_theme = get_user_theme(user_id)
-    render_breadcrumbs(["🏠 Dashboard", "🎯 Practice"])
-
-    render_header(
-        "🎯 Adaptive Practice & Retrieval Studio",
-        "Test conceptual mastery with targeted syllabus quizzes, Feynman active recall, and error retesting.",
-        theme=user_theme
+    render_top_header_bar(
+        user_id,
+        "🎯 Practice",
+        "Test conceptual mastery with targeted quizzes, mistake re-testing, and Feynman active recall.",
+        ["NEXUS", "Practice"]
     )
 
-    # Check if a tab was requested via shortcut
-    active_tab = st.session_state.get("practice_active_tab", "🎯 Quiz Engine")
+    from pages_modules.review import _render_mistake_vault_view
 
-    tab_quiz, tab_recall = st.tabs([
+    tab_quiz, tab_mistakes, tab_recall = st.tabs([
         "🎯 Quiz Engine",
+        "❌ Mistake Vault",
         "💡 Active Recall"
     ])
 
     with tab_quiz:
         _render_quiz_engine_view(user_id)
 
+    with tab_mistakes:
+        _render_mistake_vault_view(user_id)
+
     with tab_recall:
         _render_active_recall_view(user_id)
+
 
 
 # ══════════════════════════════════════════════════════════════════════════

@@ -21,24 +21,24 @@ from models import (
     get_overdue_study_tasks, reschedule_overdue_tasks,
     auto_generate_study_plan, get_top_nexus_priorities
 )
-from styles import render_header, render_metric_card, render_breadcrumbs, render_empty_state
+from styles import render_top_header_bar, render_metric_card, render_breadcrumbs, render_empty_state
 
 
 def render_planner_page(user_id: int):
-    user_theme = get_user_theme(user_id)
-    render_breadcrumbs(["🏠 Dashboard", "🗓️ Planner"])
-    render_header(
-        "🗓️ Academic Study Planner & Scheduler",
-        "Structure daily study missions, auto-schedule remaining curriculum, and allocate syllabus to exam terms.",
-        theme=user_theme
+    render_top_header_bar(
+        user_id,
+        "🗓️ Planner",
+        "Structure daily study missions, auto-schedule remaining curriculum, and track horizons.",
+        ["NEXUS", "Planner"]
     )
 
     tab_daily, tab_scheduler, tab_terms, tab_goals = st.tabs([
         "📋 Today's Plan",
-        "⚡ Smart Auto-Scheduler",
+        "⚡ Smart Schedule",
         "🏷️ Exam Term Allocator",
         "🎯 Study Goals & Logs"
     ])
+
 
     with tab_daily:
         _render_daily_planner_tab(user_id)

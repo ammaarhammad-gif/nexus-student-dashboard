@@ -25,40 +25,28 @@ from models import (
     create_quiz,
     add_daily_plan
 )
-from styles import render_breadcrumbs
+from styles import render_top_header_bar, render_breadcrumbs
 
 
 def render_ai_command_center_page(user_id: int):
-    render_breadcrumbs(["🏠 Dashboard", "🧠 AI Command Center"])
-
-    # Header & Engine Status
-    st.markdown("""
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px;">
-            <div>
-                <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.35); color: #22C55E; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 5px 14px; border-radius: 20px; margin-bottom: 10px;">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 8px #22C55E;"></span>
-                    <span>NEXUS COGNITIVE AI ENGINE ACTIVE • REAL-TIME SYLLABUS SYNC</span>
-                </div>
-                <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.3rem; font-weight: 800; margin: 0; color: var(--nexus-text-title);">
-                    Nexus AI Command Center
-                </h1>
-                <p style="color: var(--nexus-text-sub); margin: 6px 0 0 0; font-size: 0.98rem;">
-                    Your intelligent academic copilot powered by multi-factor curriculum analytics, spaced retrieval curves, and Feynman pedagogy.
-                </p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    render_top_header_bar(
+        user_id,
+        "🤖 Nexus AI",
+        "Autonomous academic intelligence tools powered by multi-factor curriculum analytics and Feynman pedagogy.",
+        ["NEXUS", "Nexus AI"]
+    )
 
     # 7 Core Command Tabs
     tab_daily, tab_mentor, tab_quiz, tab_plan, tab_diag, tab_rev, tab_mistakes = st.tabs([
-        "🌟 Daily Intelligence",
+        "🌟 Daily Blueprint",
         "💡 Concept Mentor",
         "🎯 Quiz Crafter",
         "🗓️ Study Planner",
-        "📊 Progress Diagnostic",
-        "🔄 Revision Strategist",
-        "❌ Error Diagnostic"
+        "📊 Diagnostic",
+        "🔄 Revisions",
+        "❌ Error Analysis"
     ])
+
 
     # ══════════════════════════════════════════════════════════
     # TAB 1: DAILY INTELLIGENCE BLUEPRINT

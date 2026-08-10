@@ -43,23 +43,21 @@ UNDERSTANDING_LABELS = {
 
 
 def render_learn_page(user_id: int):
-    profile = get_user_profile(user_id)
+    profile = get_user_profile(user_id) or {}
     board = profile.get("board", "CBSE")
     class_name = profile.get("class_name", "Class 10")
-    user_theme = get_user_theme(user_id)
 
-    render_breadcrumbs(["🏠 Dashboard", "📚 Learn"])
-
-    render_header(
-        "📚 Academic Learning Hub",
-        f"Official {board} ({class_name}) curriculum, personal study notes, and scientific formula vault.",
-        theme=user_theme
+    render_top_header_bar(
+        user_id,
+        "📚 Learn",
+        "Master your syllabus, one concept at a time.",
+        ["NEXUS", "Learn"]
     )
 
     tab_syllabus, tab_notes, tab_formulas = st.tabs([
-        "📚 Syllabus Manager",
-        "📝 Notes Repository",
-        "📐 Formula Vault"
+        "📚 Syllabus",
+        "📝 Notes",
+        "📐 Formulas"
     ])
 
     with tab_syllabus:
@@ -70,6 +68,7 @@ def render_learn_page(user_id: int):
 
     with tab_formulas:
         _render_formulas_view(user_id)
+
 
 
 # ══════════════════════════════════════════════════════════════════════════

@@ -58,22 +58,25 @@ def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: in
         return None
 
 
+from styles import render_top_header_bar, render_header, render_breadcrumbs, WALLPAPER_PRESETS, render_empty_state
+
+
 def render_settings_page(user_id: int):
-    user_theme = get_user_theme(user_id)
-    render_breadcrumbs(["🏠 Dashboard", "⚙️ Settings"])
-    render_header(
-        "⚙️ Nexus Command Settings",
-        "Configure your academic profile, exam calendar, visual appearance, wallpapers, and data exports.",
-        theme=user_theme
+    render_top_header_bar(
+        user_id,
+        "⚙️ Settings",
+        "Academic profile, exam terms, visual appearance studio, and data backups.",
+        ["NEXUS", "Settings"]
     )
 
     tab_profile, tab_exams, tab_appearance, tab_export, tab_danger = st.tabs([
-        "👤 Profile & Curriculum",
+        "👤 Academic Profile",
         "🗓️ Exam Terms",
-        "🎨 Appearance & Wallpapers",
-        "📦 Data Export",
+        "🎨 Appearance Studio",
+        "📦 Backups & Export",
         "⚠️ Danger Zone"
     ])
+
 
     with tab_profile:
         _render_profile_tab(user_id)

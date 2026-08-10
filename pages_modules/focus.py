@@ -14,32 +14,22 @@ from models import (
     get_study_sessions,
     get_daily_plans
 )
-from styles import render_breadcrumbs
+from styles import render_top_header_bar, render_breadcrumbs
 
 
 def render_focus_page(user_id: int):
-    render_breadcrumbs(["🏠 Dashboard", "⏱️ Focus Studio"])
-
-    st.markdown("""
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px;">
-            <div>
-                <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.35); color: #F97316; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; margin-bottom: 8px;">
-                    <span>⏱️</span> <span>DEEP WORK & STUDY ANALYTICS</span>
-                </div>
-                <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 800; margin: 0; color: var(--nexus-text-title);">
-                    Nexus Focus Studio
-                </h1>
-                <p style="color: var(--nexus-text-sub); margin: 4px 0 0 0; font-size: 0.95rem;">
-                    Single-task deep focus sessions with live timer, ambient audio, automatic topic progress syncing, and study consistency tracking.
-                </p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    render_top_header_bar(
+        user_id,
+        "⏱️ Focus",
+        "Single-task deep work studio with live timer, ambient audio, and auto XP rewards.",
+        ["NEXUS", "Focus"]
+    )
 
     tab_timer, tab_analytics = st.tabs([
-        "⏱️ Deep Focus Session",
-        "📊 Study Time Analytics"
+        "⏱️ Focus Timer",
+        "📊 Study Analytics"
     ])
+
 
     # ══════════════════════════════════════════════════════════
     # TAB 1: DEEP FOCUS TIMER

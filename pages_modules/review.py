@@ -24,7 +24,7 @@ from models import (
     generate_mistake_requiz,
     get_user_theme
 )
-from styles import render_header, render_breadcrumbs, render_empty_state
+from styles import render_top_header_bar, render_metric_card, render_breadcrumbs, render_empty_state
 from components.math_keyboard import render_latex_math_keyboard
 from anki_export import export_mistakes_to_anki
 
@@ -40,17 +40,15 @@ MISTAKE_TYPES = [
 
 
 def render_review_page(user_id: int):
-    user_theme = get_user_theme(user_id)
-    render_breadcrumbs(["🏠 Dashboard", "🧠 Review"])
-
-    render_header(
-        "🧠 Retention & Error Optimization Hub",
-        "Master forgetting curves with adaptive spaced repetition and eliminate recurring errors in the Mistake Vault.",
-        theme=user_theme
+    render_top_header_bar(
+        user_id,
+        "🧠 Review",
+        "Master forgetting curves with adaptive SuperMemo SM-2 spaced repetition.",
+        ["NEXUS", "Review"]
     )
 
     tab_revisions, tab_mistakes = st.tabs([
-        "🧠 Revision Queue",
+        "🧠 Spaced Repetition Queue",
         "❌ Mistake Vault"
     ])
 
@@ -59,6 +57,7 @@ def render_review_page(user_id: int):
 
     with tab_mistakes:
         _render_mistake_vault_view(user_id)
+
 
 
 # ══════════════════════════════════════════════════════════════════════════

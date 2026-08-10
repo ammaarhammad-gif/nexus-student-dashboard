@@ -4,16 +4,16 @@ search.py — Global Nexus Search Portal (Phase 2).
 
 import streamlit as st
 from models import global_nexus_search
-from styles import render_section_header, render_breadcrumbs, render_empty_state
+from styles import render_top_header_bar, render_section_header, render_breadcrumbs, render_empty_state
 
 def render_search_page(user_id: int):
-    render_breadcrumbs(["🏠 Dashboard", "🔍 Global Nexus Search"])
-    render_section_header(
-        badge_icon="🔍",
-        badge_text="OMNIPRESENT ACADEMIC SEARCH",
-        title="Global Nexus Search",
-        subtitle="Instantly search across your syllabus topics, chapters, notes, mistakes, exams, tasks, and goals."
+    render_top_header_bar(
+        user_id,
+        "🔍 Search",
+        "Omnipresent search across topics, notes, formulas, mistakes, and exams.",
+        ["NEXUS", "Search"]
     )
+
 
     query = st.text_input(
         "Search Query",

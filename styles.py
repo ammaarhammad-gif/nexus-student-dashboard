@@ -1765,6 +1765,147 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             .nexus-card { padding: 12px 14px; }
             .setup-hero h1 { font-size: 1.75rem !important; }
         }
+
+        /* ── Modern Sidebar Navigation Styles (Hide Radio Circles) ── */
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child {
+            display: none !important;
+        }
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label {
+            padding: 9px 14px !important;
+            border-radius: 10px !important;
+            margin-bottom: 3px !important;
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            cursor: pointer !important;
+            border: 1px solid transparent !important;
+            color: var(--nexus-text-sub) !important;
+            font-weight: 600 !important;
+            font-size: 0.92rem !important;
+            display: flex !important;
+            align-items: center !important;
+            background: transparent !important;
+        }
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+            color: var(--nexus-text-title) !important;
+            transform: translateX(3px) !important;
+        }
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked),
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"] {
+            background: rgba(56, 189, 248, 0.12) !important;
+            border: 1px solid rgba(56, 189, 248, 0.32) !important;
+            color: #38BDF8 !important;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.18) !important;
+            font-weight: 700 !important;
+        }
+
+        /* ── Top Header Bar ── */
+        .nexus-top-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0 16px 0;
+            margin-bottom: 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .nexus-top-header-left {
+            display: flex;
+            flex-direction: column;
+        }
+        .nexus-top-header-title {
+            font-family: 'Outfit', sans-serif !important;
+            font-size: 1.65rem !important;
+            font-weight: 800 !important;
+            color: var(--nexus-text-title) !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+            letter-spacing: -0.02em !important;
+        }
+        .nexus-top-header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nexus-header-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--nexus-text-title);
+            transition: all 0.2s ease;
+        }
+        .nexus-header-badge.streak-badge {
+            border-color: rgba(249, 115, 22, 0.35);
+            background: rgba(249, 115, 22, 0.1);
+            color: #F97316;
+        }
+        .nexus-header-badge.xp-badge {
+            border-color: rgba(56, 189, 248, 0.35);
+            background: rgba(56, 189, 248, 0.1);
+            color: #38BDF8;
+        }
+        .nexus-header-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0284C7, #6366F1);
+            color: #FFFFFF;
+            font-weight: 800;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+        }
+
+        /* ── Compact KPI Grid & Cards ── */
+        .nexus-kpi-card {
+            background: var(--nexus-card-bg) !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-radius: 14px;
+            padding: 16px 18px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(12px) !important;
+        }
+        .nexus-kpi-card:hover {
+            border-color: var(--nexus-card-hover-border) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--nexus-glow);
+        }
+        .nexus-kpi-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--nexus-text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+        }
+        .nexus-kpi-val {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: var(--nexus-text-title);
+            line-height: 1.1;
+        }
+        .nexus-kpi-sub {
+            font-size: 0.75rem;
+            color: var(--nexus-text-muted);
+            margin-top: 4px;
+        }
+
+        /* Maximum Content Width Constraint for Premium SaaS Layout */
+        .block-container {
+            max-width: 1400px !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
     """
 
     st.markdown(f"<style>{theme_vars}\n{wallpaper_css}\n{theme_rules}\n{shared_css}</style>", unsafe_allow_html=True)
@@ -2310,3 +2451,58 @@ def render_section_header(badge_icon: str, badge_text: str, title: str, subtitle
             {f'<p style="color: var(--nexus-text-sub); margin: 4px 0 0 0; font-size: 0.95rem;">{subtitle}</p>' if subtitle else ''}
         </div>
     """, unsafe_allow_html=True)
+
+
+def render_top_header_bar(user_id: int, page_title: str, subtitle: str = None, breadcrumbs: list = None):
+    """
+    Renders the modern, compact Nexus Top Application Header Bar:
+    LEFT: Page title + subtle breadcrumb trail
+    RIGHT: Streak indicator 🔥, XP / Level badge ⭐, and compact student avatar.
+    """
+    try:
+        from models import get_user_xp_and_level, get_user_profile
+        profile = get_user_profile(user_id) or {}
+        xp_info = get_user_xp_and_level(user_id) or {}
+        streak = xp_info.get("streak", 0)
+        level = xp_info.get("level", 1)
+        level_title = xp_info.get("title", "Novice")
+        user_name = profile.get("name", "Student")
+        initial = (user_name[0] if user_name else "A").upper()
+    except Exception:
+        streak = 1
+        level = 1
+        level_title = "Novice"
+        user_name = "Student"
+        initial = "S"
+
+    crumbs_html = ""
+    if breadcrumbs:
+        crumbs_str = " <span style='color: #64748B; margin: 0 4px;'>›</span> ".join([
+            f"<span style='color: {'var(--nexus-text-title)' if i == len(breadcrumbs)-1 else 'var(--nexus-text-sub)'}; font-weight: {'700' if i == len(breadcrumbs)-1 else '500'};'>{c}</span>"
+            for i, c in enumerate(breadcrumbs)
+        ])
+        crumbs_html = f"<div style='font-size: 0.76rem; margin-bottom: 2px;'>{crumbs_str}</div>"
+
+    st.markdown(f"""
+        <div class="nexus-top-header-bar">
+            <div class="nexus-top-header-left">
+                {crumbs_html}
+                <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+                    <h1 class="nexus-top-header-title">{page_title}</h1>
+                    {f'<span style="color: var(--nexus-text-sub); font-size: 0.88rem; font-weight: 500;">{subtitle}</span>' if subtitle else ''}
+                </div>
+            </div>
+            <div class="nexus-top-header-right">
+                <div class="nexus-header-badge streak-badge" title="Daily Active Study Streak">
+                    🔥 <span>{streak}d Streak</span>
+                </div>
+                <div class="nexus-header-badge xp-badge" title="Academic Mastery Tier">
+                    ⭐ <span>Lvl {level} • {level_title}</span>
+                </div>
+                <div class="nexus-header-avatar" title="{user_name}">
+                    {initial}
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+

@@ -242,42 +242,48 @@ def main():
     # PRIMARY SIDEBAR NAVIGATION (10 Consolidated Modules)
     # ══════════════════════════════════════════════════════════════════════════
     with st.sidebar:
-        card_bg = "linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))" if is_dark else "linear-gradient(135deg, #FFFFFF, #F1F5F9)"
-        card_border = "rgba(56, 189, 248, 0.35)" if is_dark else "#CBD5E1"
+        card_bg = "linear-gradient(135deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95))" if is_dark else "linear-gradient(135deg, #FFFFFF, #F1F5F9)"
+        card_border = "rgba(56, 189, 248, 0.28)" if is_dark else "#CBD5E1"
         name_color = "#FFFFFF" if is_dark else "#0F172A"
-        badge_bg = "rgba(56, 189, 248, 0.2)" if is_dark else "rgba(79, 70, 229, 0.1)"
+        badge_bg = "rgba(56, 189, 248, 0.15)" if is_dark else "rgba(79, 70, 229, 0.1)"
         badge_color = "#38BDF8" if is_dark else "#4F46E5"
         badge_border = "rgba(56, 189, 248, 0.3)" if is_dark else "rgba(79, 70, 229, 0.2)"
+        user_name = profile.get('name', 'Ammaar')
+        initial = (user_name[0] if user_name else "A").upper()
 
         st.markdown(f"""
-            <div style="text-align: center; padding: 10px 0 14px 0;">
-                <h2 style="font-family: 'Outfit', sans-serif; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 1.9rem; font-weight: 800; margin-bottom: 2px; letter-spacing: -0.02em;">⚡ NEXUS</h2>
-                <p style="font-family: 'Plus Jakarta Sans', sans-serif; color: {'#94A3B8' if is_dark else '#64748B'}; font-size: 0.85rem; font-weight: 500; margin: 0;">Academic Command Center</p>
-                <div style="margin-top: 12px; background: {card_bg}; border: 1px solid {card_border}; padding: 10px 12px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,{'0.3' if is_dark else '0.04'});">
-                    <strong style="font-family: 'Outfit', sans-serif; color: {name_color}; font-size: 1.15rem; font-weight: 700; display: block; margin-bottom: 3px;">{profile.get('name', 'Student')}</strong>
-                    <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; font-size: 0.78rem; font-weight: 600; padding: 2px 10px; border-radius: 12px; border: 1px solid {badge_border};">
-                        {profile.get('class_name', 'Class 10')} • {profile.get('board', 'CBSE')}
-                    </span>
+            <div style="padding: 6px 0 12px 0;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
+                    <span style="font-size: 1.5rem; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));">⚡</span>
+                    <span style="font-family: 'Outfit', sans-serif; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em;">NEXUS</span>
+                </div>
+                <p style="font-family: 'Plus Jakarta Sans', sans-serif; color: {'#94A3B8' if is_dark else '#64748B'}; font-size: 0.78rem; font-weight: 500; margin: 0 0 10px 0;">Academic Command Center</p>
+                
+                <div style="background: {card_bg}; border: 1px solid {card_border}; padding: 8px 10px; border-radius: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(0,0,0,{'0.3' if is_dark else '0.04'});">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0284C7, #6366F1); color: #FFFFFF; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);">
+                        {initial}
+                    </div>
+                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <strong style="font-family: 'Outfit', sans-serif; color: {name_color}; font-size: 0.95rem; font-weight: 700; display: block; line-height: 1.1;">{user_name}</strong>
+                        <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; font-size: 0.72rem; font-weight: 600; padding: 1px 6px; border-radius: 8px; border: 1px solid {badge_border}; margin-top: 2px;">
+                            {profile.get('class_name', 'Class 10')} • {profile.get('board', 'ICSE')}
+                        </span>
+                    </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-        # ── Quick Global Search Box in Sidebar ──
-        st.markdown("""
-            <div style="font-size: 0.8rem; font-weight: 700; color: var(--nexus-text-title); margin-bottom: 4px; font-family: 'Outfit', sans-serif;">
-                🔍 Quick Search
-            </div>
-        """, unsafe_allow_html=True)
-        search_query = st.text_input("Global Search", placeholder="Topics, notes, formulas...", key="global_search_input", label_visibility="collapsed")
+        # ── Quick Global Search in Sidebar ──
+        search_query = st.text_input("Global Search", placeholder="⌕ Search Nexus... (Ctrl + K)", key="global_search_input", label_visibility="collapsed")
         
         if search_query and len(search_query.strip()) >= 2:
             from models import global_nexus_search
             results = global_nexus_search(user_id, search_query)
             total_hits = sum(len(v) for v in results.values())
             if total_hits == 0:
-                st.caption(f"No results for '{search_query}'")
+                st.caption(f"No matches found for '{search_query}'")
             else:
-                with st.expander(f"✨ Search Hits ({total_hits})", expanded=True):
+                with st.expander(f"✨ Search Matches ({total_hits})", expanded=True):
                     for t in results.get("topics", [])[:2]:
                         st.markdown(f"📚 **{t['topic_name']}** ({t['subject_name']})")
                     for n in results.get("notes", [])[:2]:
@@ -287,8 +293,7 @@ def main():
                     for m in results.get("mistakes", [])[:2]:
                         st.markdown(f"❌ **{m['question'][:24]}...**")
 
-        st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-        st.markdown("### Navigation")
+        st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
         
         # 10 Primary Sidebar Modules
         page_options = [
@@ -313,7 +318,7 @@ def main():
             "🎯 Quiz Engine": "🎯 Practice",
             "💡 Active Recall": "🎯 Practice",
             "🧠 Revision Queue": "🧠 Review",
-            "❌ Mistake Vault": "🧠 Review",
+            "❌ Mistake Vault": "🎯 Practice",
             "⏱️ Focus Studio": "⏱️ Focus",
             "🧠 AI Command Center": "🤖 Nexus AI",
             "📊 Statistics": "📊 Analytics",
@@ -340,23 +345,28 @@ def main():
         st.session_state["current_page"] = page_selection
         page = page_selection
 
-        st.markdown("---")
-        if st.button("🚪 Log Out", use_container_width=True):
-            clear_session_param()
-            for key in ["user_id", "username", "current_page", "nav_epoch", "authenticated"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.rerun()
-
+        st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
         footer_border = "rgba(255,255,255,0.08)" if is_dark else "#E2E8F0"
+        
+        col_sync, col_logout = st.columns([1.4, 1])
+        with col_sync:
+            st.markdown(f"""
+                <div style="display: flex; align-items: center; gap: 5px; color: {'#10B981' if is_dark else '#059669'}; font-size: 0.76rem; font-weight: 600; padding-top: 6px;">
+                    <span style="font-size: 0.85rem;">☁</span> All data synced
+                </div>
+            """, unsafe_allow_html=True)
+        with col_logout:
+            if st.button("🚪 Logout", key="sidebar_logout_btn", use_container_width=True):
+                clear_session_param()
+                for key in ["user_id", "username", "current_page", "nav_epoch", "authenticated"]:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.rerun()
+
         footer_name_color = "#FFFFFF" if is_dark else "#0F172A"
         st.markdown(f"""
-            <div style="margin-top: 14px; text-align: center; border-top: 1px solid {footer_border}; padding-top: 10px;">
-                <p style="color: #64748B; font-size: 0.8rem; margin: 0; font-weight: 500;">Crafted with ❤️ by</p>
-                <h4 style="color: {footer_name_color}; font-size: 1.05rem; font-weight: 700; margin: 2px 0 4px 0; font-family: 'Outfit', sans-serif;">Ammaar Akhtar</h4>
-                <span style="display: inline-block; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 0.75rem; font-weight: 600; background: {'rgba(56, 189, 248, 0.1)' if is_dark else 'rgba(79, 70, 229, 0.08)'}; padding: 2px 8px; border-radius: 10px;">
-                    🌐 Cloud Sync Active • Student OS
-                </span>
+            <div style="margin-top: 10px; text-align: center; border-top: 1px solid {footer_border}; padding-top: 8px;">
+                <p style="color: #64748B; font-size: 0.75rem; margin: 0; font-weight: 500;">Crafted with ❤️ by <strong style="color: {footer_name_color}; font-family: 'Outfit', sans-serif;">Ammaar Akhtar</strong></p>
             </div>
         """, unsafe_allow_html=True)
 
