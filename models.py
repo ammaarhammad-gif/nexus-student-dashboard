@@ -772,7 +772,7 @@ def save_progress(user_id: int, item_type: str, item_id: int, status: str = "Not
     if status in ["Completed", "Revision Done"]:
         try:
             schedule_adaptive_revisions(user_id, item_type, item_id, understanding)
-            award_user_xp(user_id, 30, f"Completed topic #{item_id}")
+            award_user_xp(user_id, "topic_completed", 30, f"Completed {item_type} #{item_id}")
             update_user_streak(user_id)
         except Exception:
             pass
@@ -2368,76 +2368,241 @@ def complete_adaptive_revision(user_id: int, revision_id: int, new_understanding
 # EXAM READINESS SCORE ENGINE (Phase 6)
 # ══════════════════════════════════════════════
 
-@st.cache_data(ttl=20, show_spinner=False)
-def calculate_exam_readiness_score(user_id: int) -> dict:
+@st.cache_data(ttl=15, show_spinner=False)
+def calculate_exam_readiness_score(user_id: int, term_id: int = None) -> dict:
     """
-    Calculates composite Exam Readiness Score (0-100) using 4 core metrics:
-    - Syllabus Completion (35% weight)
-    - Understanding Index (30% weight)
-    - Revision Completion (20% weight)
-    - Practice & Weak Area Coverage (15% weight)
-    Includes dynamic actionable recommendations ("What should I do next?").
+    Calculates composite Exam Readiness Score (0-100) using 5 core integrated metrics:
+    - 1. Syllabus Coverage (30% weight)
+    - 2. Conceptual Understanding & Quiz/Recall Index (25% weight)
+    - 3. Spaced Repetition Adherence (20% weight)
+    - 4. Mistake Resolution Rate (15% weight)
+    - 5. Focus & Study Consistency (10% weight)
+    Supports both overall curriculum readiness and specific exam term readiness.
+    Includes dynamic actionable recommendations with page routing guidance.
     """
-    stats = get_overall_stats(user_id)
-    total_topics = stats.get("total_topics", 0)
-    completed_topics = stats.get("completed_topics", 0)
-    avg_understanding = stats.get("avg_understanding", 3.0)
+    import datetime
+    today = datetime.date.today()
+    today_str = today.strftime("%Y-%m-%d")
     
-    # 1. Syllabus Completion Component (0-100)
-    syllabus_pct = (completed_topics / total_topics * 100) if total_topics > 0 else 0.0
-    
-    # 2. Understanding Component (0-100) -> mapped from (1-5) scale
-    understanding_pct = min(100.0, max(0.0, ((avg_understanding - 1) / 4.0) * 100)) if total_topics > 0 else 0.0
-    
-    # 3. Revision Completion Component
-    queue = get_revision_queue(user_id)
-    overdue_count = len(queue.get("overdue", []))
-    due_today_count = len(queue.get("due_today", []))
-    completed_revs = len(queue.get("recent_completed", []))
-    total_revs = overdue_count + due_today_count + completed_revs
-    if total_revs > 0:
-        revision_pct = max(0.0, (completed_revs / total_revs) * 100.0)
-    else:
-        revision_pct = 75.0 if completed_topics > 0 else 0.0
-        
-    # 4. Practice & Consistency Component
-    priorities = get_top_nexus_priorities(user_id, limit=5)
-    critical_count = sum(1 for p in priorities if p["tier"] == "Critical")
-    practice_pct = max(20.0, 100.0 - (critical_count * 18.0)) if total_topics > 0 else 0.0
-    
-    # Weighted Composite Readiness Score (0-100)
-    readiness_score = int(round(
-        (syllabus_pct * 0.35) +
-        (understanding_pct * 0.30) +
-        (revision_pct * 0.20) +
-        (practice_pct * 0.15)
-    ))
-    readiness_score = max(0, min(100, readiness_score))
-    
-    # Dynamic Actionable Recommendations ("What Should I Do Next?")
-    recommendations = []
-    if overdue_count > 0:
-        recommendations.append(f"⚠️ Clear your {overdue_count} overdue revision(s) in the Revision Queue.")
-    if critical_count > 0:
-        top_crit = priorities[0]
-        recommendations.append(f"🔴 Study critical topic: **{top_crit['subject_name']} → {top_crit['topic_name']}**.")
-    if avg_understanding < 3.5 and completed_topics > 0:
-        recommendations.append("🧠 Strengthen weak concepts with low understanding ratings.")
-    if syllabus_pct < 60:
-        recommendations.append("📚 Complete remaining foundational chapters to boost coverage.")
-    if len(recommendations) < 3:
-        recommendations.append("⏱️ Start a 25-minute Nexus Focus session to build your study streak.")
-        
-    return {
-        "readiness_score": readiness_score,
-        "syllabus_pct": round(syllabus_pct, 1),
-        "understanding_pct": round(understanding_pct, 1),
-        "revision_pct": round(revision_pct, 1),
-        "practice_pct": round(practice_pct, 1),
-        "overdue_count": overdue_count,
-        "critical_count": critical_count,
-        "recommendations": recommendations[:3]
-    }
+    term_name = "Overall Curriculum"
+    exam_date_str = ""
+    days_left = None
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # ── 1. Syllabus & Topic Scope ──
+            if term_id:
+                cursor.execute("SELECT name, exam_date FROM terms WHERE id = %s AND user_id = %s", (term_id, user_id))
+                t_row = cursor.fetchone()
+                if t_row:
+                    term_name = t_row["name"]
+                    exam_date_str = t_row.get("exam_date", "") or ""
+                    if exam_date_str:
+                        try:
+                            ex_date = datetime.datetime.strptime(exam_date_str, "%Y-%m-%d").date()
+                            days_left = (ex_date - today).days
+                        except Exception:
+                            pass
+
+                cursor.execute("""
+                    SELECT
+                        COUNT(DISTINCT t.id) AS total_topics,
+                        COUNT(DISTINCT CASE WHEN tp.status IN ('Completed', 'Revision Done') THEN t.id END) AS completed,
+                        COALESCE(AVG(CASE WHEN tp.understanding IS NOT NULL THEN tp.understanding END), 3.0) AS avg_understanding
+                    FROM term_chapters tc
+                    JOIN topics t ON t.chapter_id = tc.chapter_id AND t.user_id = tc.user_id
+                    LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = tc.user_id
+                    WHERE tc.user_id = %s AND tc.term_id = %s
+                """, (user_id, term_id))
+                row = cursor.fetchone()
+                total_topics = row["total_topics"] if row else 0
+                completed_topics = row["completed"] if row else 0
+                avg_understanding = float(row["avg_understanding"]) if row and row["avg_understanding"] else 3.0
+            else:
+                stats = get_overall_stats(user_id)
+                total_topics = stats.get("total_topics", 0)
+                completed_topics = stats.get("completed", 0)
+                avg_understanding = float(stats.get("avg_understanding", 3.0))
+
+            syllabus_pct = (completed_topics / total_topics * 100.0) if total_topics > 0 else 0.0
+
+            # ── 2. Conceptual Understanding Component (Blended with Quizzes & Recall) ──
+            base_understanding_pct = min(100.0, max(0.0, ((avg_understanding - 1.0) / 4.0) * 100.0)) if total_topics > 0 else 0.0
+
+            # Fetch Quiz performance
+            cursor.execute("""
+                SELECT COALESCE(AVG(accuracy_pct), -1) AS avg_quiz_acc, COUNT(*) AS quiz_count
+                FROM quiz_attempts
+                WHERE user_id = %s
+            """, (user_id,))
+            q_row = cursor.fetchone()
+            avg_quiz_acc = float(q_row["avg_quiz_acc"]) if q_row and q_row["avg_quiz_acc"] is not None else -1
+            quiz_count = q_row["quiz_count"] if q_row else 0
+
+            # Fetch Active Recall performance
+            cursor.execute("""
+                SELECT COALESCE(AVG(understanding_score), -1) AS avg_recall_score, COUNT(*) AS recall_count
+                FROM recall_responses
+                WHERE user_id = %s
+            """, (user_id,))
+            rc_row = cursor.fetchone()
+            avg_recall_score = float(rc_row["avg_recall_score"]) if rc_row and rc_row["avg_recall_score"] is not None else -1
+            recall_count = rc_row["recall_count"] if rc_row else 0
+
+            # Blend understanding signals
+            if quiz_count > 0 and recall_count > 0:
+                recall_pct = min(100.0, max(0.0, ((avg_recall_score - 1.0) / 4.0) * 100.0))
+                understanding_pct = (base_understanding_pct * 0.50) + (avg_quiz_acc * 0.30) + (recall_pct * 0.20)
+            elif quiz_count > 0:
+                understanding_pct = (base_understanding_pct * 0.65) + (avg_quiz_acc * 0.35)
+            elif recall_count > 0:
+                recall_pct = min(100.0, max(0.0, ((avg_recall_score - 1.0) / 4.0) * 100.0))
+                understanding_pct = (base_understanding_pct * 0.70) + (recall_pct * 0.30)
+            else:
+                understanding_pct = base_understanding_pct
+
+            # ── 3. Spaced Repetition Adherence Component ──
+            if term_id:
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) AS total_revisions,
+                        COUNT(CASE WHEN r.due_date < %s AND r.is_completed = 0 THEN 1 END) AS overdue,
+                        COUNT(CASE WHEN r.is_completed = 1 THEN 1 END) AS completed_revs
+                    FROM revisions r
+                    JOIN topics t ON r.item_id = t.id
+                    JOIN term_chapters tc ON tc.chapter_id = t.chapter_id AND tc.term_id = %s AND tc.user_id = %s
+                    WHERE r.user_id = %s
+                """, (today_str, term_id, user_id, user_id))
+            else:
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) AS total_revisions,
+                        COUNT(CASE WHEN due_date < %s AND is_completed = 0 THEN 1 END) AS overdue,
+                        COUNT(CASE WHEN is_completed = 1 THEN 1 END) AS completed_revs
+                    FROM revisions
+                    WHERE user_id = %s
+                """, (today_str, user_id))
+            rev_row = cursor.fetchone()
+            total_revs = rev_row["total_revisions"] if rev_row else 0
+            overdue_count = rev_row["overdue"] if rev_row else 0
+            completed_revs = rev_row["completed_revs"] if rev_row else 0
+
+            if total_revs > 0:
+                revision_pct = max(0.0, min(100.0, ((total_revs - overdue_count) / total_revs) * 100.0))
+            else:
+                revision_pct = 85.0 if completed_topics > 0 else 0.0
+
+            # ── 4. Mistake Resolution Component ──
+            if term_id:
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) AS total_mistakes,
+                        COUNT(CASE WHEN m.is_reviewed = 1 THEN 1 END) AS reviewed
+                    FROM mistakes m
+                    JOIN topics t ON m.topic_id = t.id
+                    JOIN term_chapters tc ON tc.chapter_id = t.chapter_id AND tc.term_id = %s AND tc.user_id = %s
+                    WHERE m.user_id = %s
+                """, (term_id, user_id, user_id))
+            else:
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) AS total_mistakes,
+                        COUNT(CASE WHEN is_reviewed = 1 THEN 1 END) AS reviewed
+                    FROM mistakes
+                    WHERE user_id = %s
+                """, (user_id,))
+            mis_row = cursor.fetchone()
+            total_mistakes = mis_row["total_mistakes"] if mis_row else 0
+            reviewed_mistakes = mis_row["reviewed"] if mis_row else 0
+            unreviewed_mistakes = total_mistakes - reviewed_mistakes
+
+            if total_mistakes > 0:
+                mistake_pct = (reviewed_mistakes / total_mistakes * 100.0)
+            else:
+                mistake_pct = 100.0 if completed_topics > 0 else 0.0
+
+            # ── 5. Focus & Study Consistency Component (Last 14 Days) ──
+            two_weeks_ago = (today - datetime.timedelta(days=13)).strftime("%Y-%m-%d")
+            cursor.execute("""
+                SELECT COUNT(DISTINCT session_date) AS study_days, COALESCE(SUM(duration_minutes), 0) AS total_focus_mins
+                FROM study_sessions
+                WHERE user_id = %s AND session_date >= %s AND session_date <= %s
+            """, (user_id, two_weeks_ago, today_str))
+            cons_row = cursor.fetchone()
+            study_days = cons_row["study_days"] if cons_row else 0
+            focus_mins = cons_row["total_focus_mins"] if cons_row else 0
+
+            # Normalized consistency: 7+ study days or 300+ minutes focus gives high score
+            day_score = min(100.0, (study_days / 10.0) * 100.0)
+            min_score = min(100.0, (focus_mins / 300.0) * 100.0)
+            consistency_pct = (day_score * 0.6) + (min_score * 0.4) if (study_days > 0 or focus_mins > 0) else (40.0 if completed_topics > 0 else 0.0)
+
+            # ── Weighted Composite Readiness Score (0-100) ──
+            readiness_score = int(round(
+                (syllabus_pct * 0.30) +
+                (understanding_pct * 0.25) +
+                (revision_pct * 0.20) +
+                (mistake_pct * 0.15) +
+                (consistency_pct * 0.10)
+            ))
+            readiness_score = max(0, min(100, readiness_score))
+
+            # ── Actionable Recommendations ──
+            recommendations = []
+            priorities = get_top_nexus_priorities(user_id, limit=3)
+            critical_count = sum(1 for p in priorities if p["tier"] == "Critical")
+
+            if overdue_count > 0:
+                recommendations.append(f"⚠️ Clear {overdue_count} overdue revision(s) in Revision Queue.")
+            if unreviewed_mistakes > 0:
+                recommendations.append(f"❌ Review {unreviewed_mistakes} unmastered question(s) in Mistake Vault.")
+            if critical_count > 0:
+                top_crit = priorities[0]
+                recommendations.append(f"🔴 Study critical topic: {top_crit['subject_name']} → {top_crit['topic_name']}.")
+            if quiz_count == 0:
+                recommendations.append("🎯 Take your first Quiz to benchmark conceptual mastery.")
+            elif avg_quiz_acc < 70.0:
+                recommendations.append("🎯 Take an adaptive practice quiz on your weak topics.")
+            if recall_count == 0:
+                recommendations.append("💡 Practice Active Recall on a key chapter using Feynman technique.")
+            if syllabus_pct < 65.0:
+                recommendations.append("📚 Complete remaining syllabus chapters to improve coverage.")
+            if len(recommendations) < 3:
+                recommendations.append("⏱️ Start a 25m Focus Session to maintain daily momentum.")
+
+            return {
+                "readiness_score": readiness_score,
+                "term_id": term_id,
+                "term_name": term_name,
+                "exam_date": exam_date_str,
+                "days_left": days_left,
+                "total_topics": total_topics,
+                "completed_topics": completed_topics,
+                "syllabus_pct": round(syllabus_pct, 1),
+                "understanding_pct": round(understanding_pct, 1),
+                "revision_pct": round(revision_pct, 1),
+                "mistake_pct": round(mistake_pct, 1),
+                "practice_pct": round(consistency_pct, 1),
+                "consistency_pct": round(consistency_pct, 1),
+                "overdue_count": overdue_count,
+                "unreviewed_mistakes": unreviewed_mistakes,
+                "total_mistakes": total_mistakes,
+                "critical_count": critical_count,
+                "quiz_count": quiz_count,
+                "avg_quiz_acc": round(avg_quiz_acc, 1) if avg_quiz_acc >= 0 else None,
+                "recall_count": recall_count,
+                "factors": {
+                    "completion": round(syllabus_pct, 1),
+                    "understanding": round(understanding_pct, 1),
+                    "revision_adherence": round(revision_pct, 1),
+                    "mistake_resolution": round(mistake_pct, 1),
+                    "study_consistency": round(consistency_pct, 1)
+                },
+                "recommendations": recommendations[:3]
+            }
+    finally:
+        conn.close()
 
 
 # ══════════════════════════════════════════════
@@ -2471,8 +2636,8 @@ def add_mistake(user_id: int, question: str, mistake_type: str, subject_id: int 
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-def get_all_mistakes(user_id: int, subject_id: int = None, mistake_type: str = None) -> list:
-    """Retrieves mistakes with optional subject and type filtering."""
+def get_all_mistakes(user_id: int, subject_id: int = None, mistake_type: str = None, is_reviewed: int = None) -> list:
+    """Retrieves mistakes with optional subject, type, and review status filtering."""
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -2491,6 +2656,9 @@ def get_all_mistakes(user_id: int, subject_id: int = None, mistake_type: str = N
             if mistake_type and mistake_type != "All":
                 query += " AND m.mistake_type = %s"
                 params.append(mistake_type)
+            if is_reviewed is not None:
+                query += " AND m.is_reviewed = %s"
+                params.append(1 if is_reviewed else 0)
             query += " ORDER BY m.created_at DESC"
             
             cursor.execute(query, params)
@@ -2499,12 +2667,54 @@ def get_all_mistakes(user_id: int, subject_id: int = None, mistake_type: str = N
         conn.close()
 
 
+def add_mistake_batch(user_id: int, mistakes_list: list) -> int:
+    """Batch adds multiple recorded mistakes into the student's Mistake Vault."""
+    if not mistakes_list:
+        return 0
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            inserted_count = 0
+            for m in mistakes_list:
+                cursor.execute("""
+                    INSERT INTO mistakes (user_id, subject_id, chapter_id, topic_id, question, your_answer,
+                                          correct_answer, mistake_type, explanation, prevention_strategy)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (user_id, m.get("subject_id"), m.get("chapter_id"), m.get("topic_id"),
+                      m["question"].strip(), m.get("your_answer", "").strip(),
+                      m.get("correct_answer", "").strip(), m.get("mistake_type", "Conceptual"),
+                      m.get("explanation", "").strip(), m.get("prevention_strategy", "").strip()))
+                inserted_count += 1
+            conn.commit()
+            st.cache_data.clear()
+            award_user_xp(user_id, "logged_mistakes_batch", inserted_count * 20, f"Logged {inserted_count} mistakes in Vault")
+            return inserted_count
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @st.cache_data(ttl=30, show_spinner=False)
 def get_mistake_analytics(user_id: int) -> dict:
-    """Computes distribution and percentage breakdown of mistake types."""
+    """Computes distribution, unreviewed vs reviewed counts, and percentage breakdown of mistake types."""
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN is_reviewed = 0 THEN 1 END) as unreviewed,
+                    COUNT(CASE WHEN is_reviewed = 1 THEN 1 END) as reviewed
+                FROM mistakes
+                WHERE user_id = %s
+            """, (user_id,))
+            totals_row = cursor.fetchone()
+            total = totals_row["total"] or 0
+            unreviewed = totals_row["unreviewed"] or 0
+            reviewed = totals_row["reviewed"] or 0
+
             cursor.execute("""
                 SELECT mistake_type, COUNT(*) as count
                 FROM mistakes
@@ -2513,7 +2723,6 @@ def get_mistake_analytics(user_id: int) -> dict:
                 ORDER BY count DESC
             """, (user_id,))
             rows = cursor.fetchall()
-            total = sum(r["count"] for r in rows)
             breakdown = []
             for r in rows:
                 pct = round((r["count"] / total * 100), 1) if total > 0 else 0
@@ -2522,19 +2731,34 @@ def get_mistake_analytics(user_id: int) -> dict:
                     "count": r["count"],
                     "pct": pct
                 })
-            return {"total": total, "breakdown": breakdown}
+            return {
+                "total": total,
+                "unreviewed": unreviewed,
+                "reviewed": reviewed,
+                "breakdown": breakdown
+            }
     finally:
         conn.close()
 
 
-def toggle_mistake_reviewed(user_id: int, mistake_id: int, is_reviewed: int):
-    """Toggles reviewed status of a mistake."""
+def toggle_mistake_reviewed(user_id: int, mistake_id: int, is_reviewed: int = None):
+    """Toggles reviewed status of a mistake and awards mastery XP."""
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("UPDATE mistakes SET is_reviewed = %s WHERE id = %s AND user_id = %s", (is_reviewed, mistake_id, user_id))
+            if is_reviewed is None:
+                cursor.execute("SELECT is_reviewed FROM mistakes WHERE id = %s AND user_id = %s", (mistake_id, user_id))
+                curr = cursor.fetchone()
+                new_val = 0 if curr and curr[0] == 1 else 1
+            else:
+                new_val = 1 if is_reviewed else 0
+
+            cursor.execute("UPDATE mistakes SET is_reviewed = %s WHERE id = %s AND user_id = %s", (new_val, mistake_id, user_id))
             conn.commit()
             st.cache_data.clear()
+            if new_val == 1:
+                award_user_xp(user_id, "mastered_mistake", 15, "Mastered mistake in Vault")
+            return new_val
     except Exception:
         conn.rollback()
         raise
@@ -2853,4 +3077,890 @@ def update_user_streak(user_id: int):
     finally:
         conn.close()
 
+
+# ══════════════════════════════════════════════
+# EXAM READINESS SCORE & TERM INTEGRATION
+# ══════════════════════════════════════════════
+
+def compute_exam_readiness(user_id: int, term_id: int) -> dict:
+    """
+    Computes a weighted Exam Readiness Score (0-100) for a specific term.
+    Delegates to the 5-factor composite calculate_exam_readiness_score engine.
+    """
+    return calculate_exam_readiness_score(user_id, term_id=term_id)
+
+
+def get_all_readiness_scores(user_id: int) -> list:
+    """Compute readiness scores for all active (non-done) terms."""
+    terms = get_active_upcoming_terms(user_id)
+    results = []
+    for t in terms:
+        score = calculate_exam_readiness_score(user_id, term_id=t["id"])
+        results.append(score)
+    return results
+
+
+# ══════════════════════════════════════════════
+# ENHANCED MISTAKE VAULT & RE-QUIZ ENGINE
+# ══════════════════════════════════════════════
+
+def get_mistake_trend(user_id: int) -> list:
+    """Returns weekly mistake counts over last 8 weeks for trend analysis."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    DATE_TRUNC('week', created_at)::DATE AS week_start,
+                    COUNT(*) AS count
+                FROM mistakes
+                WHERE user_id = %s AND created_at >= CURRENT_DATE - INTERVAL '56 days'
+                GROUP BY DATE_TRUNC('week', created_at)
+                ORDER BY week_start ASC
+            """, (user_id,))
+            rows = cursor.fetchall()
+            return [{"week": str(r[0]), "count": r[1]} for r in rows]
+    finally:
+        conn.close()
+
+
+def get_unreviewed_mistakes_for_quiz(user_id: int, limit: int = 10) -> list:
+    """Fetches unreviewed mistakes to generate a targeted re-quiz."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT m.*, s.name as subject_name, s.color as subject_color,
+                       c.name as chapter_name, t.name as topic_name
+                FROM mistakes m
+                LEFT JOIN subjects s ON m.subject_id = s.id
+                LEFT JOIN chapters c ON m.chapter_id = c.id
+                LEFT JOIN topics t ON m.topic_id = t.id
+                WHERE m.user_id = %s AND m.is_reviewed = 0
+                ORDER BY m.created_at DESC
+                LIMIT %s
+            """, (user_id, limit))
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def generate_mistake_requiz(user_id: int, limit: int = 5) -> dict:
+    """Generates an interactive re-quiz payload directly from unreviewed Mistake Vault items."""
+    mistakes = get_unreviewed_mistakes_for_quiz(user_id, limit=limit)
+    if not mistakes:
+        return None
+
+    questions = []
+    for idx, m in enumerate(mistakes, 1):
+        corr = m.get("correct_answer", "").strip() or "Standard definition/solution"
+        wrong = m.get("your_answer", "").strip() or "Common misconception"
+        
+        # Build 4 options if feasible
+        opts = [corr, wrong]
+        alt1 = f"Inverted {corr[:20]}" if len(corr) > 5 else "Alternate incorrect formulation"
+        alt2 = "None of the above"
+        if alt1 not in opts:
+            opts.append(alt1)
+        if alt2 not in opts:
+            opts.append(alt2)
+        import random
+        random.shuffle(opts)
+        
+        questions.append({
+            "id": idx,
+            "mistake_id": m["id"],
+            "topic_id": m.get("topic_id"),
+            "subject_id": m.get("subject_id"),
+            "subject_name": m.get("subject_name", "General"),
+            "question": m["question"],
+            "options": opts,
+            "correct_answer": corr,
+            "explanation": m.get("explanation") or f"Prevention rule: {m.get('prevention_strategy') or 'Review fundamental concept carefully.'}",
+            "prevention_strategy": m.get("prevention_strategy", "")
+        })
+
+    import json
+    title = f"🎯 Mistake Vault Re-Quiz ({len(questions)} items)"
+    quiz_id = create_quiz(
+        user_id=user_id,
+        title=title,
+        subject_id=mistakes[0].get("subject_id"),
+        chapter_id=mistakes[0].get("chapter_id"),
+        topic_id=mistakes[0].get("topic_id"),
+        difficulty="Adaptive",
+        questions_json=json.dumps(questions)
+    )
+
+    return {
+        "quiz_id": quiz_id,
+        "title": title,
+        "questions": questions
+    }
+
+
+def mark_mistakes_reviewed_from_quiz(user_id: int, mistake_ids: list):
+    """Marks mistakes as reviewed after student gets them right on a re-quiz."""
+    if not mistake_ids:
+        return
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE mistakes SET is_reviewed = 1 
+                WHERE user_id = %s AND id = ANY(%s)
+            """, (user_id, mistake_ids))
+            conn.commit()
+            st.cache_data.clear()
+            award_user_xp(user_id, "mastered_mistakes_requiz", len(mistake_ids) * 25, f"Mastered {len(mistake_ids)} mistakes on Re-Quiz")
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# COMPREHENSIVE QUIZ ENGINE
+# ══════════════════════════════════════════════
+
+CURATED_QUESTION_BANK = {
+    "Physics": [
+        {
+            "topic_keywords": ["force", "newton", "motion", "gravity", "work", "energy"],
+            "question": "What is the SI unit of Force and its dimensional definition?",
+            "options": ["Newton (kg·m/s²)", "Joule (kg·m²/s²)", "Pascal (N/m²)", "Watt (J/s)"],
+            "correct_answer": "Newton (kg·m/s²)",
+            "explanation": "1 Newton is the force required to give a mass of 1 kg an acceleration of 1 m/s² (F = ma)."
+        },
+        {
+            "topic_keywords": ["lens", "refraction", "light", "optics", "focal"],
+            "question": "A lens has a power of -2.5 D. What is its focal length and nature?",
+            "options": ["-40 cm, Concave lens", "+40 cm, Convex lens", "-25 cm, Concave lens", "+25 cm, Convex lens"],
+            "correct_answer": "-40 cm, Concave lens",
+            "explanation": "Power P = 1/f(m) -> f = 1/(-2.5) = -0.4 m = -40 cm. Negative focal length indicates a diverging (concave) lens."
+        },
+        {
+            "topic_keywords": ["ohm", "current", "circuit", "electricity", "resistance"],
+            "question": "If three 6-ohm resistors are connected in parallel, what is the equivalent resistance?",
+            "options": ["2 Ω", "18 Ω", "3 Ω", "0.5 Ω"],
+            "correct_answer": "2 Ω",
+            "explanation": "1/R_eq = 1/6 + 1/6 + 1/6 = 3/6 = 1/2 -> R_eq = 2 Ω."
+        },
+        {
+            "topic_keywords": ["sound", "echo", "frequency", "wave"],
+            "question": "What is the minimum distance between source and reflector to hear a distinct echo in air at 20°C?",
+            "options": ["17.2 meters", "34.4 meters", "10.0 meters", "5.0 meters"],
+            "correct_answer": "17.2 meters",
+            "explanation": "Persistence of hearing is 0.1s. Speed of sound is ~344 m/s. Total distance = 344 * 0.1 = 34.4m -> Distance to wall = 34.4 / 2 = 17.2m."
+        }
+    ],
+    "Chemistry": [
+        {
+            "topic_keywords": ["periodic", "element", "table", "atomic", "trend"],
+            "question": "Across a period from left to right in the modern periodic table, what happens to atomic radius?",
+            "options": ["Decreases due to increasing effective nuclear charge", "Increases due to extra shells", "Remains constant", "First increases then decreases"],
+            "correct_answer": "Decreases due to increasing effective nuclear charge",
+            "explanation": "Electrons are added to the same principal shell while protons increase, pulling the valence electrons closer to the nucleus."
+        },
+        {
+            "topic_keywords": ["acid", "base", "salt", "ph"],
+            "question": "What is the pH of a neutral aqueous solution at 25°C?",
+            "options": ["7.0", "1.0", "14.0", "0.0"],
+            "correct_answer": "7.0",
+            "explanation": "At 25°C, [H+] = [OH-] = 10^-7 M, giving pH = -log(10^-7) = 7.0."
+        },
+        {
+            "topic_keywords": ["mole", "avogadro", "stoichiometry"],
+            "question": "How many atoms are present in 1 mole of any monoatomic element?",
+            "options": ["6.022 × 10²³ atoms", "3.011 × 10²³ atoms", "1.204 × 10²⁴ atoms", "6.022 × 10²² atoms"],
+            "correct_answer": "6.022 × 10²³ atoms",
+            "explanation": "Avogadro's constant is exactly 6.02214076 × 10²³ particles per mole."
+        },
+        {
+            "topic_keywords": ["organic", "carbon", "alkane", "alkene", "isomer"],
+            "question": "What is the general molecular formula for homologous series of Alkenes?",
+            "options": ["CnH2n", "CnH2n+2", "CnH2n-2", "CnH2n+1OH"],
+            "correct_answer": "CnH2n",
+            "explanation": "Alkenes contain one carbon-carbon double bond and conform to the general formula CnH2n."
+        }
+    ],
+    "Biology": [
+        {
+            "topic_keywords": ["photosynthesis", "chlorophyll", "plant", "light"],
+            "question": "During the light-dependent reaction of photosynthesis, what is the primary source of released oxygen?",
+            "options": ["Photolysis of water (H2O)", "Breakdown of carbon dioxide (CO2)", "Decomposition of glucose", "Atmospheric air"],
+            "correct_answer": "Photolysis of water (H2O)",
+            "explanation": "Light energy splits water molecules (2H2O -> 4H+ + 4e- + O2) releasing oxygen gas into the atmosphere."
+        },
+        {
+            "topic_keywords": ["cell", "mitosis", "meiosis", "division", "chromosome"],
+            "question": "In which phase of mitosis do sister chromatids separate and move toward opposite poles?",
+            "options": ["Anaphase", "Prophase", "Metaphase", "Telophase"],
+            "correct_answer": "Anaphase",
+            "explanation": "During Anaphase, centromeres split and spindle fibers contract, pulling sister chromatids to opposite poles."
+        },
+        {
+            "topic_keywords": ["genetics", "mendel", "dna", "heredity", "gene"],
+            "question": "What is the classic monohybrid phenotypic ratio observed in Mendel's F2 generation?",
+            "options": ["3 : 1", "1 : 2 : 1", "9 : 3 : 3 : 1", "1 : 1"],
+            "correct_answer": "3 : 1",
+            "explanation": "Cross of two heterozygous individuals (Tt x Tt) yields 3 dominant to 1 recessive phenotype."
+        }
+    ],
+    "Mathematics": [
+        {
+            "topic_keywords": ["quadratic", "equation", "roots", "discriminant"],
+            "question": "If the discriminant b² - 4ac of a quadratic equation is greater than zero and not a perfect square, what are the roots?",
+            "options": ["Real, unequal, and irrational", "Real, equal, and rational", "Complex/imaginary", "Real, unequal, and rational"],
+            "correct_answer": "Real, unequal, and irrational",
+            "explanation": "D > 0 indicates two real distinct roots; non-perfect square means square root is irrational."
+        },
+        {
+            "topic_keywords": ["trigonometry", "sin", "cos", "tan", "identity"],
+            "question": "What is the value of sin²(θ) + cos²(θ) for any angle θ?",
+            "options": ["1", "0", "tan²(θ)", "2"],
+            "correct_answer": "1",
+            "explanation": "Fundamental Pythagorean trigonometric identity: sin²θ + cos²θ = 1."
+        },
+        {
+            "topic_keywords": ["circle", "tangent", "radius", "chord"],
+            "question": "What is the angle between a tangent to a circle and the radius drawn through the point of contact?",
+            "options": ["90° (Perpendicular)", "45°", "60°", "180°"],
+            "correct_answer": "90° (Perpendicular)",
+            "explanation": "Theorem: The tangent at any point of a circle is perpendicular to the radius through the point of contact."
+        }
+    ]
+}
+
+
+def get_question_bank_for_topic(user_id: int, subject_id: int = None, chapter_id: int = None,
+                                topic_id: int = None, difficulty: str = "Mixed", count: int = 5) -> list:
+    """
+    Generates or retrieves structured multiple-choice questions for a specific topic, chapter, or subject.
+    Combines curated high-yield syllabus question banks with smart dynamic generators.
+    """
+    questions = []
+    subj_name = ""
+    chap_name = ""
+    top_name = ""
+    
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            if topic_id:
+                cursor.execute("""
+                    SELECT t.name as topic_name, c.name as chapter_name, s.name as subject_name
+                    FROM topics t
+                    JOIN chapters c ON t.chapter_id = c.id
+                    JOIN subjects s ON c.subject_id = s.id
+                    WHERE t.id = %s AND t.user_id = %s
+                """, (topic_id, user_id))
+                r = cursor.fetchone()
+                if r:
+                    top_name = r["topic_name"]
+                    chap_name = r["chapter_name"]
+                    subj_name = r["subject_name"]
+            elif chapter_id:
+                cursor.execute("""
+                    SELECT c.name as chapter_name, s.name as subject_name
+                    FROM chapters c
+                    JOIN subjects s ON c.subject_id = s.id
+                    WHERE c.id = %s AND c.user_id = %s
+                """, (chapter_id, user_id))
+                r = cursor.fetchone()
+                if r:
+                    chap_name = r["chapter_name"]
+                    subj_name = r["subject_name"]
+            elif subject_id:
+                cursor.execute("SELECT name as subject_name FROM subjects WHERE id = %s AND user_id = %s", (subject_id, user_id))
+                r = cursor.fetchone()
+                if r:
+                    subj_name = r["subject_name"]
+    finally:
+        conn.close()
+
+    # Search curated bank for subject match
+    matched_questions = []
+    for s_key, q_list in CURATED_QUESTION_BANK.items():
+        if s_key.lower() in subj_name.lower() or subj_name.lower() in s_key.lower():
+            for q in q_list:
+                # Check keyword relevance
+                q_keywords = q.get("topic_keywords", [])
+                target_str = f"{top_name} {chap_name}".lower()
+                if any(kw in target_str for kw in q_keywords):
+                    matched_questions.append(q)
+            if not matched_questions:
+                matched_questions = list(q_list)
+
+    # Dynamic generation from syllabus topics & notes if bank has fewer questions
+    import random
+    if matched_questions:
+        random.shuffle(matched_questions)
+        for q in matched_questions[:count]:
+            opts = list(q["options"])
+            random.shuffle(opts)
+            questions.append({
+                "id": len(questions) + 1,
+                "topic_id": topic_id,
+                "subject_id": subject_id,
+                "question": q["question"],
+                "options": opts,
+                "correct_answer": q["correct_answer"],
+                "explanation": q["explanation"]
+            })
+
+    # Fill remaining count with dynamic conceptual questions
+    while len(questions) < count:
+        curr_idx = len(questions) + 1
+        t_label = top_name or chap_name or subj_name or "Core Concept"
+        
+        dynamic_q_types = [
+            {
+                "question": f"Which of the following is the fundamental governing principle of '{t_label}'?",
+                "correct_answer": f"Conservation laws and direct systematic relations governing {t_label}",
+                "distractors": [
+                    f"Spontaneous arbitrary changes without conservation in {t_label}",
+                    f"Inverse exponential decay without energy transfer",
+                    f"Uniform non-responsive equilibrium in all conditions"
+                ],
+                "explanation": f"The core framework of {t_label} relies on established fundamental physical/chemical/mathematical conservation principles."
+            },
+            {
+                "question": f"When analyzing '{t_label}', what is the primary consequence of changing standard baseline conditions?",
+                "correct_answer": f"Proportional reaction governed by equilibrium and rate constants of {t_label}",
+                "distractors": [
+                    "Complete cessation of all molecular or mathematical interactions",
+                    "Independent random fluctuations unrelated to initial parameters",
+                    "Immediate inversion of all sign conventions"
+                ],
+                "explanation": f"According to fundamental laws, variations in {t_label} shift equilibrium or outputs in predictable proportional ways."
+            },
+            {
+                "question": f"What is the standard methodology to verify and solve problems in '{t_label}'?",
+                "correct_answer": f"State given variables, apply governing formula/theorem, verify units, and compute solution",
+                "distractors": [
+                    "Estimate values without unit verification or formula derivation",
+                    "Apply unrelated trigonometric identities without checking assumptions",
+                    "Assume zero resistance or zero mass in all real-world contexts"
+                ],
+                "explanation": f"Systematic problem solving in {t_label} requires disciplined variable identification, formula application, and unit consistency."
+            },
+            {
+                "question": f"Which common misconception must be avoided when studying '{t_label}'?",
+                "correct_answer": f"Confusing scalar magnitudes with directional vector quantities or rate with total quantity",
+                "distractors": [
+                    "Checking dimensional consistency before finalizing solutions",
+                    "Maintaining proper sign conventions in coordinate geometry and optics",
+                    "Balancing both sides of mathematical or chemical equations"
+                ],
+                "explanation": f"A primary source of exam errors in {t_label} is confusing rate vs total quantity or forgetting sign and unit conventions."
+            }
+        ]
+        
+        template = dynamic_q_types[(curr_idx - 1) % len(dynamic_q_types)]
+        opts = [template["correct_answer"]] + template["distractors"]
+        random.shuffle(opts)
+        
+        questions.append({
+            "id": curr_idx,
+            "topic_id": topic_id,
+            "subject_id": subject_id,
+            "question": template["question"],
+            "options": opts,
+            "correct_answer": template["correct_answer"],
+            "explanation": template["explanation"]
+        })
+
+    return questions[:count]
+
+
+def create_quiz(user_id: int, title: str, subject_id: int = None,
+                chapter_id: int = None, topic_id: int = None,
+                difficulty: str = "Mixed", questions_json: str = "[]") -> int:
+    """Creates a new quiz record and returns its ID."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO quizzes (user_id, title, subject_id, chapter_id, topic_id, difficulty, questions_json)
+                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """, (user_id, title.strip(), subject_id, chapter_id, topic_id, difficulty, questions_json))
+            quiz_id = cursor.fetchone()[0]
+            conn.commit()
+            st.cache_data.clear()
+            return quiz_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def save_quiz_attempt(user_id: int, quiz_id: int, score: int, total_questions: int,
+                      accuracy_pct: float, time_taken_seconds: int = 0,
+                      weak_topics_json: str = "[]") -> int:
+    """Records a quiz attempt."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO quiz_attempts (user_id, quiz_id, score, total_questions, accuracy_pct,
+                                           time_taken_seconds, weak_topics_json)
+                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """, (user_id, quiz_id, score, total_questions, accuracy_pct,
+                  time_taken_seconds, weak_topics_json))
+            attempt_id = cursor.fetchone()[0]
+            conn.commit()
+            st.cache_data.clear()
+            return attempt_id
+    finally:
+        conn.close()
+
+
+def submit_quiz_and_sync_nexus(user_id: int, quiz_id: int, user_answers: dict,
+                               time_taken_seconds: int = 0, auto_save_mistakes: bool = True) -> dict:
+    """
+    Evaluates quiz answers, updates topic understanding, auto-saves wrong answers to Mistake Vault,
+    schedules adaptive revisions for weak areas, awards XP, and updates daily study streak.
+    """
+    quiz = get_quiz_by_id(user_id, quiz_id)
+    if not quiz:
+        raise ValueError("Quiz not found")
+
+    import json
+    questions = json.loads(quiz.get("questions_json", "[]"))
+    total_q = len(questions)
+    if total_q == 0:
+        return {"score": 0, "total": 0, "accuracy_pct": 0, "xp_earned": 0, "mistakes_logged": 0}
+
+    correct_count = 0
+    mistakes_to_log = []
+    solved_mistake_ids = []
+
+    for q in questions:
+        q_id = str(q["id"])
+        selected_ans = user_answers.get(q_id, "").strip()
+        correct_ans = q.get("correct_answer", "").strip()
+
+        if selected_ans == correct_ans:
+            correct_count += 1
+            if q.get("mistake_id"):
+                solved_mistake_ids.append(q["mistake_id"])
+        else:
+            # Wrong answer -> prepare mistake entry
+            mistakes_to_log.append({
+                "subject_id": q.get("subject_id") or quiz.get("subject_id"),
+                "chapter_id": quiz.get("chapter_id"),
+                "topic_id": q.get("topic_id") or quiz.get("topic_id"),
+                "question": q["question"],
+                "your_answer": selected_ans or "No answer submitted",
+                "correct_answer": correct_ans,
+                "mistake_type": "Conceptual" if "principle" in q["question"].lower() else "Calculation",
+                "explanation": q.get("explanation", "Review core concept fundamentals."),
+                "prevention_strategy": q.get("prevention_strategy") or "Double-check units, definitions, and question conditions before answering."
+            })
+
+    accuracy_pct = round((correct_count / total_q * 100.0), 1)
+
+    # 1. Auto-save mistakes to Mistake Vault
+    mistakes_logged = 0
+    if auto_save_mistakes and mistakes_to_log:
+        mistakes_logged = add_mistake_batch(user_id, mistakes_to_log)
+
+    # 2. If solved items came from a Mistake Re-Quiz, mark them reviewed
+    if solved_mistake_ids:
+        mark_mistakes_reviewed_from_quiz(user_id, solved_mistake_ids)
+
+    # 3. Update topic understanding & Spaced Repetition sync
+    topic_id = quiz.get("topic_id")
+    if topic_id:
+        if accuracy_pct >= 80.0:
+            save_progress(user_id, "topic", topic_id, understanding=5)
+        elif accuracy_pct >= 60.0:
+            save_progress(user_id, "topic", topic_id, understanding=4)
+        else:
+            # Low accuracy (<60%) -> mark topic as understanding 2 and trigger revisions
+            save_progress(user_id, "topic", topic_id, understanding=2)
+            try:
+                schedule_adaptive_revisions(user_id, "topic", topic_id, 2)
+            except Exception:
+                pass
+
+    # 4. Award XP and update streak
+    earned_xp = max(25, int(accuracy_pct * 0.75) + (correct_count * 10))
+    award_user_xp(user_id, "quiz_completed", earned_xp, f"Completed quiz: {quiz.get('title')} ({accuracy_pct}%)")
+    update_user_streak(user_id)
+
+    # 5. Record attempt
+    attempt_id = save_quiz_attempt(
+        user_id=user_id,
+        quiz_id=quiz_id,
+        score=correct_count,
+        total_questions=total_q,
+        accuracy_pct=accuracy_pct,
+        time_taken_seconds=time_taken_seconds,
+        weak_topics_json=json.dumps([m["question"][:30] for m in mistakes_to_log])
+    )
+
+    return {
+        "attempt_id": attempt_id,
+        "score": correct_count,
+        "total": total_q,
+        "accuracy_pct": accuracy_pct,
+        "earned_xp": earned_xp,
+        "mistakes_logged": mistakes_logged,
+        "solved_mistakes_count": len(solved_mistake_ids),
+        "incorrect_questions": mistakes_to_log
+    }
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_quiz_history(user_id: int, limit: int = 20) -> list:
+    """Retrieves quiz attempt history with quiz metadata."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT qa.*, q.title as quiz_title, q.difficulty,
+                       s.name as subject_name, s.color as subject_color
+                FROM quiz_attempts qa
+                JOIN quizzes q ON qa.quiz_id = q.id
+                LEFT JOIN subjects s ON q.subject_id = s.id
+                WHERE qa.user_id = %s
+                ORDER BY qa.created_at DESC
+                LIMIT %s
+            """, (user_id, limit))
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_quiz_by_id(user_id: int, quiz_id: int) -> dict:
+    """Retrieves a specific quiz with its questions JSON."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT q.*, s.name as subject_name, c.name as chapter_name, t.name as topic_name
+                FROM quizzes q
+                LEFT JOIN subjects s ON q.subject_id = s.id
+                LEFT JOIN chapters c ON q.chapter_id = c.id
+                LEFT JOIN topics t ON q.topic_id = t.id
+                WHERE q.id = %s AND q.user_id = %s
+            """, (quiz_id, user_id))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# COMPREHENSIVE ACTIVE RECALL ENGINE
+# ══════════════════════════════════════════════
+
+def get_active_recall_prompt(user_id: int, topic_id: int) -> dict:
+    """
+    Generates a structured Feynman Technique Active Recall prompt, key concept checklist,
+    and reference cues for a topic.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT t.name as topic_name, c.name as chapter_name, s.name as subject_name,
+                       COALESCE(tp.understanding, 3) as understanding, COALESCE(tp.notes, '') as user_notes
+                FROM topics t
+                JOIN chapters c ON t.chapter_id = c.id
+                JOIN subjects s ON c.subject_id = s.id
+                LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = %s
+                WHERE t.id = %s AND t.user_id = %s
+            """, (user_id, topic_id, user_id))
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            # Fetch any notes or formulas for reference rubric
+            cursor.execute("SELECT title, content FROM notes WHERE topic_id = %s AND user_id = %s", (topic_id, user_id))
+            note_rows = cursor.fetchall()
+            notes_text = " ".join([f"{n['title']}: {n['content']}" for n in note_rows])
+
+            cursor.execute("SELECT title, formula_latex FROM formulas WHERE topic_id = %s AND user_id = %s", (topic_id, user_id))
+            form_rows = cursor.fetchall()
+            formulas_text = ", ".join([f"{f['title']} (${f['formula_latex']}$)" for f in form_rows])
+
+            t_name = row["topic_name"]
+            c_name = row["chapter_name"]
+            s_name = row["subject_name"]
+
+            prompt_text = f"Explain the core principles of **{t_name}** ({c_name}) as if teaching a classmate. Describe the underlying mechanisms, key formulas/laws, and common problem-solving rules without looking at your notes."
+
+            rubric_points = [
+                f"Accurate formal definition and physical/theoretical significance of {t_name}",
+                f"Key governing laws, statements, formulas, or chemical reactions",
+                f"Essential assumptions, conditions, and sign conventions",
+                f"Real-world application or sample numerical setup",
+                f"Common pitfalls and misconceptions to avoid"
+            ]
+
+            return {
+                "topic_id": topic_id,
+                "topic_name": t_name,
+                "chapter_name": c_name,
+                "subject_name": s_name,
+                "prompt_text": prompt_text,
+                "rubric_points": rubric_points,
+                "has_notes": bool(notes_text),
+                "formulas_text": formulas_text
+            }
+    finally:
+        conn.close()
+
+
+def save_active_recall_session(user_id: int, topic_id: int, prompt_text: str,
+                               user_response: str, evaluation_feedback: str = "",
+                               understanding_score: int = 3) -> int:
+    """
+    Saves an active recall session, synchronizes topic understanding, triggers
+    adaptive spaced repetition for weak scores, awards XP, and updates streak.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO recall_responses (user_id, topic_id, prompt_text, user_response,
+                                              evaluation_feedback, understanding_score)
+                VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+            """, (user_id, topic_id, prompt_text.strip(), user_response.strip(),
+                  evaluation_feedback.strip(), understanding_score))
+            recall_id = cursor.fetchone()[0]
+            conn.commit()
+
+        # 1. Update understanding in topic_progress
+        save_progress(user_id, "topic", topic_id, understanding=understanding_score)
+
+        # 2. Adaptive Spaced Repetition trigger
+        if understanding_score <= 2:
+            # Weak recall -> review soon in 1d, 3d, 7d
+            try:
+                schedule_adaptive_revisions(user_id, "topic", topic_id, understanding_score)
+            except Exception:
+                pass
+        elif understanding_score >= 4:
+            # Strong recall -> schedule next spaced repetition milestones
+            try:
+                schedule_adaptive_revisions(user_id, "topic", topic_id, understanding_score)
+            except Exception:
+                pass
+
+        # 3. Award XP & update streak
+        earned_xp = 35 if understanding_score >= 4 else (25 if understanding_score == 3 else 15)
+        award_user_xp(user_id, "active_recall", earned_xp, f"Active Recall on Topic #{topic_id} ({understanding_score}/5 stars)")
+        update_user_streak(user_id)
+        st.cache_data.clear()
+        return recall_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def save_recall_response(user_id: int, topic_id: int, prompt_text: str,
+                         user_response: str, evaluation_feedback: str = "",
+                         understanding_score: int = 3) -> int:
+    """Wrapper delegating to save_active_recall_session."""
+    return save_active_recall_session(user_id, topic_id, prompt_text, user_response, evaluation_feedback, understanding_score)
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_recall_history(user_id: int, topic_id: int = None, limit: int = 20) -> list:
+    """Retrieves recall history, optionally filtered by topic."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            query = """
+                SELECT rr.*, t.name as topic_name, c.name as chapter_name,
+                       s.name as subject_name, s.color as subject_color
+                FROM recall_responses rr
+                JOIN topics t ON rr.topic_id = t.id
+                JOIN chapters c ON t.chapter_id = c.id
+                JOIN subjects s ON c.subject_id = s.id
+                WHERE rr.user_id = %s
+            """
+            params = [user_id]
+            if topic_id:
+                query += " AND rr.topic_id = %s"
+                params.append(topic_id)
+            query += " ORDER BY rr.created_at DESC LIMIT %s"
+            params.append(limit)
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_recall_stats(user_id: int) -> dict:
+    """Aggregated recall statistics for a user."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    COUNT(*) AS total_sessions,
+                    COALESCE(AVG(understanding_score), 0) AS avg_score,
+                    COUNT(DISTINCT topic_id) AS unique_topics,
+                    COUNT(CASE WHEN understanding_score >= 4 THEN 1 END) AS strong_recalls,
+                    COUNT(CASE WHEN understanding_score <= 2 THEN 1 END) AS weak_recalls
+                FROM recall_responses
+                WHERE user_id = %s
+            """, (user_id,))
+            row = cursor.fetchone()
+            return {
+                "total_sessions": row[0] or 0,
+                "avg_score": round(float(row[1]), 1) if row[1] else 0,
+                "unique_topics": row[2] or 0,
+                "strong_recalls": row[3] or 0,
+                "weak_recalls": row[4] or 0
+            }
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════
+# COMPREHENSIVE FOCUS MODE & ANALYTICS
+# ══════════════════════════════════════════════
+
+def log_focus_session_and_sync(user_id: int, duration_minutes: int, subject_id: int = None,
+                               chapter_id: int = None, topic_id: int = None, notes: str = "",
+                               update_topic_status: str = None, planner_task_id: int = None) -> int:
+    """
+    Logs a deep focus study session, optionally updates linked topic progress or planner task,
+    awards XP (+2 XP per minute, +50 XP bonus for >= 50m), and updates streak.
+    """
+    import datetime
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    
+    session_id = add_study_session(
+        user_id=user_id,
+        subject_id=subject_id,
+        duration_minutes=duration_minutes,
+        session_date=today_str,
+        notes=notes,
+        chapter_id=chapter_id,
+        topic_id=topic_id
+    )
+
+    # 1. If topic status update requested
+    if topic_id and update_topic_status:
+        try:
+            save_progress(user_id, "topic", topic_id, status=update_topic_status)
+        except Exception:
+            pass
+
+    # 2. If planner task completed
+    if planner_task_id:
+        conn = get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("UPDATE daily_plans SET is_completed = 1 WHERE id = %s AND user_id = %s", (planner_task_id, user_id))
+                conn.commit()
+        finally:
+            conn.close()
+
+    # 3. Calculate and award XP
+    base_xp = duration_minutes * 2
+    bonus_xp = 50 if duration_minutes >= 50 else 0
+    total_xp = base_xp + bonus_xp
+    award_user_xp(user_id, "focus_session", total_xp, f"Completed {duration_minutes}m Deep Focus (+{total_xp} XP)")
+    update_user_streak(user_id)
+    st.cache_data.clear()
+    return session_id
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_focus_analytics(user_id: int) -> dict:
+    """Comprehensive focus session analytics: totals, weekly breakdown, subject distribution."""
+    import datetime
+    today = datetime.date.today()
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # Totals
+            cursor.execute("""
+                SELECT
+                    COUNT(*) AS total_sessions,
+                    COALESCE(SUM(duration_minutes), 0) AS total_minutes,
+                    COALESCE(AVG(duration_minutes), 0) AS avg_duration
+                FROM study_sessions WHERE user_id = %s
+            """, (user_id,))
+            totals = cursor.fetchone()
+
+            # This week
+            week_start = (today - datetime.timedelta(days=today.weekday())).strftime("%Y-%m-%d")
+            cursor.execute("""
+                SELECT COALESCE(SUM(duration_minutes), 0) AS week_minutes,
+                       COUNT(*) AS week_sessions
+                FROM study_sessions
+                WHERE user_id = %s AND session_date >= %s
+            """, (user_id, week_start))
+            week_row = cursor.fetchone()
+
+            # Subject distribution
+            cursor.execute("""
+                SELECT s.name, s.color, COALESCE(SUM(ss.duration_minutes), 0) AS minutes
+                FROM study_sessions ss
+                JOIN subjects s ON ss.subject_id = s.id
+                WHERE ss.user_id = %s
+                GROUP BY s.name, s.color
+                ORDER BY minutes DESC
+            """, (user_id,))
+            subj_dist = [dict(r) for r in cursor.fetchall()]
+
+            # Daily breakdown for last 14 days
+            two_weeks_ago = (today - datetime.timedelta(days=13)).strftime("%Y-%m-%d")
+            cursor.execute("""
+                SELECT session_date, SUM(duration_minutes) AS minutes
+                FROM study_sessions
+                WHERE user_id = %s AND session_date >= %s
+                GROUP BY session_date ORDER BY session_date ASC
+            """, (user_id, two_weeks_ago))
+            daily_rows = cursor.fetchall()
+            daily_data = {r["session_date"]: r["minutes"] for r in daily_rows}
+            daily_trend = []
+            for i in range(14):
+                d = today - datetime.timedelta(days=13 - i)
+                ds = d.strftime("%Y-%m-%d")
+                daily_trend.append({
+                    "date": ds,
+                    "day_label": d.strftime("%a %d"),
+                    "minutes": daily_data.get(ds, 0)
+                })
+
+            # Focus streak
+            cursor.execute("""
+                SELECT DISTINCT session_date FROM study_sessions
+                WHERE user_id = %s ORDER BY session_date DESC
+            """, (user_id,))
+            all_dates = [r["session_date"] for r in cursor.fetchall()]
+            focus_streak = 0
+            check_date = today
+            for _ in range(365):
+                if check_date.strftime("%Y-%m-%d") in all_dates:
+                    focus_streak += 1
+                    check_date -= datetime.timedelta(days=1)
+                else:
+                    break
+
+            return {
+                "total_sessions": totals["total_sessions"] or 0,
+                "total_minutes": totals["total_minutes"] or 0,
+                "total_hours": round((totals["total_minutes"] or 0) / 60, 1),
+                "avg_duration": round(float(totals["avg_duration"] or 0), 0),
+                "week_minutes": week_row["week_minutes"] or 0,
+                "week_sessions": week_row["week_sessions"] or 0,
+                "subject_distribution": subj_dist,
+                "daily_trend": daily_trend,
+                "focus_streak": focus_streak
+            }
+    finally:
+        conn.close()
 

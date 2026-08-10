@@ -78,25 +78,35 @@ def render_dashboard_page(user_id: int):
     """, unsafe_allow_html=True)
 
     # ── Quick Hub Action Bar ──
-    c_act1, c_act2, c_act3, c_act4 = st.columns([1, 1, 1, 1])
+    c_act1, c_act2, c_act3, c_act4, c_act5, c_act6 = st.columns(6)
     with c_act1:
-        if st.button("📚 Syllabus Manager", use_container_width=True, key="dash_go_syllabus_btn"):
-            st.session_state["current_page"] = "📚 Syllabus Manager"
+        if st.button("🎯 Quiz Engine", use_container_width=True, type="primary", key="dash_go_quiz_btn"):
+            st.session_state["current_page"] = "🎯 Quiz Engine"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act2:
-        if st.button("🧠 Revision Queue", use_container_width=True, type="primary", key="dash_go_revisions_btn"):
-            st.session_state["current_page"] = "🧠 Revision Queue"
+        if st.button("💡 Active Recall", use_container_width=True, key="dash_go_recall_btn"):
+            st.session_state["current_page"] = "💡 Active Recall"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act3:
-        if st.button("🗓️ Study Planner", use_container_width=True, key="dash_go_planner_btn"):
-            st.session_state["current_page"] = "🗓️ Study Planner"
+        if st.button("❌ Mistake Vault", use_container_width=True, key="dash_go_mistakes_btn"):
+            st.session_state["current_page"] = "❌ Mistake Vault"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
     with c_act4:
-        if st.button("🔍 Global Search", use_container_width=True, key="dash_go_search_btn"):
-            st.session_state["current_page"] = "🔍 Global Search"
+        if st.button("⏱️ Focus Studio", use_container_width=True, key="dash_go_focus_btn"):
+            st.session_state["current_page"] = "⏱️ Focus Studio"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+            st.rerun()
+    with c_act5:
+        if st.button("🧠 Revisions", use_container_width=True, key="dash_go_revisions_btn"):
+            st.session_state["current_page"] = "🧠 Revision Queue"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+            st.rerun()
+    with c_act6:
+        if st.button("🗓️ Planner", use_container_width=True, key="dash_go_planner_btn"):
+            st.session_state["current_page"] = "🗓️ Study Planner"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
             st.rerun()
 
@@ -118,7 +128,7 @@ def render_dashboard_page(user_id: int):
     st.markdown("---")
 
     # ── NEXUS SMART PRIORITIES & EXAM READINESS ENGINE ──
-    c_prio, c_ready = st.columns([1.5, 1])
+    c_prio, c_ready = st.columns([1.3, 1.2])
 
     with c_prio:
         st.subheader("🔴 Nexus Smart Priorities")
@@ -150,29 +160,43 @@ def render_dashboard_page(user_id: int):
 
     with c_ready:
         st.subheader("🎓 Exam Readiness Score")
-        st.caption("AI-modeled composite preparedness indicator.")
-        readiness = calculate_exam_readiness_score(user_id)
+        
+        # Term selector
+        active_terms = get_active_upcoming_terms(user_id)
+        term_options = {"Overall (All Terms)": None}
+        for t in active_terms:
+            term_options[f"{t['name']} (Exam: {t.get('exam_date', 'N/A')})"] = t["id"]
+            
+        sel_term_label = st.selectbox("Exam Term Filter", list(term_options.keys()), key="dash_term_select", label_visibility="collapsed")
+        sel_term_id = term_options[sel_term_label]
+        
+        readiness = calculate_exam_readiness_score(user_id, term_id=sel_term_id)
+        r_score = readiness["readiness_score"]
+        r_color = "#22C55E" if r_score >= 80 else ("#38BDF8" if r_score >= 60 else ("#F59E0B" if r_score >= 40 else "#EF4444"))
         
         st.markdown(f"""
-            <div class="readiness-container" style="text-align: center;">
-                <div class="readiness-score-big">
-                    {readiness['readiness_score']} <span style="font-size: 1.5rem; color: var(--nexus-text-sub);">/ 100</span>
+            <div class="readiness-container" style="text-align: center; padding: 18px 16px;">
+                <div style="font-size: 0.78rem; font-weight: 700; color: {r_color}; text-transform: uppercase; letter-spacing: 0.05em;">
+                    COMPOSITE PREPAREDNESS INDEX
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0 12px 0; font-size: 0.85rem;">
-                    <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                        <strong>Syllabus:</strong> {readiness['syllabus_pct']}%
+                <div class="readiness-score-big" style="margin: 4px 0; color: {r_color};">
+                    {r_score} <span style="font-size: 1.4rem; color: var(--nexus-text-sub);">/ 100</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 12px 0 10px 0; font-size: 0.82rem; text-align: left;">
+                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
+                        📚 <strong>Syllabus:</strong> {readiness['syllabus_pct']}%
                     </div>
-                    <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                        <strong>Understanding:</strong> {readiness['understanding_pct']}%
+                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
+                        🧠 <strong>Understand:</strong> {readiness['understanding_pct']}%
                     </div>
-                    <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                        <strong>Revision:</strong> {readiness['revision_pct']}%
+                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
+                        🔄 <strong>Revisions:</strong> {readiness['revision_pct']}%
                     </div>
-                    <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                        <strong>Consistency:</strong> {readiness['practice_pct']}%
+                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
+                        ❌ <strong>Mistakes:</strong> {readiness.get('factors', {}).get('mistake_resolution', 100)}%
                     </div>
                 </div>
-                <div style="text-align: left; font-size: 0.82rem; color: var(--nexus-text-sub); border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                <div style="text-align: left; font-size: 0.8rem; color: var(--nexus-text-sub); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
                     <strong style="color: #38BDF8;">⚡ Actionable Next Step:</strong><br/>
                     {readiness['recommendations'][0] if readiness['recommendations'] else 'Keep up your daily study momentum!'}
                 </div>

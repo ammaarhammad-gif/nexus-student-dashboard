@@ -12,8 +12,11 @@ from models import (
     delete_mistake,
     get_all_subjects,
     get_chapters_for_subject,
-    get_topics_for_chapter
+    get_topics_for_chapter,
+    generate_mistake_requiz,
+    get_mistake_trend
 )
+from styles import render_breadcrumbs
 
 MISTAKE_TYPES = [
     "Conceptual",
@@ -25,18 +28,21 @@ MISTAKE_TYPES = [
     "Application"
 ]
 
+
 def render_mistakes_page(user_id: int):
+    render_breadcrumbs(["🏠 Dashboard", "❌ Mistake Vault"])
+
     st.markdown("""
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px;">
             <div>
                 <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #EF4444; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; margin-bottom: 8px;">
-                    <span>❌</span> <span>ERROR PATTERN MASTERY</span>
+                    <span>❌</span> <span>ERROR PATTERN MASTERY & RE-QUIZ</span>
                 </div>
                 <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 800; margin: 0; color: var(--nexus-text-title);">
                     Mistake Vault
                 </h1>
                 <p style="color: var(--nexus-text-sub); margin: 4px 0 0 0; font-size: 0.95rem;">
-                    Analyze your past exam and practice mistakes to eliminate recurring errors and build exam-day perfection.
+                    Analyze past exam & quiz errors, master recurring misconceptions, launch targeted Re-Quizzes, and boost your Exam Readiness score.
                 </p>
             </div>
         </div>
@@ -44,26 +50,43 @@ def render_mistakes_page(user_id: int):
 
     analytics = get_mistake_analytics(user_id)
     total_mistakes = analytics.get("total", 0)
+    unreviewed_count = analytics.get("unreviewed", 0)
+    reviewed_count = analytics.get("reviewed", 0)
     breakdown = analytics.get("breakdown", [])
 
     # Overview Analytics Bar
-    c_m1, c_m2 = st.columns([1, 2])
+    c_m1, c_m2, c_m3 = st.columns([1, 1, 2])
     with c_m1:
         st.markdown(f"""
-            <div class="readiness-container" style="text-align: center; height: 100%;">
-                <div style="font-size: 0.85rem; font-weight: 700; color: #EF4444; text-transform: uppercase; letter-spacing: 0.05em;">
-                    Total Mistakes Logged
+            <div class="readiness-container" style="text-align: center; height: 100%; padding: 18px 12px;">
+                <div style="font-size: 0.75rem; font-weight: 700; color: #EF4444; text-transform: uppercase; letter-spacing: 0.05em;">
+                    Unreviewed Errors
                 </div>
-                <div class="readiness-score-big" style="margin: 10px 0; background: linear-gradient(135deg, #EF4444, #F97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                    {total_mistakes}
+                <div class="readiness-score-big" style="margin: 6px 0; color: #EF4444;">
+                    {unreviewed_count}
                 </div>
-                <div style="font-size: 0.8rem; color: var(--nexus-text-sub);">
-                    Turn your errors into lifelong strengths
+                <div style="font-size: 0.75rem; color: var(--nexus-text-sub);">
+                    Pending mastery
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
     with c_m2:
+        st.markdown(f"""
+            <div class="readiness-container" style="text-align: center; height: 100%; padding: 18px 12px;">
+                <div style="font-size: 0.75rem; font-weight: 700; color: #22C55E; text-transform: uppercase; letter-spacing: 0.05em;">
+                    Mastered Errors
+                </div>
+                <div class="readiness-score-big" style="margin: 6px 0; color: #22C55E;">
+                    {reviewed_count}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--nexus-text-sub);">
+                    Resolved & reinforced
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with c_m3:
         if breakdown:
             import pandas as pd
             df_err = pd.DataFrame(breakdown)
@@ -80,7 +103,7 @@ def render_mistakes_page(user_id: int):
             fig.update_layout(
                 showlegend=False,
                 margin=dict(l=10, r=10, t=30, b=10),
-                height=160,
+                height=140,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color="#94A3B8", size=11),
@@ -92,7 +115,19 @@ def render_mistakes_page(user_id: int):
         else:
             st.info("Log your practice or test questions to unlock Error Pattern Analytics!")
 
-    st.markdown("---")
+    # Action Quick Launch
+    if unreviewed_count > 0:
+        if st.button("🔥 Launch Interactive Mistake Re-Quiz (Take Test Now)", type="primary", use_container_width=True):
+            req = generate_mistake_requiz(user_id, limit=min(10, unreviewed_count))
+            if req:
+                st.session_state["active_quiz_id"] = req["quiz_id"]
+                st.session_state["quiz_submitted"] = False
+                st.session_state["quiz_results"] = None
+                st.session_state["current_page"] = "🎯 Quiz Engine"
+                st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+                st.rerun()
+
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
     # Filter & Log Controls
     tab_list, tab_add, tab_review = st.tabs(["📋 View Vault", "➕ Log New Mistake", "🎯 Rapid Review Mode"])
@@ -167,27 +202,41 @@ def render_mistakes_page(user_id: int):
         if subjects:
             s_filter_map.update({s["name"]: s["id"] for s in subjects})
             
-        c_f1, c_f2 = st.columns(2)
+        c_f1, c_f2, c_f3 = st.columns(3)
         with c_f1:
             filt_subj = st.selectbox("Filter Subject", list(s_filter_map.keys()), key="mst_filt_subj")
         with c_f2:
             filt_type = st.selectbox("Filter Mistake Type", ["All"] + MISTAKE_TYPES, key="mst_filt_type")
-            
-        mistakes = get_all_mistakes(user_id, subject_id=s_filter_map[filt_subj], mistake_type=filt_type)
+        with c_f3:
+            filt_status = st.selectbox("Filter Status", ["All Mistakes", "Unreviewed Only", "Mastered Only"], key="mst_filt_status")
+
+        is_rev_param = None
+        if filt_status == "Unreviewed Only":
+            is_rev_param = False
+        elif filt_status == "Mastered Only":
+            is_rev_param = True
+
+        mistakes = get_all_mistakes(user_id, subject_id=s_filter_map[filt_subj], mistake_type=filt_type, is_reviewed=is_rev_param)
         if not mistakes:
             st.info("No recorded mistakes matching the selected filter.")
         else:
             for m in mistakes:
+                is_rev = bool(m.get("is_reviewed", 0))
                 with st.container():
                     st.markdown(f"""
-                        <div class="priority-item-card" style="border-left-color: #EF4444;">
+                        <div class="priority-item-card" style="border-left-color: {'#22C55E' if is_rev else '#EF4444'};">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                                 <div style="display: flex; gap: 6px; align-items: center;">
-                                    <span class="nexus-pill-critical">{m.get('mistake_type', 'Conceptual')}</span>
+                                    <span class="{'nexus-pill-badge' if is_rev else 'nexus-pill-critical'}">{m.get('mistake_type', 'Conceptual')}</span>
                                     <span style="font-size: 0.8rem; font-weight: 700; color: {m.get('subject_color', '#38BDF8')};">{m.get('subject_name', '')}</span>
                                     <span style="font-size: 0.75rem; color: var(--nexus-text-sub);">{m.get('chapter_name', '')}</span>
                                 </div>
-                                <span style="font-size: 0.75rem; color: var(--nexus-text-sub);">{str(m.get('created_at', ''))[:10]}</span>
+                                <div>
+                                    <span style="font-size: 0.75rem; font-weight: 700; color: {'#22C55E' if is_rev else '#EF4444'};">
+                                        {'✨ MASTERED' if is_rev else '⚠️ UNREVIEWED'}
+                                    </span>
+                                    <span style="font-size: 0.75rem; color: var(--nexus-text-sub); margin-left: 8px;">{str(m.get('created_at', ''))[:10]}</span>
+                                </div>
                             </div>
                             <div style="font-size: 1.0rem; font-weight: 700; color: var(--nexus-text-title); margin-bottom: 8px;">
                                 ❓ {m['question']}
@@ -205,8 +254,14 @@ def render_mistakes_page(user_id: int):
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    c_b1, c_b2 = st.columns([6, 1])
+                    c_b1, c_b2, c_b3 = st.columns([4, 2, 1])
                     with c_b2:
+                        toggle_label = "↩️ Reopen Error" if is_rev else "✅ Mark Mastered (+15 XP)"
+                        if st.button(toggle_label, key=f"tog_mst_{m['id']}", use_container_width=True):
+                            toggle_mistake_reviewed(user_id, m["id"])
+                            st.toast("Mistake status updated!" if is_rev else "Mastered! +15 XP", icon="✨")
+                            st.rerun()
+                    with c_b3:
                         if st.button("🗑️ Delete", key=f"del_mst_{m['id']}", use_container_width=True):
                             delete_mistake(user_id, m['id'])
                             st.toast("Deleted from Vault", icon="🗑️")
@@ -214,9 +269,9 @@ def render_mistakes_page(user_id: int):
 
     with tab_review:
         st.subheader("🎯 Rapid Flashcard Mistake Review")
-        mistakes = get_all_mistakes(user_id)
+        mistakes = get_all_mistakes(user_id, is_reviewed=False)
         if not mistakes:
-            st.info("Log some mistakes first to start your review session.")
+            st.info("🎉 All mistakes reviewed! You have zero unreviewed errors in your vault.")
         else:
             if "mst_review_idx" not in st.session_state:
                 st.session_state["mst_review_idx"] = 0
@@ -227,7 +282,7 @@ def render_mistakes_page(user_id: int):
             st.markdown(f"""
                 <div class="readiness-container" style="text-align: center;">
                     <div style="font-size: 0.8rem; color: #38BDF8; font-weight: 700; text-transform: uppercase;">
-                        Reviewing Mistake {idx + 1} of {len(mistakes)} • {cur.get('subject_name')}
+                        Reviewing Unresolved Mistake {idx + 1} of {len(mistakes)} • {cur.get('subject_name')}
                     </div>
                     <h2 style="font-family: 'Outfit', sans-serif; color: var(--nexus-text-title); margin: 16px 0;">
                         {cur['question']}
@@ -251,12 +306,18 @@ def render_mistakes_page(user_id: int):
                     </div>
                 """, unsafe_allow_html=True)
                 
-            c_p, c_n = st.columns(2)
+            c_p, c_m, c_n = st.columns([1, 1.2, 1])
             with c_p:
-                if st.button("⬅️ Previous Question", use_container_width=True):
+                if st.button("⬅️ Previous", use_container_width=True):
                     st.session_state["mst_review_idx"] = (idx - 1) % len(mistakes)
                     st.rerun()
+            with c_m:
+                if st.button("✅ Mark Mastered (+15 XP)", use_container_width=True, type="primary"):
+                    toggle_mistake_reviewed(user_id, cur["id"])
+                    st.toast("Marked as Mastered! +15 XP", icon="✨")
+                    st.session_state["mst_review_idx"] = idx % max(1, len(mistakes) - 1)
+                    st.rerun()
             with c_n:
-                if st.button("➡️ Next Question", use_container_width=True, type="primary"):
+                if st.button("➡️ Next", use_container_width=True):
                     st.session_state["mst_review_idx"] = (idx + 1) % len(mistakes)
                     st.rerun()
