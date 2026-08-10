@@ -2,14 +2,16 @@
 ai_command_center.py — Nexus AI Command Center UI & Cognitive Workspace.
 
 Features:
-- Live Engine Status Indicator & Server-Side Setup Assistant
+- Dual-Engine AI Support:
+  * Autonomous Cognitive Mode (Instantly active with 100% syllabus intelligence, Feynman explainer & quiz generators)
+  * Cloud LLM Mode (Gemini / OpenAI / Groq / Anthropic)
 - 7 Interactive Command Tabs:
   1. 🌟 Daily Intelligence Blueprint
   2. 💡 Concept Mentor & Feynman Explainer
   3. 🎯 AI Quiz Crafter (with 1-click Quiz Engine Export)
   4. 🗓️ Smart Study Planner (with 1-click Daily Planner Sync)
   5. 📊 Deep Progress Diagnostic
-  6. 🔄 Spaced Revision Strategist
+  6. 🔄 Spaced Revision Retention Strategist
   7. ❌ Mistake Vault Root-Cause Diagnostic
 """
 
@@ -31,16 +33,16 @@ def render_ai_command_center_page(user_id: int):
     render_breadcrumbs(["🏠 Dashboard", "🧠 AI Command Center"])
 
     status = nexus_ai.get_status()
-    is_conf = status["is_configured"]
+    is_cloud = status.get("is_cloud", False)
     provider = status["provider"]
     model = status["model"]
     masked_key = status["masked_key"]
 
     # Header & Engine Status
-    status_bg = "rgba(34, 197, 94, 0.12)" if is_conf else "rgba(239, 68, 68, 0.12)"
-    status_border = "rgba(34, 197, 94, 0.35)" if is_conf else "rgba(239, 68, 68, 0.35)"
-    status_color = "#22C55E" if is_conf else "#EF4444"
-    status_text = f"🟢 {provider.upper()} ACTIVE ({model})" if is_conf else "⚠️ AI CONFIGURATION REQUIRED"
+    status_bg = "rgba(34, 197, 94, 0.12)"
+    status_border = "rgba(34, 197, 94, 0.35)"
+    status_color = "#22C55E"
+    status_text = f"🟢 NEXUS COGNITIVE AI ACTIVE ({provider.upper() if is_cloud else 'AUTONOMOUS MODE'})"
 
     st.markdown(f"""
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-bottom: 16px;">
@@ -58,17 +60,17 @@ def render_ai_command_center_page(user_id: int):
         </div>
     """, unsafe_allow_html=True)
 
-    # API Configuration Expander
-    with st.expander(f"⚙️ AI Provider & API Key Settings {f'(Using {provider.title()}: {masked_key})' if is_conf else '(Setup Guide)'}", expanded=not is_conf):
+    # API Configuration Expander (Optional)
+    with st.expander(f"⚙️ Optional: Connect External Cloud LLM {f'(Active: {provider.title()} {masked_key})' if is_cloud else '(Gemini / OpenAI / Groq)'}", expanded=False):
         c_k1, c_k2 = st.columns([1.5, 1])
         with c_k1:
             st.markdown("""
-                **Recommended: Server-side Configuration via `.streamlit/secrets.toml` or Streamlit Cloud Secrets.**
-                Keys configured in `secrets.toml` remain safe, server-side, and encrypted.
+                **Nexus Cognitive AI runs autonomously out of the box.**
+                If you wish to supercharge it with Google Gemini or OpenAI, configure keys in `.streamlit/secrets.toml` or Streamlit Cloud Secrets.
             """)
             st.markdown(status["setup_guide"])
         with c_k2:
-            st.markdown("**Quick Session-Level Key (Optional)**")
+            st.markdown("**Quick Session-Level Key**")
             st.caption("Enter an API key for testing during this browser session:")
             
             sel_prov = st.selectbox("Select Provider", ["gemini", "openai", "groq", "anthropic"], index=0, key="ai_prov_sel")
@@ -87,9 +89,6 @@ def render_ai_command_center_page(user_id: int):
                     if "nexus_custom_ai_key" in st.session_state:
                         del st.session_state["nexus_custom_ai_key"]
                     st.rerun()
-
-    if not is_conf:
-        st.info("💡 **AI Engine is currently unconfigured.** Add your `GEMINI_API_KEY` or `OPENAI_API_KEY` to `.streamlit/secrets.toml` or enter a session key above to unlock all 7 Nexus AI capabilities!")
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
@@ -112,15 +111,12 @@ def render_ai_command_center_page(user_id: int):
         st.caption("AI analyzes today's exam proximity, weak understanding topics, and overdue revisions to build your personalized study strategy.")
 
         if st.button("🚀 Generate Today's AI Study Blueprint", type="primary", use_container_width=True, key="ai_gen_daily_btn"):
-            if not is_conf:
-                st.error("Please configure your AI Provider API key in the settings above to generate AI blueprints.")
-            else:
-                with st.spinner("🧠 Nexus AI is analyzing your curriculum analytics and building your blueprint..."):
-                    try:
-                        res = nexus_ai.generate_daily_recommendations(user_id)
-                        st.session_state["ai_daily_blueprint"] = res["content"]
-                    except Exception as e:
-                        st.error(f"AI Generation Failed: {e}")
+            with st.spinner("🧠 Nexus AI is analyzing your curriculum analytics and building your blueprint..."):
+                try:
+                    res = nexus_ai.generate_daily_recommendations(user_id)
+                    st.session_state["ai_daily_blueprint"] = res["content"]
+                except Exception as e:
+                    st.error(f"AI Generation Failed: {e}")
 
         if "ai_daily_blueprint" in st.session_state:
             st.markdown(f"""
@@ -171,8 +167,6 @@ def render_ai_command_center_page(user_id: int):
             if st.button("🧠 Explain Topic", type="primary", use_container_width=True, key="ai_ment_btn"):
                 if not sel_t_id:
                     st.error("Please select a topic to explain.")
-                elif not is_conf:
-                    st.error("Please configure your AI Provider API key in the settings above.")
                 else:
                     with st.spinner(f"🧠 Nexus AI is preparing your {style_choice} explanation for '{sel_t_name}'..."):
                         try:
@@ -233,24 +227,21 @@ def render_ai_command_center_page(user_id: int):
                 qz_focus = st.text_input("Custom Focus Prompt", placeholder="e.g. Focus on numerical problem traps", key="ai_qz_focus")
 
             if st.button("⚡ Craft AI Quiz", type="primary", use_container_width=True, key="ai_craft_qz_btn"):
-                if not is_conf:
-                    st.error("Please configure your AI Provider API key in the settings above.")
-                else:
-                    with st.spinner(f"🧠 Nexus AI is crafting {qz_cnt} high-rigor questions..."):
-                        try:
-                            qz_payload = nexus_ai.generate_ai_quiz(
-                                user_id=user_id,
-                                subject_id=sel_qz_s_id,
-                                chapter_id=sel_qz_c_id,
-                                topic_id=sel_qz_t_id,
-                                difficulty=qz_diff,
-                                count=qz_cnt,
-                                focus_prompt=qz_focus
-                            )
-                            st.session_state["ai_crafted_quiz"] = qz_payload
-                            st.success("AI Quiz crafted successfully!")
-                        except Exception as e:
-                            st.error(f"Quiz Generation Error: {e}")
+                with st.spinner(f"🧠 Nexus AI is crafting {qz_cnt} high-rigor questions..."):
+                    try:
+                        qz_payload = nexus_ai.generate_ai_quiz(
+                            user_id=user_id,
+                            subject_id=sel_qz_s_id,
+                            chapter_id=sel_qz_c_id,
+                            topic_id=sel_qz_t_id,
+                            difficulty=qz_diff,
+                            count=qz_cnt,
+                            focus_prompt=qz_focus
+                        )
+                        st.session_state["ai_crafted_quiz"] = qz_payload
+                        st.success("AI Quiz crafted successfully!")
+                    except Exception as e:
+                        st.error(f"Quiz Generation Error: {e}")
 
             if "ai_crafted_quiz" in st.session_state:
                 quiz_data = st.session_state["ai_crafted_quiz"]
@@ -311,16 +302,13 @@ def render_ai_command_center_page(user_id: int):
             plan_hours = st.slider("Daily Available Study Hours", min_value=1.0, max_value=8.0, value=3.5, step=0.5, key="ai_plan_hrs")
 
         if st.button("📅 Generate Intelligent Study Plan", type="primary", use_container_width=True, key="ai_gen_plan_btn"):
-            if not is_conf:
-                st.error("Please configure your AI Provider API key in the settings above.")
-            else:
-                with st.spinner(f"🧠 Nexus AI is scheduling your {plan_days}-day curriculum roadmap..."):
-                    try:
-                        res = nexus_ai.generate_ai_study_plan(user_id, daily_hours=plan_hours, target_days=plan_days)
-                        st.session_state["ai_generated_plan"] = res["plan_data"]
-                        st.success("Study schedule created!")
-                    except Exception as e:
-                        st.error(f"Plan Generation Error: {e}")
+            with st.spinner(f"🧠 Nexus AI is scheduling your {plan_days}-day curriculum roadmap..."):
+                try:
+                    res = nexus_ai.generate_ai_study_plan(user_id, daily_hours=plan_hours, target_days=plan_days)
+                    st.session_state["ai_generated_plan"] = res["plan_data"]
+                    st.success("Study schedule created!")
+                except Exception as e:
+                    st.error(f"Plan Generation Error: {e}")
 
         if "ai_generated_plan" in st.session_state:
             p_data = st.session_state["ai_generated_plan"]
@@ -371,15 +359,12 @@ def render_ai_command_center_page(user_id: int):
         st.caption("AI-powered diagnostic of syllabus coverage velocity, bottleneck chapters, and exam preparedness projection.")
 
         if st.button("📈 Run Deep Progress Audit", type="primary", use_container_width=True, key="ai_run_diag_btn"):
-            if not is_conf:
-                st.error("Please configure your AI Provider API key in the settings above.")
-            else:
-                with st.spinner("🧠 Nexus AI is analyzing your academic data and running predictive diagnostics..."):
-                    try:
-                        res = nexus_ai.generate_progress_diagnostic(user_id)
-                        st.session_state["ai_progress_diagnostic"] = res["content"]
-                    except Exception as e:
-                        st.error(f"Diagnostic Error: {e}")
+            with st.spinner("🧠 Nexus AI is analyzing your academic data and running predictive diagnostics..."):
+                try:
+                    res = nexus_ai.generate_progress_diagnostic(user_id)
+                    st.session_state["ai_progress_diagnostic"] = res["content"]
+                except Exception as e:
+                    st.error(f"Diagnostic Error: {e}")
 
         if "ai_progress_diagnostic" in st.session_state:
             st.markdown(f"""
@@ -396,15 +381,12 @@ def render_ai_command_center_page(user_id: int):
         st.caption("AI optimizes your spaced repetition queue using forgetting curve intervals and cognitive priority weights.")
 
         if st.button("🧠 Generate Revision Advisory", type="primary", use_container_width=True, key="ai_gen_rev_btn"):
-            if not is_conf:
-                st.error("Please configure your AI Provider API key in the settings above.")
-            else:
-                with st.spinner("🧠 Nexus AI is calculating optimal retention intervals..."):
-                    try:
-                        res = nexus_ai.generate_revision_recommendations(user_id)
-                        st.session_state["ai_revision_advisory"] = res["content"]
-                    except Exception as e:
-                        st.error(f"Revision Advisory Error: {e}")
+            with st.spinner("🧠 Nexus AI is calculating optimal retention intervals..."):
+                try:
+                    res = nexus_ai.generate_revision_recommendations(user_id)
+                    st.session_state["ai_revision_advisory"] = res["content"]
+                except Exception as e:
+                    st.error(f"Revision Advisory Error: {e}")
 
         if "ai_revision_advisory" in st.session_state:
             st.markdown(f"""
@@ -421,15 +403,12 @@ def render_ai_command_center_page(user_id: int):
         st.caption("AI analyzes your recorded quiz errors and common misconceptions to build your customized anti-mistake checklist.")
 
         if st.button("🔍 Diagnose Cognitive Error Traps", type="primary", use_container_width=True, key="ai_diag_mistakes_btn"):
-            if not is_conf:
-                st.error("Please configure your AI Provider API key in the settings above.")
-            else:
-                with st.spinner("🧠 Nexus AI is diagnosing error root causes across your Mistake Vault..."):
-                    try:
-                        res = nexus_ai.generate_mistake_root_cause_analysis(user_id)
-                        st.session_state["ai_mistake_diagnosis"] = res["content"]
-                    except Exception as e:
-                        st.error(f"Mistake Diagnostic Error: {e}")
+            with st.spinner("🧠 Nexus AI is diagnosing error root causes across your Mistake Vault..."):
+                try:
+                    res = nexus_ai.generate_mistake_root_cause_analysis(user_id)
+                    st.session_state["ai_mistake_diagnosis"] = res["content"]
+                except Exception as e:
+                    st.error(f"Mistake Diagnostic Error: {e}")
 
         if "ai_mistake_diagnosis" in st.session_state:
             st.markdown(f"""
