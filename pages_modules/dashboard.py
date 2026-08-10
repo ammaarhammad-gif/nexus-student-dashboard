@@ -20,7 +20,7 @@ from models import (
     get_recent_activity_stream, get_weak_areas, get_focus_analytics
 )
 from preloaded_syllabi import preload_standard_syllabus
-from styles import render_top_header_bar
+from styles import render_top_header_bar, render_html
 
 
 def render_dashboard_page(user_id: int):
@@ -31,42 +31,42 @@ def render_dashboard_page(user_id: int):
     user_theme = get_user_theme(user_id)
     is_dark = (user_theme.strip().lower() == "dark")
 
-    # Fetch stats and auto-preload if fresh
-    stats = get_overall_stats(user_id) or {}
-    subjects_with_stats = get_all_subjects_with_stats(user_id) or []
-    if not subjects_with_stats:
-        preload_standard_syllabus(user_id, board, class_name)
-        stats = get_overall_stats(user_id) or {}
-        subjects_with_stats = get_all_subjects_with_stats(user_id) or []
+    # Ensure standard syllabus is preloaded if database is empty
+    subjects_raw = get_all_subjects_with_stats(user_id)
+    if not subjects_raw:
+        preload_standard_syllabus(user_id, board=board, class_name=class_name)
 
+    stats = get_overall_stats(user_id) or {}
     xp_info = get_user_xp_summary(user_id) or {}
     readiness = calculate_exam_readiness_score(user_id) or {}
     priorities = get_top_nexus_priorities(user_id, limit=3) or []
     queue = get_revision_queue(user_id) or {}
     unreviewed_mistakes = get_unreviewed_mistakes_for_quiz(user_id, limit=10) or []
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
-    today_plans = get_daily_plans(user_id, today_str) or []
+    today_plans = get_daily_plans(user_id) or []
     focus_data = get_focus_analytics(user_id, days=7) or {}
 
-    # ══════════════════════════════════════════════════════════════════════════
     # TOP APPLICATION HEADER BAR
-    # ══════════════════════════════════════════════════════════════════════════
-    render_top_header_bar(user_id, "🏠 Dashboard", "Academic Command Center", ["NEXUS", "Dashboard"])
+    render_top_header_bar(
+        user_id,
+        "🏠 Dashboard",
+        "Executive academic command center and daily intelligence briefing.",
+        ["NEXUS", "Dashboard"]
+    )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # ROW 1: TIME-AWARE GREETING & DATE BANNER
+    # ROW 1: PERSONALIZED GREETING & STATUS BANNER
     # ══════════════════════════════════════════════════════════════════════════
-    current_hour = datetime.datetime.now().hour
-    if current_hour < 12:
+    now_hour = datetime.datetime.now().hour
+    if now_hour < 12:
         time_greeting = "Good morning"
-    elif current_hour < 17:
+    elif now_hour < 17:
         time_greeting = "Good afternoon"
     else:
         time_greeting = "Good evening"
 
-    today_date_str = datetime.date.today().strftime("%A, %B %d, %Y")
+    today_date_str = datetime.date.today().strftime("%A, %d %B %Y")
 
-    st.markdown(f"""
+    render_html(f"""
         <div style="margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 8px;">
                 <div>
@@ -82,7 +82,7 @@ def render_dashboard_page(user_id: int):
                 </div>
             </div>
         </div>
-    """, unsafe_allow_html=True)
+    """)
 
     # ══════════════════════════════════════════════════════════════════════════
     # ROW 2: 4 COMPACT EXECUTIVE KPI CARDS
@@ -98,34 +98,34 @@ def render_dashboard_page(user_id: int):
     k1, k2, k3, k4 = st.columns(4)
 
     with k1:
-        st.markdown(f"""
+        render_html(f"""
             <div class="nexus-kpi-card" style="border-left: 3px solid {r_color};">
                 <div class="nexus-kpi-label">🎓 Exam Readiness</div>
                 <div class="nexus-kpi-val" style="color: {r_color};">{r_score} <span style="font-size: 1.05rem; color: var(--nexus-text-sub); font-weight: 600;">/ 100</span></div>
                 <div class="nexus-kpi-sub">Tier: <strong style="color: {r_color};">{r_tier}</strong></div>
             </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with k2:
-        st.markdown(f"""
+        render_html(f"""
             <div class="nexus-kpi-card" style="border-left: 3px solid #F97316;">
                 <div class="nexus-kpi-label">🔥 Current Streak</div>
                 <div class="nexus-kpi-val" style="color: #F97316;">{xp_info.get('streak', 0)} <span style="font-size: 1.05rem; color: var(--nexus-text-sub); font-weight: 600;">Days</span></div>
                 <div class="nexus-kpi-sub">Best: <strong>{xp_info.get('best_streak', xp_info.get('streak', 0))}d</strong> • Active</div>
             </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with k3:
-        st.markdown(f"""
+        render_html(f"""
             <div class="nexus-kpi-card" style="border-left: 3px solid #38BDF8;">
                 <div class="nexus-kpi-label">⏱️ Focus Time (7d)</div>
                 <div class="nexus-kpi-val" style="color: #38BDF8;">{total_focus_hours} <span style="font-size: 1.05rem; color: var(--nexus-text-sub); font-weight: 600;">hrs</span></div>
                 <div class="nexus-kpi-sub">{total_focus_min}m • {focus_sessions_count} sessions</div>
             </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with k4:
-        st.markdown(f"""
+        render_html(f"""
             <div class="nexus-kpi-card" style="border-left: 3px solid #10B981;">
                 <div class="nexus-kpi-label">📚 Syllabus Done</div>
                 <div class="nexus-kpi-val" style="color: #10B981;">{stats.get('percent_completed', 0.0)}%</div>
@@ -141,7 +141,8 @@ def render_dashboard_page(user_id: int):
     col_gauge, col_mission = st.columns([1.1, 1.4])
 
     with col_gauge:
-        st.markdown(f"""
+        rec_text = readiness.get('recommendations', ['Maintain consistent daily focus blocks.'])[0]
+        render_html(f"""
             <div class="nexus-card" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid {r_color};">
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -159,7 +160,6 @@ def render_dashboard_page(user_id: int):
                         <div style="font-size: 1.1rem; color: var(--nexus-text-sub); font-weight: 600;">/ 100</div>
                     </div>
                     
-                    <!-- 4 Sub-Metrics Progress Bars -->
                     <div style="display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px;">
                         <div>
                             <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--nexus-text-sub); margin-bottom: 3px;">
@@ -201,10 +201,10 @@ def render_dashboard_page(user_id: int):
                 </div>
 
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; font-size: 0.8rem; color: var(--nexus-text-sub);">
-                    <strong style="color: #38BDF8;">💡 Recommendation:</strong> {readiness.get('recommendations', ['Maintain consistent daily focus blocks.'])[0]}
+                    <strong style="color: #38BDF8;">💡 Recommendation:</strong> {rec_text}
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        """)
 
     with col_mission:
         top_priority_topic = priorities[0] if priorities else None
@@ -273,7 +273,7 @@ def render_dashboard_page(user_id: int):
             for m_title, m_desc, m_tag, m_time, m_xp, m_dest in mission_items[:3]
         ])
 
-        st.markdown(f"""
+        render_html(f"""
             <div class="nexus-card" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; border-left: 4px solid var(--nexus-accent);">
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -285,7 +285,8 @@ def render_dashboard_page(user_id: int):
                     {items_html}
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        """)
+
 
         c_launch_1, c_launch_2 = st.columns([1.5, 1])
         with c_launch_1:
@@ -307,19 +308,19 @@ def render_dashboard_page(user_id: int):
                 st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
                 st.rerun()
 
-    st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
+    render_html("<div style='margin-top: 18px;'></div>")
 
     # ══════════════════════════════════════════════════════════════════════════
     # ROW 4: 7-DAY STUDY ACTIVITY CHART
     # ══════════════════════════════════════════════════════════════════════════
-    st.markdown("""
+    render_html("""
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--nexus-text-title); margin: 0;">
                 📈 7-Day Study & Focus Momentum
             </h3>
             <span style="font-size: 0.78rem; color: var(--nexus-text-sub);">Minutes Studied Daily</span>
         </div>
-    """, unsafe_allow_html=True)
+    """)
 
     daily_breakdown = focus_data.get("daily_breakdown", [])
     if not daily_breakdown:
@@ -370,7 +371,7 @@ def render_dashboard_page(user_id: int):
     )
     st.plotly_chart(fig_act, use_container_width=True, config={"displayModeBar": False})
 
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    render_html("<div style='margin-top: 10px;'></div>")
 
     # ══════════════════════════════════════════════════════════════════════════
     # ROW 5: UPCOMING EXAMS & SMART PRIORITY TOPICS (2 Columns)
@@ -378,14 +379,14 @@ def render_dashboard_page(user_id: int):
     col_exams, col_prios = st.columns([1, 1.3])
 
     with col_exams:
-        st.markdown("""
+        render_html("""
             <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--nexus-text-title); margin: 0 0 10px 0;">
                 ⏳ Upcoming Exams
             </h3>
-        """, unsafe_allow_html=True)
+        """)
         active_terms = get_active_upcoming_terms(user_id) or []
         if not active_terms:
-            st.markdown("""
+            render_html("""
                 <div class="nexus-card" style="text-align: center; padding: 22px 14px;">
                     <div style="font-size: 1.6rem; margin-bottom: 4px;">📅</div>
                     <strong style="color: var(--nexus-text-title); font-size: 0.95rem;">No Upcoming Terms Scheduled</strong>
@@ -393,7 +394,7 @@ def render_dashboard_page(user_id: int):
                         Configure your exam terms & target dates in Settings.
                     </div>
                 </div>
-            """, unsafe_allow_html=True)
+            """)
             if st.button("➕ Set Up Exam Terms", key="dash_cfg_terms_btn", use_container_width=True):
                 st.session_state["current_page"] = "⚙️ Settings"
                 st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
@@ -408,7 +409,7 @@ def render_dashboard_page(user_id: int):
                     except Exception:
                         days = 0
                 badge_bg = "#EF4444" if days <= 7 else ("#F97316" if days <= 21 else "#38BDF8")
-                st.markdown(f"""
+                render_html(f"""
                     <div class="priority-item-card" style="border-left-color: {badge_bg}; margin-bottom: 8px; padding: 10px 14px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
@@ -421,21 +422,21 @@ def render_dashboard_page(user_id: int):
                             </div>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
+                """)
 
     with col_prios:
-        st.markdown("""
+        render_html("""
             <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--nexus-text-title); margin: 0 0 10px 0;">
                 🎯 Smart Priority Topics
             </h3>
-        """, unsafe_allow_html=True)
+        """)
         if not priorities:
-            st.markdown("""
+            render_html("""
                 <div class="nexus-card" style="padding: 16px; text-align: center;">
                     <div style="color: #10B981; font-weight: 700; font-size: 0.95rem;">🎉 No Critical Bottlenecks</div>
                     <div style="font-size: 0.78rem; color: var(--nexus-text-sub); margin-top: 4px;">Syllabus pacing is in good standing across all subjects.</div>
                 </div>
-            """, unsafe_allow_html=True)
+            """)
         else:
             for p in priorities[:3]:
                 reasons_str = " • ".join(p.get("reasons", []))
@@ -443,7 +444,7 @@ def render_dashboard_page(user_id: int):
                 reason_html = f'• <span style="color: {p_badge_color};">{reasons_str}</span>' if reasons_str else ''
                 c_p_card, c_p_act = st.columns([3.8, 1.2])
                 with c_p_card:
-                    st.markdown(f"""
+                    render_html(f"""
                         <div class="priority-item-card" style="border-left-color: {p_badge_color}; margin-bottom: 8px; padding: 9px 12px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                                 <div style="display: flex; gap: 5px; align-items: center;">
@@ -455,7 +456,7 @@ def render_dashboard_page(user_id: int):
                             <div style="font-size: 0.92rem; font-weight: 700; color: var(--nexus-text-title);">{p['topic_name']}</div>
                             <div style="font-size: 0.75rem; color: var(--nexus-text-sub);">{p['chapter_name']} {reason_html}</div>
                         </div>
-                    """, unsafe_allow_html=True)
+                    """)
                 with c_p_act:
                     st.write("")
                     if st.button("⏱️ Focus", key=f"dash_prio_act_{p['topic_id']}", use_container_width=True):
@@ -463,3 +464,4 @@ def render_dashboard_page(user_id: int):
                         st.session_state["current_page"] = "⏱️ Focus"
                         st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
                         st.rerun()
+

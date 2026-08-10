@@ -5,7 +5,8 @@ from models import (
     is_setup_complete, has_completed_guide, get_user_profile, get_user_theme, get_user_wallpaper_config,
     set_user_theme, set_user_wallpaper_config, clear_user_wallpaper_config
 )
-from styles import apply_custom_css, render_cinematic_welcome_banner, render_welcome_splash_screen, WALLPAPER_PRESETS
+from styles import apply_custom_css, render_cinematic_welcome_banner, render_welcome_splash_screen, render_html, WALLPAPER_PRESETS
+
 
 
 
@@ -251,7 +252,7 @@ def main():
         user_name = profile.get('name', 'Ammaar')
         initial = (user_name[0] if user_name else "A").upper()
 
-        st.markdown(f"""
+        render_html(f"""
             <div style="padding: 6px 0 12px 0;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
                     <span style="font-size: 1.5rem; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));">⚡</span>
@@ -271,7 +272,8 @@ def main():
                     </div>
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        """)
+
 
         # ── Quick Global Search in Sidebar ──
         search_query = st.text_input("Global Search", placeholder="⌕ Search Nexus... (Ctrl + K)", key="global_search_input", label_visibility="collapsed")

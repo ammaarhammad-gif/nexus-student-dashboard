@@ -1766,10 +1766,25 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             .setup-hero h1 { font-size: 1.75rem !important; }
         }
 
-        /* ── Modern Sidebar Navigation Styles (Hide Radio Circles) ── */
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child {
+        /* ── Modern Sidebar Navigation Styles (Completely Hide Radio Circles) ── */
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child,
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] > div:first-child,
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] input + div,
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label div:first-child,
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] input[type="radio"] {
             display: none !important;
+            opacity: 0 !important;
+            width: 0 !important;
+            height: 0 !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
         }
+
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"],
         div[data-testid="stSidebar"] div[data-testid="stRadio"] label {
             padding: 9px 14px !important;
             border-radius: 10px !important;
@@ -1782,20 +1797,32 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             font-size: 0.92rem !important;
             display: flex !important;
             align-items: center !important;
+            width: 100% !important;
             background: transparent !important;
         }
+
         div[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
             background: rgba(255, 255, 255, 0.05) !important;
             color: var(--nexus-text-title) !important;
             transform: translateX(3px) !important;
         }
+
         div[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked),
-        div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"] {
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"][aria-checked="true"] {
             background: rgba(56, 189, 248, 0.12) !important;
             border: 1px solid rgba(56, 189, 248, 0.32) !important;
             color: #38BDF8 !important;
             box-shadow: 0 0 14px rgba(56, 189, 248, 0.18) !important;
             font-weight: 700 !important;
+        }
+
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label [data-testid="stMarkdownContainer"],
+        div[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
+            margin: 0 !important;
+            color: inherit !important;
+            font-weight: inherit !important;
+            font-size: inherit !important;
         }
 
         /* ── Top Header Bar ── */
@@ -2453,6 +2480,15 @@ def render_section_header(badge_icon: str, badge_text: str, title: str, subtitle
     """, unsafe_allow_html=True)
 
 
+import textwrap
+
+def render_html(html_str: str):
+    """Safely renders HTML without Markdown 4-space indentation code block bug."""
+    if html_str:
+        cleaned = textwrap.dedent(str(html_str)).strip()
+        st.markdown(cleaned, unsafe_allow_html=True)
+
+
 def render_top_header_bar(user_id: int, page_title: str, subtitle: str = None, breadcrumbs: list = None):
     """
     Renders the modern, compact Nexus Top Application Header Bar:
@@ -2483,13 +2519,15 @@ def render_top_header_bar(user_id: int, page_title: str, subtitle: str = None, b
         ])
         crumbs_html = f"<div style='font-size: 0.76rem; margin-bottom: 2px;'>{crumbs_str}</div>"
 
-    st.markdown(f"""
+    sub_html = f'<span style="color: var(--nexus-text-sub); font-size: 0.88rem; font-weight: 500;">{subtitle}</span>' if subtitle else ''
+
+    render_html(f"""
         <div class="nexus-top-header-bar">
             <div class="nexus-top-header-left">
                 {crumbs_html}
                 <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
                     <h1 class="nexus-top-header-title">{page_title}</h1>
-                    {f'<span style="color: var(--nexus-text-sub); font-size: 0.88rem; font-weight: 500;">{subtitle}</span>' if subtitle else ''}
+                    {sub_html}
                 </div>
             </div>
             <div class="nexus-top-header-right">
@@ -2504,5 +2542,6 @@ def render_top_header_bar(user_id: int, page_title: str, subtitle: str = None, b
                 </div>
             </div>
         </div>
-    """, unsafe_allow_html=True)
+    """)
+
 

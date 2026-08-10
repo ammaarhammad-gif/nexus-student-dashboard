@@ -22,9 +22,10 @@ from models import (
     add_formula, get_all_formulas, toggle_formula_favorite, delete_formula
 )
 from preloaded_syllabi import preload_standard_syllabus, reload_and_replace_syllabus
-from styles import render_header, render_breadcrumbs, render_empty_state
+from styles import render_top_header_bar, render_header, render_breadcrumbs, render_empty_state, render_html
 from components.math_keyboard import render_latex_math_keyboard
 from anki_export import export_formulas_to_anki
+
 
 STATUS_OPTIONS = ["Not Started", "In Progress", "Completed", "Revision Done"]
 STATUS_ICONS = {

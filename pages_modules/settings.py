@@ -27,7 +27,7 @@ from models import (
     get_user_wallpaper_config, set_user_wallpaper_config, clear_user_wallpaper_config
 )
 from preloaded_syllabi import reload_and_replace_syllabus
-from styles import render_header, render_breadcrumbs, WALLPAPER_PRESETS, render_empty_state
+from styles import render_top_header_bar, render_header, render_breadcrumbs, WALLPAPER_PRESETS, render_empty_state, render_html
 from pages_modules.setup_wizard import CLASS_OPTIONS
 from anki_export import export_all_to_anki
 from pdf_generator import generate_weekly_progress_pdf
@@ -58,11 +58,9 @@ def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: in
         return None
 
 
-from styles import render_top_header_bar, render_header, render_breadcrumbs, WALLPAPER_PRESETS, render_empty_state
-
-
 def render_settings_page(user_id: int):
     render_top_header_bar(
+
         user_id,
         "⚙️ Settings",
         "Academic profile, exam terms, visual appearance studio, and data backups.",
