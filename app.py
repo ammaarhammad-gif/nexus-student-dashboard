@@ -12,18 +12,15 @@ from styles import apply_custom_css, render_cinematic_welcome_banner, render_wel
 
 from pages_modules.setup_wizard import render_setup_wizard
 from pages_modules.dashboard import render_dashboard_page
-from pages_modules.syllabus import render_syllabus_page
-from pages_modules.statistics import render_statistics_page
+from pages_modules.learn import render_learn_page
 from pages_modules.planner import render_planner_page
-from pages_modules.wallpapers import render_wallpapers_page
-from pages_modules.settings import render_settings_page
-from pages_modules.search import render_search_page
-from pages_modules.revisions import render_revisions_page
-from pages_modules.quiz import render_quiz_page
-from pages_modules.active_recall import render_active_recall_page
-from pages_modules.mistakes import render_mistakes_page
+from pages_modules.practice import render_practice_page
+from pages_modules.review import render_review_page
 from pages_modules.focus import render_focus_page
 from pages_modules.ai_command_center import render_ai_command_center_page
+from pages_modules.statistics import render_statistics_page
+from pages_modules.search import render_search_page
+from pages_modules.settings import render_settings_page
 from auth_utils import (
     create_session_token, verify_session_token,
     set_session_param, get_session_param, clear_session_param

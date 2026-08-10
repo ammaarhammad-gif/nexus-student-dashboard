@@ -44,16 +44,19 @@ def render_statistics_page(user_id: int):
         pdf_days = st.selectbox("Report Timeframe", [7, 14, 30], format_func=lambda x: f"Last {x} Days", key="stat_pdf_days")
     with c_pdf2:
         st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-        pdf_bytes = generate_weekly_progress_pdf(user_id, days=pdf_days)
-        st.download_button(
-            label=f"⬇️ Download {pdf_days}-Day Report (PDF)",
-            data=pdf_bytes,
-            file_name=f"Nexus_Academic_Report_{pdf_days}Days.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True,
-            key="dl_weekly_pdf_btn"
-        )
+        try:
+            pdf_bytes = generate_weekly_progress_pdf(user_id, days=pdf_days)
+            st.download_button(
+                label=f"⬇️ Download {pdf_days}-Day Report (PDF)",
+                data=pdf_bytes,
+                file_name=f"Nexus_Academic_Report_{pdf_days}Days.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True,
+                key="dl_weekly_pdf_btn"
+            )
+        except Exception as e:
+            st.button(f"📄 Generate {pdf_days}-Day Report", disabled=True, use_container_width=True)
     with c_pdf3:
         st.markdown("<div style='margin-top: 34px; font-size: 0.8rem; color: #10B981; font-weight: 600;'>✅ Vector PDF Ready</div>", unsafe_allow_html=True)
 

@@ -452,38 +452,45 @@ def generate_weekly_progress_pdf(user_id: int, days: int = 7) -> bytes:
     # SECTION 4: AI PEDAGOGICAL RECOMMENDATIONS & NEXT WEEK ACTION PLAN
     # ══════════════════════════════════════════════════════════
     import re
+    import html
+
     def _format_markdown_for_reportlab(text: str) -> str:
         if not text:
-            return ""
-        # 1. Headers: ### Header -> <b>Header</b>
+            return "Maintain consistent daily review momentum and practice active recall."
         lines = []
         for line in text.splitlines():
             line_str = line.strip()
             if not line_str:
                 lines.append("")
                 continue
-            if line_str.startswith("#"):
-                clean_h = re.sub(r"^#+\s*", "", line_str)
+            # Step 1: Escape raw XML/HTML entities
+            escaped = html.escape(line_str)
+            # Step 2: Convert markdown syntax safely
+            if escaped.startswith("#"):
+                clean_h = re.sub(r"^#+\s*", "", escaped)
                 lines.append(f"<b>{clean_h}</b>")
-            elif line_str.startswith("- ") or line_str.startswith("* "):
-                clean_b = line_str[2:].strip()
-                # format bold inside bullets
+            elif escaped.startswith("- ") or escaped.startswith("* "):
+                clean_b = escaped[2:].strip()
                 clean_b = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", clean_b)
+                clean_b = re.sub(r"\*(.+?)\*", r"<i>\1</i>", clean_b)
                 lines.append(f"• {clean_b}")
-            elif line_str == "---":
+            elif escaped == "---":
                 lines.append("<br/>────────────────────────────────────────<br/>")
             else:
-                clean_line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", line_str)
+                clean_line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
+                clean_line = re.sub(r"\*(.+?)\*", r"<i>\1</i>", clean_line)
                 lines.append(clean_line)
         return "<br/>".join(lines)
 
     clean_ai_text = _format_markdown_for_reportlab(ai_text)
     
-    ai_box_data = [
-        [
-            Paragraph(f"<b>NEXUS AI STRATEGIC ACTION PLAN & RETENTION ROADMAP</b><br/><br/>{clean_ai_text}", body_style)
-        ]
-    ]
+    try:
+        ai_para = Paragraph(f"<b>NEXUS AI STRATEGIC ACTION PLAN & RETENTION ROADMAP</b><br/><br/>{clean_ai_text}", body_style)
+    except Exception:
+        safe_fallback = html.escape(str(ai_text)[:500])
+        ai_para = Paragraph(f"<b>NEXUS AI STRATEGIC ACTION PLAN & RETENTION ROADMAP</b><br/><br/>{safe_fallback}", body_style)
+
+    ai_box_data = [[ai_para]]
     ai_table = Table(ai_box_data, colWidths=[532])
     ai_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#EEF2FF")),
