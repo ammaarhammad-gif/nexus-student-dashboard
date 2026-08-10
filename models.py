@@ -2572,11 +2572,17 @@ def calculate_exam_readiness_score(user_id: int, term_id: int = None) -> dict:
                 recommendations.append("💡 Practice Active Recall on a key chapter using Feynman technique.")
             if syllabus_pct < 65.0:
                 recommendations.append("📚 Complete remaining syllabus chapters to improve coverage.")
-            if len(recommendations) < 3:
-                recommendations.append("⏱️ Start a 25m Focus Session to maintain daily momentum.")
+            factors_dict = {
+                "completion": round(syllabus_pct, 1),
+                "understanding": round(understanding_pct, 1),
+                "revision_adherence": round(revision_pct, 1),
+                "mistake_resolution": round(mistake_pct, 1),
+                "study_consistency": round(consistency_pct, 1)
+            }
 
             return {
                 "readiness_score": readiness_score,
+                "composite_score": readiness_score,
                 "term_id": term_id,
                 "term_name": term_name,
                 "exam_date": exam_date_str,
@@ -2596,13 +2602,8 @@ def calculate_exam_readiness_score(user_id: int, term_id: int = None) -> dict:
                 "quiz_count": quiz_count,
                 "avg_quiz_acc": round(avg_quiz_acc, 1) if avg_quiz_acc >= 0 else None,
                 "recall_count": recall_count,
-                "factors": {
-                    "completion": round(syllabus_pct, 1),
-                    "understanding": round(understanding_pct, 1),
-                    "revision_adherence": round(revision_pct, 1),
-                    "mistake_resolution": round(mistake_pct, 1),
-                    "study_consistency": round(consistency_pct, 1)
-                },
+                "factors": factors_dict,
+                "breakdown": factors_dict,
                 "recommendations": recommendations[:3]
             }
     finally:
