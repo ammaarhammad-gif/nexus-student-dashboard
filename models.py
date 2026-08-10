@@ -1283,10 +1283,12 @@ def get_term_stats(user_id: int, term_id: int) -> dict:
                 "total_chapters": r["total_chapters"],
                 "total_topics": tot_topics,
                 "completed": comp,
+                "completed_topics": comp,
                 "in_progress": r["in_progress"],
                 "not_started": r["not_started"],
                 "revision_done": r["revision_done"],
-                "percent_completed": pct
+                "percent_completed": pct,
+                "completion_pct": pct
             }
     finally:
         conn.close()

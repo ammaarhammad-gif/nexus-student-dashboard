@@ -224,11 +224,14 @@ def _render_term_allocation_tab(user_id: int):
     stats = get_term_stats(user_id, sel_term_id)
     c1, c2, c3 = st.columns(3)
     with c1:
-        render_metric_card("Allocated Chapters", stats["total_chapters"], "Chapters in term")
+        render_metric_card("Allocated Chapters", stats.get("total_chapters", 0), "Chapters in term")
     with c2:
-        render_metric_card("Total Topics", stats["total_topics"], "Topics to master")
+        render_metric_card("Total Topics", stats.get("total_topics", 0), "Topics to master")
     with c3:
-        render_metric_card("Term Completion", f"{stats['completion_pct']}%", f"{stats['completed_topics']}/{stats['total_topics']} done")
+        pct_val = stats.get("percent_completed", stats.get("completion_pct", 0.0))
+        comp_val = stats.get("completed", stats.get("completed_topics", 0))
+        tot_val = stats.get("total_topics", 0)
+        render_metric_card("Term Completion", f"{pct_val}%", f"{comp_val}/{tot_val} done")
 
     # Allocation Editor
     st.markdown("### 📚 Select Chapters Included in this Term")
