@@ -765,7 +765,8 @@ $$\\Delta Y = k \\cdot \\Delta X$$
     # ══════════════════════════════════════════════════════════
     def generate_ai_quiz(self, user_id: int, subject_id: int, chapter_id: int = None,
                          topic_id: int = None, difficulty: str = "Adaptive", count: int = 5,
-                         focus_prompt: str = "") -> dict:
+                         question_count: int = None, focus_prompt: str = "") -> dict:
+        effective_count = question_count if question_count is not None else count
         conn = get_connection()
         s_name, c_name, t_name = "General", "", ""
         try:
@@ -1042,6 +1043,11 @@ When solving tricky multiple-choice questions or numericals, errors typically ar
 3. ✅ **Eliminate 2 Distractors:** Always eliminate two clearly incorrect options before confirming your final choice.
 """
         return {"status": "success", "content": analysis, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+    # ── Ergonomic Method Aliases ──
+    generate_custom_quiz = generate_ai_quiz
+    recommend_revision_strategy = generate_revision_recommendations
+    diagnose_mistake_patterns = generate_mistake_root_cause_analysis
 
 
 # Global Singleton
