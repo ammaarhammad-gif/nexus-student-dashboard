@@ -147,6 +147,14 @@ def _render_profile_tab(user_id: int):
             st.rerun()
 
     st.markdown("---")
+    st.subheader("📖 Nexus Product Tour & Command Center Guide")
+    st.markdown("Need a quick refresher on how all 10 modules, spaced repetition, Feynman active recall, and focus timers operate together?")
+    if st.button("🚀 Replay Interactive Product Tour & Guide", type="secondary", use_container_width=True, key="replay_guide_btn"):
+        st.session_state["show_onboarding_guide"] = True
+        st.session_state["guide_step"] = 0
+        st.rerun()
+
+    st.markdown("---")
     st.subheader("🔄 Quick Reload Official Curriculum")
     st.caption("Need to reset your syllabus back to the standard official curriculum structure?")
     if st.button(f"⚡ Reload Official {profile.get('board', 'CBSE')} ({profile.get('class_name', 'Class 10')}) Curriculum", use_container_width=True):

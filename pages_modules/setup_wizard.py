@@ -206,8 +206,9 @@ def render_setup_wizard(user_id: int):
         with st.spinner(f"⚡ Loading official {final_board} ({class_name}) syllabus into your dashboard..."):
             preload_standard_syllabus(user_id=user_id, board=final_board, class_name=class_name)
 
-        st.session_state["show_welcome_splash"] = True
-        st.success("✅ Setup complete & official syllabus loaded! Loading your dashboard...")
+        st.session_state["show_onboarding_guide"] = True
+        st.session_state["guide_step"] = 0
+        st.success("✅ Setup complete & official syllabus loaded! Preparing your Command Center Guide...")
         st.rerun()
 
 

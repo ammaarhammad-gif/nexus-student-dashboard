@@ -2,7 +2,7 @@ import streamlit as st
 import logging
 from database import init_db
 from models import (
-    is_setup_complete, get_user_profile, get_user_theme, get_user_wallpaper_config,
+    is_setup_complete, has_completed_guide, get_user_profile, get_user_theme, get_user_wallpaper_config,
     set_user_theme, set_user_wallpaper_config, clear_user_wallpaper_config
 )
 from styles import apply_custom_css, render_cinematic_welcome_banner, render_welcome_splash_screen, WALLPAPER_PRESETS
@@ -11,6 +11,7 @@ from styles import apply_custom_css, render_cinematic_welcome_banner, render_wel
 
 
 from pages_modules.setup_wizard import render_setup_wizard
+from pages_modules.onboarding_guide import render_onboarding_guide
 from pages_modules.dashboard import render_dashboard_page
 from pages_modules.learn import render_learn_page
 from pages_modules.planner import render_planner_page
@@ -51,9 +52,6 @@ def get_resolved_wallpaper(user_id=None):
                 if p["id"] == preset_id:
                     return p["url"], blur, opacity, preset_id
         return None, 0, 0.30, None
-    except Exception:
-        return None, 0, 0.30, None
-
 # Apply Theme Styling & Wallpaper (Syncs instantly with session state and DB)
 active_theme = "Dark"
 wp_url, wp_blur, wp_opacity, wp_preset_id = WALLPAPER_PRESETS[0]["url"], 0, 0.35, "cosmic_nebula"
@@ -227,24 +225,15 @@ def main():
         render_setup_wizard(user_id)
         return
 
+    # Check if full onboarding guide/tour is active or needed
+    if st.session_state.get("show_onboarding_guide", False) or not has_completed_guide(user_id):
+        render_onboarding_guide(user_id)
+        return
+
     # User Profile & Theme Context
     profile = get_user_profile(user_id)
     user_theme = get_user_theme(user_id)
     is_dark = (user_theme.strip().lower() == "dark")
-
-    # One-Time Welcome Splash Screen
-    if st.session_state.get("show_welcome_splash", False):
-        render_welcome_splash_screen(
-            user_name=profile.get("name", "Student"),
-            board=profile.get("board", "CBSE"),
-            class_name=profile.get("class_name", "Class 10")
-        )
-        c1, c2, c3 = st.columns([1, 1.5, 1])
-        with c2:
-            if st.button("🚀 Continue to Dashboard", type="primary", use_container_width=True, key="enter_dashboard_btn"):
-                st.session_state["show_welcome_splash"] = False
-                st.rerun()
-        return
 
     # ══════════════════════════════════════════════════════════════════════════
     # PRIMARY SIDEBAR NAVIGATION (10 Consolidated Modules)

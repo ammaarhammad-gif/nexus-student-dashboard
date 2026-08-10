@@ -120,6 +120,17 @@ def is_setup_complete(user_id: int) -> bool:
     return get_setting(user_id, "is_setup_completed", "0") == "1"
 
 
+def has_completed_guide(user_id: int) -> bool:
+    """Check if the user has completed or skipped the initial full app guide."""
+    return get_setting(user_id, "has_completed_guide", "0") == "1"
+
+
+def set_completed_guide(user_id: int, completed: bool = True):
+    """Mark the initial full app guide as completed or skipped."""
+    set_setting(user_id, "has_completed_guide", "1" if completed else "0")
+    st.cache_data.clear()
+
+
 def save_user_profile(user_id: int, name: str, academic_year: str, board: str, class_name: str):
     """Save all user profile fields and mark setup as complete."""
     set_setting(user_id, "user_name", name)
