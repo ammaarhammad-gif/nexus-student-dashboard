@@ -12,7 +12,7 @@ from models import (
     log_focus_session_and_sync,
     get_focus_analytics,
     get_study_sessions,
-    get_planner_tasks
+    get_daily_plans
 )
 from styles import render_breadcrumbs
 
@@ -140,9 +140,9 @@ def render_focus_page(user_id: int):
                         update_topic_status = None
             with c_f2:
                 # Fetch pending tasks for today to optionally mark complete
-                tasks = get_planner_tasks(user_id, datetime.date.today().strftime("%Y-%m-%d"))
+                tasks = get_daily_plans(user_id, datetime.date.today().strftime("%Y-%m-%d"))
                 pending_tasks = [t for t in tasks if not t.get("is_completed")]
-                task_map = {f"#{t['id']}: {t['title']}": t['id'] for t in pending_tasks}
+                task_map = {f"#{t['id']}: {t.get('task') or t.get('title') or t.get('description', 'Task')}": t['id'] for t in pending_tasks}
                 sel_task_str = st.selectbox("Link to Planner Task (Optional)", ["None"] + list(task_map.keys()))
                 linked_task_id = task_map.get(sel_task_str)
 
