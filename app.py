@@ -52,6 +52,9 @@ def get_resolved_wallpaper(user_id=None):
                 if p["id"] == preset_id:
                     return p["url"], blur, opacity, preset_id
         return None, 0, 0.30, None
+    except Exception:
+        return None, 0, 0.30, None
+
 # Apply Theme Styling & Wallpaper (Syncs instantly with session state and DB)
 active_theme = "Dark"
 wp_url, wp_blur, wp_opacity, wp_preset_id = WALLPAPER_PRESETS[0]["url"], 0, 0.35, "cosmic_nebula"
