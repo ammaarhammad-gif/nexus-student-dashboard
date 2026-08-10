@@ -1766,15 +1766,11 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             .setup-hero h1 { font-size: 1.75rem !important; }
         }
 
-        /* ── Modern Sidebar Navigation Styles (Completely Hide Radio Circles) ── */
-        [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child,
-        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child,
-        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:nth-child(1),
-        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] input + div,
-        [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label div:first-child,
-        [data-testid="stSidebar"] [data-testid="stRadio"] input[type="radio"],
-        [data-testid="stSidebar"] [data-testid="stRadio"] label > div:first-child,
-        [data-testid="stSidebar"] [data-testid="stRadio"] label > span:first-child,
+        /* ── Modern Sidebar Navigation Styles (Hide Radio Circles & Preserve Text) ── */
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] input[type="radio"],
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] input[type="radio"] + div,
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] div:has(> input[type="radio"]),
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child:not(:has([data-testid="stMarkdownContainer"])),
         [data-testid="stSidebar"] [data-testid="stRadio"] svg {
             display: none !important;
             opacity: 0 !important;
@@ -1792,15 +1788,12 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
 
         [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"],
         [data-testid="stSidebar"] [data-testid="stRadio"] label {
-            padding: 9px 14px !important;
-            border-radius: 10px !important;
-            margin-bottom: 3px !important;
+            padding: 10px 14px !important;
+            border-radius: 12px !important;
+            margin-bottom: 4px !important;
             transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
             cursor: pointer !important;
             border: 1px solid transparent !important;
-            color: var(--nexus-text-sub) !important;
-            font-weight: 600 !important;
-            font-size: 0.92rem !important;
             display: flex !important;
             align-items: center !important;
             width: 100% !important;
@@ -1808,29 +1801,38 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         }
 
         [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
-            background: rgba(255, 255, 255, 0.05) !important;
-            color: var(--nexus-text-title) !important;
-            transform: translateX(3px) !important;
+            background: rgba(255, 255, 255, 0.06) !important;
+            transform: translateX(4px) !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked),
         [data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"],
         [data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"][aria-checked="true"] {
-            background: rgba(56, 189, 248, 0.12) !important;
-            border: 1px solid rgba(56, 189, 248, 0.32) !important;
+            background: rgba(56, 189, 248, 0.14) !important;
+            border: 1px solid rgba(56, 189, 248, 0.38) !important;
+            box-shadow: 0 0 16px rgba(56, 189, 248, 0.22) !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stMarkdownContainer"],
+        [data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p,
+        [data-testid="stSidebar"] [data-testid="stRadio"] label p {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            font-size: 0.94rem !important;
+            font-weight: 600 !important;
+            color: var(--nexus-text-title, #F8FAFC) !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p,
+        [data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"] p {
             color: #38BDF8 !important;
-            box-shadow: 0 0 14px rgba(56, 189, 248, 0.18) !important;
             font-weight: 700 !important;
         }
 
-        [data-testid="stSidebar"] [data-testid="stRadio"] label [data-testid="stMarkdownContainer"],
-        [data-testid="stSidebar"] [data-testid="stRadio"] label p {
-            margin: 0 !important;
-            color: inherit !important;
-            font-weight: inherit !important;
-            font-size: inherit !important;
-            width: 100% !important;
-        }
 
 
         /* ── Top Header Bar ── */

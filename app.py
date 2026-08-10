@@ -339,12 +339,11 @@ def main():
 
         render_html("""
             <style>
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] > div:first-child,
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] input[type="radio"],
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"] input + div,
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child,
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label > span:first-child,
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] svg {
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] input[type="radio"],
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] input[type="radio"] + div,
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] div:has(> input[type="radio"]),
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child:not(:has([data-testid="stMarkdownContainer"])),
+            section[data-testid="stSidebar"] [data-testid="stRadio"] svg {
                 display: none !important;
                 opacity: 0 !important;
                 width: 0 !important;
@@ -359,8 +358,8 @@ def main():
                 pointer-events: none !important;
             }
 
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"],
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label {
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"],
+            section[data-testid="stSidebar"] [data-testid="stRadio"] label {
                 padding: 10px 14px !important;
                 border-radius: 12px !important;
                 margin-bottom: 4px !important;
@@ -373,27 +372,41 @@ def main():
                 background: transparent !important;
             }
 
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
+            section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
                 background: rgba(255, 255, 255, 0.06) !important;
                 transform: translateX(4px) !important;
             }
 
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked),
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-baseweb="radio"][aria-checked="true"] {
+            section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked),
+            section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"],
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"][aria-checked="true"] {
                 background: rgba(56, 189, 248, 0.14) !important;
                 border: 1px solid rgba(56, 189, 248, 0.38) !important;
                 box-shadow: 0 0 16px rgba(56, 189, 248, 0.22) !important;
             }
 
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label p,
-            section[data-testid="stSidebar"] div[data-testid="stRadio"] label div[data-testid="stMarkdownContainer"] {
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stMarkdownContainer"],
+            section[data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p,
+            section[data-testid="stSidebar"] [data-testid="stRadio"] label p {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
                 font-size: 0.94rem !important;
                 font-weight: 600 !important;
+                color: var(--nexus-text-title, #F8FAFC) !important;
                 margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+            }
+
+            section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p,
+            section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"] p {
+                color: #38BDF8 !important;
+                font-weight: 700 !important;
             }
             </style>
         """)
+
 
         page_selection = st.radio(
             "Navigation Menu",
