@@ -134,9 +134,10 @@ def render_dashboard_page(user_id: int):
                 <div class="nexus-kpi-val" style="color: #10B981;">{stats.get('percent_completed', 0.0)}%</div>
                 <div class="nexus-kpi-sub">{stats.get('completed_topics', 0)} of {stats.get('total_topics', 0)} Topics</div>
             </div>
-        """, unsafe_allow_html=True)
+        """)
 
-    st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
+    render_html("<div style='margin-top: 18px;'></div>")
+
 
     # ══════════════════════════════════════════════════════════════════════════
     # ROW 3: COMPOSITE EXAM READINESS GAUGE & TODAY'S MISSION

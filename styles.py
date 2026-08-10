@@ -2480,13 +2480,12 @@ def render_section_header(badge_icon: str, badge_text: str, title: str, subtitle
     """, unsafe_allow_html=True)
 
 
-import textwrap
-
-def render_html(html_str: str):
-    """Safely renders HTML without Markdown 4-space indentation code block bug."""
+def render_html(html_str: str, *args, **kwargs):
+    """Safely renders HTML by stripping all line indentation to prevent Markdown 4-space code block interpretation."""
     if html_str:
-        cleaned = textwrap.dedent(str(html_str)).strip()
+        cleaned = "\n".join(line.strip() for line in str(html_str).strip().splitlines())
         st.markdown(cleaned, unsafe_allow_html=True)
+
 
 
 def render_top_header_bar(user_id: int, page_title: str, subtitle: str = None, breadcrumbs: list = None):
