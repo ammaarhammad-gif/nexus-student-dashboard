@@ -1527,6 +1527,80 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             background: rgba(56, 189, 248, 0.08) !important;
         }
 
+        /* ── NASA Mission Control & Today's Mission Cards ── */
+        .nexus-mission-card {
+            background: var(--nexus-card-bg) !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-left: 5px solid var(--nexus-accent) !important;
+            border-radius: 18px;
+            padding: 22px 26px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(16px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nexus-mission-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .nexus-mission-item:hover {
+            background: rgba(56, 189, 248, 0.08);
+            border-color: rgba(56, 189, 248, 0.25);
+            transform: translateX(4px);
+        }
+
+        .nexus-topic-shortcut-bar {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+
+        .nexus-topic-shortcut-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 8px;
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: #38BDF8 !important;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .nexus-topic-shortcut-btn:hover {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: #38BDF8;
+            color: #FFFFFF !important;
+        }
+
+        .nexus-stat-capsule {
+            background: var(--nexus-card-bg) !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-radius: 14px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(14px) !important;
+        }
+
         .nexus-card {
             background: var(--nexus-card-bg) !important;
             border: 1px solid var(--nexus-card-border) !important;

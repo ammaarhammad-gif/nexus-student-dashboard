@@ -230,30 +230,28 @@ def main():
         render_setup_wizard(user_id)
         return
 
+    # User Profile & Theme Context
     profile = get_user_profile(user_id)
     user_theme = get_user_theme(user_id)
-    st.session_state["theme_mode"] = user_theme
-    wp_url, wp_blur, wp_opacity, wp_preset_id = get_resolved_wallpaper(user_id)
-    apply_custom_css(user_theme, wallpaper_url=wp_url, wallpaper_blur=wp_blur, overlay_opacity=wp_opacity, preset_id=wp_preset_id)
     is_dark = (user_theme.strip().lower() == "dark")
 
-    # ── Fullscreen Welcome Splash Screen on Login / Signup / Setup ──
-    if st.session_state.get("show_welcome_splash"):
-        user_name = profile.get("name") or st.session_state.get("username", "Student")
-        class_name = profile.get("class_name", "Class 10")
-        board = profile.get("board", "CBSE")
-        
-        st.balloons()
-        render_welcome_splash_screen(user_name, class_name, board, theme=user_theme)
-        
-        c1, c2, c3 = st.columns([1, 2, 1])
+    # One-Time Welcome Splash Screen
+    if st.session_state.get("show_welcome_splash", False):
+        render_welcome_splash_screen(
+            user_name=profile.get("name", "Student"),
+            board=profile.get("board", "CBSE"),
+            class_name=profile.get("class_name", "Class 10")
+        )
+        c1, c2, c3 = st.columns([1, 1.5, 1])
         with c2:
             if st.button("🚀 Continue to Dashboard", type="primary", use_container_width=True, key="enter_dashboard_btn"):
                 st.session_state["show_welcome_splash"] = False
                 st.rerun()
         return
 
-    # Sidebar Navigation Menu
+    # ══════════════════════════════════════════════════════════════════════════
+    # PRIMARY SIDEBAR NAVIGATION (10 Consolidated Modules)
+    # ══════════════════════════════════════════════════════════════════════════
     with st.sidebar:
         card_bg = "linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))" if is_dark else "linear-gradient(135deg, #FFFFFF, #F1F5F9)"
         card_border = "rgba(56, 189, 248, 0.35)" if is_dark else "#CBD5E1"
@@ -263,25 +261,25 @@ def main():
         badge_border = "rgba(56, 189, 248, 0.3)" if is_dark else "rgba(79, 70, 229, 0.2)"
 
         st.markdown(f"""
-            <div style="text-align: center; padding: 10px 0 16px 0;">
-                <h2 style="font-family: 'Outfit', sans-serif; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 2rem; font-weight: 800; margin-bottom: 2px; letter-spacing: -0.02em;">⚡ NEXUS</h2>
-                <p style="font-family: 'Plus Jakarta Sans', sans-serif; color: {'#94A3B8' if is_dark else '#64748B'}; font-size: 0.95rem; font-weight: 500; margin: 0;">Syllabus & Exam Manager</p>
-                <div style="margin-top: 14px; background: {card_bg}; border: 1px solid {card_border}; padding: 12px 14px; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,{'0.3' if is_dark else '0.04'});">
-                    <strong style="font-family: 'Outfit', sans-serif; color: {name_color}; font-size: 1.25rem; font-weight: 700; display: block; margin-bottom: 3px;">{profile.get('name', 'Student')}</strong>
-                    <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; font-size: 0.8rem; font-weight: 600; padding: 2px 10px; border-radius: 12px; border: 1px solid {badge_border};">
-                        {profile.get('class_name', 'Class 10')} • {profile.get('board', 'ICSE')}
+            <div style="text-align: center; padding: 10px 0 14px 0;">
+                <h2 style="font-family: 'Outfit', sans-serif; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 1.9rem; font-weight: 800; margin-bottom: 2px; letter-spacing: -0.02em;">⚡ NEXUS</h2>
+                <p style="font-family: 'Plus Jakarta Sans', sans-serif; color: {'#94A3B8' if is_dark else '#64748B'}; font-size: 0.85rem; font-weight: 500; margin: 0;">Academic Command Center</p>
+                <div style="margin-top: 12px; background: {card_bg}; border: 1px solid {card_border}; padding: 10px 12px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,{'0.3' if is_dark else '0.04'});">
+                    <strong style="font-family: 'Outfit', sans-serif; color: {name_color}; font-size: 1.15rem; font-weight: 700; display: block; margin-bottom: 3px;">{profile.get('name', 'Student')}</strong>
+                    <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; font-size: 0.78rem; font-weight: 600; padding: 2px 10px; border-radius: 12px; border: 1px solid {badge_border};">
+                        {profile.get('class_name', 'Class 10')} • {profile.get('board', 'CBSE')}
                     </span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        
-        # ── Global Nexus Search Engine ──
+
+        # ── Quick Global Search Box in Sidebar ──
         st.markdown("""
-            <div style="font-size: 0.82rem; font-weight: 700; color: var(--nexus-text-title); margin-bottom: 6px; font-family: 'Outfit', sans-serif;">
-                🔍 Global Nexus Search
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--nexus-text-title); margin-bottom: 4px; font-family: 'Outfit', sans-serif;">
+                🔍 Quick Search
             </div>
         """, unsafe_allow_html=True)
-        search_query = st.text_input("Global Search", placeholder="Search topics, notes, mistakes...", key="global_search_input", label_visibility="collapsed")
+        search_query = st.text_input("Global Search", placeholder="Topics, notes, formulas...", key="global_search_input", label_visibility="collapsed")
         
         if search_query and len(search_query.strip()) >= 2:
             from models import global_nexus_search
@@ -290,49 +288,61 @@ def main():
             if total_hits == 0:
                 st.caption(f"No results for '{search_query}'")
             else:
-                with st.expander(f"✨ Search Results ({total_hits})", expanded=True):
-                    # Topics
-                    for t in results.get("topics", [])[:3]:
+                with st.expander(f"✨ Search Hits ({total_hits})", expanded=True):
+                    for t in results.get("topics", [])[:2]:
                         st.markdown(f"📚 **{t['topic_name']}** ({t['subject_name']})")
-                    # Notes
                     for n in results.get("notes", [])[:2]:
-                        st.markdown(f"📝 **{n['title']}** ({n.get('subject_name','')})")
-                    # Mistakes
+                        st.markdown(f"📝 **{n['title']}**")
+                    for f in results.get("formulas", [])[:2]:
+                        st.markdown(f"📐 **{f['title']}**")
                     for m in results.get("mistakes", [])[:2]:
-                        st.markdown(f"❌ **{m['question'][:30]}...** ({m.get('mistake_type')})")
-                    # Exams
-                    for e in results.get("exams", [])[:2]:
-                        st.markdown(f"⏰ **{e['exam_name']}** ({e.get('exam_date')})")
-                    # Tasks
-                    for tk in results.get("tasks", [])[:2]:
-                        st.markdown(f"🗓️ **{tk['description']}** ({tk.get('plan_date')})")
-        
-        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                        st.markdown(f"❌ **{m['question'][:24]}...**")
+
+        st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
         st.markdown("### Navigation")
+        
+        # 10 Primary Sidebar Modules
         page_options = [
             "🏠 Dashboard",
-            "🧠 AI Command Center",
-            "🎯 Quiz Engine",
-            "💡 Active Recall",
-            "❌ Mistake Vault",
-            "⏱️ Focus Studio",
-            "🧠 Revision Queue",
-            "📚 Syllabus Manager",
-            "🗓️ Study Planner",
-            "📊 Statistics",
-            "🔍 Global Search",
-            "🖼️ Wallpapers & Themes",
+            "📚 Learn",
+            "🗓️ Planner",
+            "🎯 Practice",
+            "🧠 Review",
+            "⏱️ Focus",
+            "🤖 Nexus AI",
+            "📊 Analytics",
+            "🔍 Search",
             "⚙️ Settings"
         ]
 
-        if "current_page" not in st.session_state or st.session_state["current_page"] not in page_options:
-            st.session_state["current_page"] = page_options[0]
+        # Normalize legacy or redirect page names
+        page_aliases = {
+            "📚 Syllabus Manager": "📚 Learn",
+            "📝 Notes": "📚 Learn",
+            "📐 Formula Vault": "📚 Learn",
+            "🗓️ Study Planner": "🗓️ Planner",
+            "🎯 Quiz Engine": "🎯 Practice",
+            "💡 Active Recall": "🎯 Practice",
+            "🧠 Revision Queue": "🧠 Review",
+            "❌ Mistake Vault": "🧠 Review",
+            "⏱️ Focus Studio": "⏱️ Focus",
+            "🧠 AI Command Center": "🤖 Nexus AI",
+            "📊 Statistics": "📊 Analytics",
+            "🔍 Global Search": "🔍 Search",
+            "🖼️ Wallpapers & Themes": "⚙️ Settings"
+        }
+
+        curr_page = st.session_state.get("current_page", "🏠 Dashboard")
+        curr_page = page_aliases.get(curr_page, curr_page)
+        if curr_page not in page_options:
+            curr_page = page_options[0]
+        st.session_state["current_page"] = curr_page
 
         nav_epoch = st.session_state.get("nav_epoch", 0)
-        current_nav_index = page_options.index(st.session_state["current_page"])
+        current_nav_index = page_options.index(curr_page)
 
         page_selection = st.radio(
-            "Go to page",
+            "Navigation Menu",
             page_options,
             index=current_nav_index,
             key=f"nav_selector_{nav_epoch}",
@@ -340,114 +350,51 @@ def main():
         )
         st.session_state["current_page"] = page_selection
         page = page_selection
-        
-        # ── Quick Wallpaper & Theme Switcher in Sidebar ──
-        st.markdown("---")
-        st.markdown("""
-            <div style="font-size: 0.85rem; font-weight: 700; color: var(--nexus-text-title); margin-bottom: 8px; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 6px;">
-                <span>🎨</span> <span>Quick Theme & Wallpaper</span>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        wp_cfg = get_user_wallpaper_config(user_id)
-        curr_mode = wp_cfg.get("mode", "none")
-        curr_preset = wp_cfg.get("preset_id")
-        
-        # Theme fast switch
-        c_th1, c_th2 = st.columns(2)
-        with c_th1:
-            if st.button("☀️ Light", use_container_width=True, type="primary" if not is_dark else "secondary", key="sb_light_btn"):
-                set_user_theme(user_id, "Light")
-                st.session_state["theme_mode"] = "Light"
-                st.rerun()
-        with c_th2:
-            if st.button("🌙 Dark", use_container_width=True, type="primary" if is_dark else "secondary", key="sb_dark_btn"):
-                set_user_theme(user_id, "Dark")
-                st.session_state["theme_mode"] = "Dark"
-                st.rerun()
-        
-        # Quick preset select
-        quick_options = ["Solid (No Wallpaper)"] + [p["name"] for p in WALLPAPER_PRESETS[:8]]
-        curr_selection_idx = 0
-        if curr_mode == "preset":
-            for i, p in enumerate(WALLPAPER_PRESETS[:8]):
-                if p["id"] == curr_preset:
-                    curr_selection_idx = i + 1
-                    break
-        
-        chosen_wp_label = st.selectbox(
-            "Quick Wallpaper:",
-            quick_options,
-            index=curr_selection_idx,
-            key="sb_quick_wp_select"
-        )
-        
-        if st.button("✨ Apply Quick Wallpaper", use_container_width=True, key="sb_apply_quick_wp_btn"):
-            if chosen_wp_label == "Solid (No Wallpaper)":
-                clear_user_wallpaper_config(user_id)
-                st.toast("Reset to solid theme!", icon="✨")
-            else:
-                target_preset = next((p for p in WALLPAPER_PRESETS if p["name"] == chosen_wp_label), None)
-                if target_preset:
-                    set_user_wallpaper_config(user_id, mode="preset", preset_id=target_preset["id"], blur=wp_cfg.get("blur", 0), opacity=0.30)
-                    set_user_theme(user_id, "Dark")
-                    st.session_state["theme_mode"] = "Dark"
-                    st.toast(f"Applied {target_preset['name']} in Dark Glassmorphism!", icon="🖼️")
-            st.rerun()
-
-        if st.button("🎨 Open Full Wallpaper Studio ➔", use_container_width=True, key="sb_open_studio_btn"):
-            st.session_state["current_page"] = "🖼️ Wallpapers & Themes"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
 
         st.markdown("---")
         if st.button("🚪 Log Out", use_container_width=True):
             clear_session_param()
-            for key in ["user_id", "username", "current_page", "nav_epoch"]:
+            for key in ["user_id", "username", "current_page", "nav_epoch", "authenticated"]:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
-            
+
         footer_border = "rgba(255,255,255,0.08)" if is_dark else "#E2E8F0"
         footer_name_color = "#FFFFFF" if is_dark else "#0F172A"
         st.markdown(f"""
-            <div style="margin-top: 18px; text-align: center; border-top: 1px solid {footer_border}; padding-top: 14px;">
-                <p style="color: #64748B; font-size: 0.85rem; margin: 0; font-weight: 500;">Crafted with ❤️ by</p>
-                <h4 style="color: {footer_name_color}; font-size: 1.1rem; font-weight: 700; margin: 2px 0 6px 0; font-family: 'Outfit', sans-serif;">Ammaar Akhtar</h4>
-                <span style="display: inline-block; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 0.78rem; font-weight: 600; background: {'rgba(56, 189, 248, 0.1)' if is_dark else 'rgba(79, 70, 229, 0.08)'}; padding: 3px 10px; border-radius: 12px; border: 1px solid {'rgba(56, 189, 248, 0.2)' if is_dark else 'rgba(79, 70, 229, 0.15)'};">
+            <div style="margin-top: 14px; text-align: center; border-top: 1px solid {footer_border}; padding-top: 10px;">
+                <p style="color: #64748B; font-size: 0.8rem; margin: 0; font-weight: 500;">Crafted with ❤️ by</p>
+                <h4 style="color: {footer_name_color}; font-size: 1.05rem; font-weight: 700; margin: 2px 0 4px 0; font-family: 'Outfit', sans-serif;">Ammaar Akhtar</h4>
+                <span style="display: inline-block; color: {'#38BDF8' if is_dark else '#4F46E5'}; font-size: 0.75rem; font-weight: 600; background: {'rgba(56, 189, 248, 0.1)' if is_dark else 'rgba(79, 70, 229, 0.08)'}; padding: 2px 8px; border-radius: 10px;">
                     🌐 Cloud Sync Active • Student OS
                 </span>
             </div>
         """, unsafe_allow_html=True)
 
-
-    # Page Router
+    # ══════════════════════════════════════════════════════════════════════════
+    # PAGE ROUTER (10 Clean Modules)
+    # ══════════════════════════════════════════════════════════════════════════
     if page == "🏠 Dashboard":
         render_dashboard_page(user_id)
-    elif page == "🧠 AI Command Center":
-        render_ai_command_center_page(user_id)
-    elif page == "🎯 Quiz Engine":
-        render_quiz_page(user_id)
-    elif page == "💡 Active Recall":
-        render_active_recall_page(user_id)
-    elif page == "❌ Mistake Vault":
-        render_mistakes_page(user_id)
-    elif page == "⏱️ Focus Studio":
-        render_focus_page(user_id)
-    elif page == "🧠 Revision Queue":
-        render_revisions_page(user_id)
-    elif page == "📚 Syllabus Manager":
-        render_syllabus_page(user_id)
-    elif page == "🗓️ Study Planner":
+    elif page == "📚 Learn":
+        render_learn_page(user_id)
+    elif page == "🗓️ Planner":
         render_planner_page(user_id)
-    elif page == "📊 Statistics":
+    elif page == "🎯 Practice":
+        render_practice_page(user_id)
+    elif page == "🧠 Review":
+        render_review_page(user_id)
+    elif page == "⏱️ Focus":
+        render_focus_page(user_id)
+    elif page == "🤖 Nexus AI":
+        render_ai_command_center_page(user_id)
+    elif page == "📊 Analytics":
         render_statistics_page(user_id)
-    elif page == "🔍 Global Search":
+    elif page == "🔍 Search":
         render_search_page(user_id)
-    elif page == "🖼️ Wallpapers & Themes":
-        render_wallpapers_page(user_id)
     elif page == "⚙️ Settings":
         render_settings_page(user_id)
+
 
 if __name__ == "__main__":
     main()

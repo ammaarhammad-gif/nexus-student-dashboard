@@ -1,20 +1,26 @@
 """
-dashboard.py — Main dashboard page.
+dashboard.py — Nexus Academic Command Center Dashboard.
 
-Shows: Welcome banner, overall stats, donut chart, per-subject breakdown,
-and an exam countdown section.
+Core Design Philosophy:
+PLAN → LEARN → PRACTICE → REVIEW → FOCUS → MEASURE
+
+Answers: "What should I study right now?"
 """
 
 import streamlit as st
-import plotly.graph_objects as go
 import datetime
+import plotly.graph_objects as go
 from models import (
     get_overall_stats, get_user_profile,
     get_all_subjects_with_stats, get_active_upcoming_terms,
-    get_due_revisions, complete_revision, get_user_theme
+    get_user_theme, set_user_theme,
+    get_user_xp_summary, get_top_nexus_priorities,
+    calculate_exam_readiness_score, get_daily_plans,
+    get_revision_queue, get_unreviewed_mistakes_for_quiz,
+    get_recent_activity_stream, get_weak_areas
 )
 from preloaded_syllabi import preload_standard_syllabus
-from styles import render_header, render_metric_card, render_cinematic_welcome_banner
+from styles import render_metric_card
 
 
 def render_dashboard_page(user_id: int):
@@ -22,418 +28,405 @@ def render_dashboard_page(user_id: int):
     user_name = profile.get("name", "Student")
     class_name = profile.get("class_name", "Class 10")
     board = profile.get("board", "CBSE")
-    class_info = f"{class_name} • {board} • {profile.get('academic_year', '')}"
-
     user_theme = get_user_theme(user_id)
     is_dark = (user_theme.strip().lower() == "dark")
 
-    # Fetch overall stats and all subjects with stats in 2 super-fast indexed queries
+    # Fetch stats and auto-preload if fresh
     stats = get_overall_stats(user_id)
     subjects_with_stats = get_all_subjects_with_stats(user_id)
-
-    # Auto-load official board syllabus if user has no subjects
     if not subjects_with_stats:
-        board = profile.get("board", "CBSE")
-        class_name = profile.get("class_name", "Class 10")
-        loaded = preload_standard_syllabus(user_id, board, class_name)
-        if loaded:
-            st.rerun()
+        preload_standard_syllabus(user_id, board, class_name)
         stats = get_overall_stats(user_id)
         subjects_with_stats = get_all_subjects_with_stats(user_id)
 
-
-    # ── Ultra-Smooth Cinematic Animated Welcome Hero ──
-    render_cinematic_welcome_banner(user_name, class_name, board, theme=user_theme)
-
-    # ── Student OS Gamification & Streak Banner ──
-    from models import get_user_xp_summary, get_top_nexus_priorities, calculate_exam_readiness_score
     xp_info = get_user_xp_summary(user_id)
-    
-    st.markdown(f"""
-        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 14px; padding: 14px 20px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; backdrop-filter: blur(14px);">
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <div style="background: linear-gradient(135deg, #38BDF8, #0284C7); width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 800; color: #FFFFFF; box-shadow: 0 4px 14px rgba(56,189,248,0.3);">
-                    {xp_info['level']}
-                </div>
-                <div>
-                    <div style="font-size: 0.78rem; font-weight: 700; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.05em;">
-                        NEXUS RANK • {xp_info['title']}
-                    </div>
-                    <div style="font-size: 1.1rem; font-weight: 800; color: var(--nexus-text-title);">
-                        {xp_info['total_xp']} <span style="font-size: 0.8rem; color: #94A3B8;">/ {xp_info['next_xp']} XP</span>
-                    </div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <div style="text-align: right;">
-                    <div style="font-size: 0.78rem; font-weight: 700; color: #F97316; text-transform: uppercase;">
-                        🔥 STUDY STREAK
-                    </div>
-                    <div style="font-size: 1.15rem; font-weight: 800; color: var(--nexus-text-title);">
-                        {xp_info['streak']} Day{'s' if xp_info['streak'] != 1 else ''} <span style="font-size: 0.78rem; color: var(--nexus-text-sub);">(Best: {xp_info['longest_streak']}d)</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    readiness = calculate_exam_readiness_score(user_id)
+    priorities = get_top_nexus_priorities(user_id, limit=3)
+    queue = get_revision_queue(user_id)
+    unreviewed_mistakes = get_unreviewed_mistakes_for_quiz(user_id, limit=10)
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    today_plans = get_daily_plans(user_id, today_str)
 
-    # ── Quick Hub Action Bar ──
-    c_act0, c_act1, c_act2, c_act3, c_act4, c_act5, c_act6 = st.columns(7)
-    with c_act0:
-        if st.button("🧠 Nexus AI", use_container_width=True, type="primary", key="dash_go_ai_btn"):
-            st.session_state["current_page"] = "🧠 AI Command Center"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
-    with c_act1:
-        if st.button("🎯 Quiz Engine", use_container_width=True, key="dash_go_quiz_btn"):
-            st.session_state["current_page"] = "🎯 Quiz Engine"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
-    with c_act2:
-        if st.button("💡 Active Recall", use_container_width=True, key="dash_go_recall_btn"):
-            st.session_state["current_page"] = "💡 Active Recall"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
-    with c_act3:
-        if st.button("❌ Mistake Vault", use_container_width=True, key="dash_go_mistakes_btn"):
-            st.session_state["current_page"] = "❌ Mistake Vault"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
-    with c_act4:
-        if st.button("⏱️ Focus Studio", use_container_width=True, key="dash_go_focus_btn"):
-            st.session_state["current_page"] = "⏱️ Focus Studio"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
-    with c_act5:
-        if st.button("🧠 Revisions", use_container_width=True, key="dash_go_revisions_btn"):
-            st.session_state["current_page"] = "🧠 Revision Queue"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
-    with c_act6:
-        if st.button("🗓️ Planner", use_container_width=True, key="dash_go_planner_btn"):
-            st.session_state["current_page"] = "🗓️ Study Planner"
-            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-            st.rerun()
+    # ══════════════════════════════════════════════════════════════════════════
+    # 1. TOP HEADER (Level, Rank, XP Progress, Compact Theme Switch, Logout)
+    # ══════════════════════════════════════════════════════════════════════════
+    col_hdr_left, col_hdr_right = st.columns([3, 1.2])
 
-    # ── Top Metric Cards ──
-    m1, m2, m3, m4, m5 = st.columns(5)
-    with m1:
-        render_metric_card("Subjects", stats["total_subjects"], "#6366F1", theme=user_theme)
-    with m2:
-        render_metric_card("Chapters", stats["total_chapters"], "#8B5CF6", theme=user_theme)
-    with m3:
-        render_metric_card("Topics", stats["total_topics"], "#A855F7", theme=user_theme)
-    with m4:
-        render_metric_card("Completed", stats["completed"], "#22C55E",
-                          f"of {stats['total_topics']}", theme=user_theme)
-    with m5:
-        render_metric_card("Progress", f"{stats['percent_completed']}%", "#6366F1",
-                          f"{stats['remaining']} remaining", theme=user_theme)
-
-    st.markdown("---")
-
-    # ── NEXUS SMART PRIORITIES & EXAM READINESS ENGINE ──
-    c_prio, c_ready = st.columns([1.3, 1.2])
-
-    with c_prio:
-        st.subheader("🔴 Nexus Smart Priorities")
-        st.caption("Dynamically scored based on exam proximity, understanding level, and overdue status.")
-        
-        priorities = get_top_nexus_priorities(user_id, limit=4)
-        if not priorities:
-            st.success("🎉 Outstanding! No critical or high priority bottlenecks found.")
-        else:
-            for p in priorities:
-                reasons_str = " • ".join(p["reasons"])
-                st.markdown(f"""
-                    <div class="priority-item-card" style="border-left-color: {p['badge_color']};">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                <span class="nexus-pill-{p['tier'].lower()}">{p['tier_icon']} {p['tier']}</span>
-                                <span style="font-size: 0.8rem; font-weight: 700; color: {p.get('subject_color', '#38BDF8')};">{p['subject_name']}</span>
-                            </div>
-                            <span style="font-size: 0.78rem; font-weight: 700; color: {p['badge_color']};">Score: {p['score']}</span>
-                        </div>
-                        <div style="font-size: 1.02rem; font-weight: 700; color: var(--nexus-text-title);">
-                            {p['topic_name']}
-                        </div>
-                        <div style="font-size: 0.8rem; color: var(--nexus-text-sub); margin-top: 4px;">
-                            {p['chapter_name']} {f'• <span style="color: {p["badge_color"]};">{reasons_str}</span>' if reasons_str else ''}
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-    with c_ready:
-        st.subheader("🎓 Exam Readiness Score")
-        
-        # Term selector
-        active_terms = get_active_upcoming_terms(user_id)
-        term_options = {"Overall (All Terms)": None}
-        for t in active_terms:
-            term_options[f"{t['name']} (Exam: {t.get('exam_date', 'N/A')})"] = t["id"]
-            
-        sel_term_label = st.selectbox("Exam Term Filter", list(term_options.keys()), key="dash_term_select", label_visibility="collapsed")
-        sel_term_id = term_options[sel_term_label]
-        
-        readiness = calculate_exam_readiness_score(user_id, term_id=sel_term_id)
-        r_score = readiness["readiness_score"]
-        r_color = "#22C55E" if r_score >= 80 else ("#38BDF8" if r_score >= 60 else ("#F59E0B" if r_score >= 40 else "#EF4444"))
-        
+    with col_hdr_left:
+        xp_pct = min(100, round((xp_info['total_xp'] / max(1, xp_info['next_xp'])) * 100))
         st.markdown(f"""
-            <div class="readiness-container" style="text-align: center; padding: 18px 16px;">
-                <div style="font-size: 0.78rem; font-weight: 700; color: {r_color}; text-transform: uppercase; letter-spacing: 0.05em;">
-                    COMPOSITE PREPAREDNESS INDEX
-                </div>
-                <div class="readiness-score-big" style="margin: 4px 0; color: {r_color};">
-                    {r_score} <span style="font-size: 1.4rem; color: var(--nexus-text-sub);">/ 100</span>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 12px 0 10px 0; font-size: 0.82rem; text-align: left;">
-                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
-                        📚 <strong>Syllabus:</strong> {readiness['syllabus_pct']}%
+            <div class="nexus-stat-capsule" style="margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="background: linear-gradient(135deg, #38BDF8, #0284C7); width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 800; color: #FFFFFF; box-shadow: 0 4px 14px rgba(56,189,248,0.3);">
+                        {xp_info['level']}
                     </div>
-                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
-                        🧠 <strong>Understand:</strong> {readiness['understanding_pct']}%
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 0.78rem; font-weight: 700; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.05em;">
+                                RANK: {xp_info['title']}
+                            </span>
+                            <span style="font-size: 0.75rem; color: #F97316; font-weight: 700;">
+                                🔥 {xp_info['streak']}d Streak
+                            </span>
+                        </div>
+                        <div style="font-size: 0.95rem; font-weight: 800; color: var(--nexus-text-title);">
+                            {xp_info['total_xp']} <span style="font-size: 0.78rem; color: var(--nexus-text-sub);">/ {xp_info['next_xp']} XP ({xp_pct}%)</span>
+                        </div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
-                        🔄 <strong>Revisions:</strong> {readiness['revision_pct']}%
-                    </div>
-                    <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
-                        ❌ <strong>Mistakes:</strong> {readiness.get('factors', {}).get('mistake_resolution', 100)}%
-                    </div>
-                </div>
-                <div style="text-align: left; font-size: 0.8rem; color: var(--nexus-text-sub); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
-                    <strong style="color: #38BDF8;">⚡ Actionable Next Step:</strong><br/>
-                    {readiness['recommendations'][0] if readiness['recommendations'] else 'Keep up your daily study momentum!'}
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("---")
+    with col_hdr_right:
+        c_th_btn, c_lo_btn = st.columns([1.2, 1])
+        with c_th_btn:
+            theme_target = "Light" if is_dark else "Dark"
+            theme_icon = "☀️" if is_dark else "🌙"
+            if st.button(f"{theme_icon} {theme_target}", key="dash_compact_theme_toggle", use_container_width=True):
+                set_user_theme(user_id, theme_target)
+                st.session_state["theme_mode"] = theme_target
+                st.rerun()
+        with c_lo_btn:
+            if st.button("🚪 Logout", key="dash_logout_btn", use_container_width=True):
+                for k in ["authenticated", "user_id", "username", "session_token"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
 
-    # ── Main: Donut Chart + Details ──
-    col_chart, col_details = st.columns([3, 2])
+    # ══════════════════════════════════════════════════════════════════════════
+    # 2. TIME-AWARE GREETING & TODAY'S MISSION
+    # ══════════════════════════════════════════════════════════════════════════
+    current_hour = datetime.datetime.now().hour
+    if current_hour < 12:
+        time_greeting = "Good morning"
+    elif current_hour < 17:
+        time_greeting = "Good afternoon"
+    else:
+        time_greeting = "Good evening"
 
-    with col_chart:
-        st.subheader("📊 Overall Syllabus Progress")
-        if stats["total_topics"] > 0:
-            fig = go.Figure(data=[go.Pie(
-                labels=["Completed", "Revision Done", "In Progress", "Not Started"],
-                values=[
-                    stats["completed"] - stats["revision_done"],
-                    stats["revision_done"],
-                    stats["in_progress"],
-                    stats["not_started"]
-                ],
-                hole=0.65,
-                marker=dict(colors=["#22C55E", "#0284C7", "#F59E0B", "#94A3B8" if not is_dark else "#475569"]),
-                hoverinfo="label+percent+value",
-                textinfo="percent",
-                textfont=dict(size=13, color="#FFFFFF" if is_dark else "#0F172A")
-            )])
+    st.markdown(f"""
+        <div style="margin-bottom: 16px;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;">
+                ACADEMIC COMMAND CENTER • {board} {class_name}
+            </div>
+            <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 800; color: var(--nexus-text-title); margin: 0;">
+                {time_greeting}, {user_name} 👋 Ready for your next mission?
+            </h1>
+        </div>
+    """, unsafe_allow_html=True)
 
-            text_color = "#FFFFFF" if is_dark else "#0F172A"
-            sub_text_color = "#94A3B8" if is_dark else "#64748B"
-            legend_color = "#CBD5E1" if is_dark else "#334155"
+    # ══════════════════════════════════════════════════════════════════════════
+    # 3. TODAY'S MISSION (Primary Decision Engine)
+    # ══════════════════════════════════════════════════════════════════════════
+    top_priority_topic = priorities[0] if priorities else None
+    overdue_count = len(queue.get("overdue", []))
+    due_today_count = len(queue.get("due_today", []))
+    pending_tasks_count = len([t for t in today_plans if not t["is_completed"]])
 
-            fig.update_layout(
-                annotations=[dict(
-                    text=f"<b>{stats['percent_completed']}%</b><br>"
-                         f"<span style='font-size:12px;color:{sub_text_color};'>"
-                         f"{stats['completed']}/{stats['total_topics']}</span>",
-                    x=0.5, y=0.5, font_size=28, font_color=text_color,
-                    showarrow=False
-                )],
-                showlegend=True,
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=-0.2,
-                    xanchor="center", x=0.5,
-                    font=dict(color=legend_color)
-                ),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color=text_color),
-                margin=dict(t=10, b=40, l=10, r=10),
-                height=340
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    st.markdown("""
+        <div class="nexus-mission-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <div style="font-size: 0.78rem; font-weight: 700; color: var(--nexus-accent); text-transform: uppercase; letter-spacing: 0.08em;">
+                        ⚡ STRATEGIC FOCUS
+                    </div>
+                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--nexus-text-title); margin: 2px 0 0 0;">
+                        Today's Mission
+                    </h2>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--nexus-text-sub);">
+                    Curated actions for maximum retention & score acceleration
+                </div>
+            </div>
+    """, unsafe_allow_html=True)
+
+    # Mission items list
+    mission_items = []
+    if overdue_count > 0:
+        mission_items.append((
+            "🔴 Overdue Spaced Revisions",
+            f"{overdue_count} topics have crossed their optimal retention threshold",
+            "#EF4444",
+            "🧠 Review",
+            "review_queue"
+        ))
+    if top_priority_topic:
+        mission_items.append((
+            f"🎯 Master Priority: {top_priority_topic['topic_name']}",
+            f"{top_priority_topic['subject_name']} › {top_priority_topic['chapter_name']} ({' • '.join(top_priority_topic['reasons'])})",
+            "#38BDF8",
+            "⏱️ Focus",
+            "focus_top"
+        ))
+    if len(unreviewed_mistakes) > 0:
+        mission_items.append((
+            "❌ Eliminate Recurring Errors",
+            f"{len(unreviewed_mistakes)} unreviewed mistakes awaiting targeted re-testing in Mistake Re-Quiz",
+            "#F97316",
+            "🎯 Practice",
+            "practice_mistakes"
+        ))
+    if pending_tasks_count > 0:
+        mission_items.append((
+            "📋 Daily Study Tasks",
+            f"{pending_tasks_count} study tasks remaining on today's planner schedule",
+            "#22C55E",
+            "🗓️ Planner",
+            "planner_daily"
+        ))
+
+    if not mission_items:
+        mission_items.append((
+            "✨ Perfect Pace!",
+            "All revisions caught up and daily milestones achieved. Explore new syllabus topics in Learn Hub.",
+            "#22C55E",
+            "📚 Learn",
+            "learn_hub"
+        ))
+
+    for m_title, m_desc, m_col, m_page, m_key in mission_items[:4]:
+        st.markdown(f"""
+            <div class="nexus-mission-item">
+                <div>
+                    <strong style="color: {m_col}; font-size: 0.95rem;">{m_title}</strong>
+                    <div style="font-size: 0.82rem; color: var(--nexus-text-sub); margin-top: 2px;">{m_desc}</div>
+                </div>
+                <div>
+                    <span style="background: rgba(56, 189, 248, 0.12); color: #38BDF8; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 12px;">
+                        {m_page}
+                    </span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Primary Action CTA Button
+    c_cta1, c_cta2 = st.columns([2, 1])
+    with c_cta1:
+        if top_priority_topic:
+            btn_txt = f"🚀 Launch Session: {top_priority_topic['topic_name']} ({top_priority_topic['subject_name']})"
         else:
-            st.info("📝 No topics yet. Go to **📚 Syllabus Manager** to add your subjects and topics!")
+            btn_txt = "🚀 Start Recommended Focus Session"
 
-    with col_details:
-        st.subheader("🎯 Progress Breakdown")
+        if st.button(btn_txt, type="primary", use_container_width=True, key="dash_primary_mission_launch_btn"):
+            if top_priority_topic:
+                st.session_state["focus_target_topic_id"] = top_priority_topic["topic_id"]
+            st.session_state["current_page"] = "⏱️ Focus"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+            st.rerun()
 
-        if stats["total_topics"] > 0:
-            st.markdown(f"🟢 **Completed:** {stats['completed']} / {stats['total_topics']}")
-            st.progress(stats["completed"] / stats["total_topics"])
+    with c_cta2:
+        if st.button("🤖 Consult Nexus AI Daily Blueprint", use_container_width=True, key="dash_mission_ai_btn"):
+            st.session_state["current_page"] = "🤖 Nexus AI"
+            st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+            st.rerun()
 
-            st.markdown(f"🔵 **Revision Done:** {stats['revision_done']}")
-            st.progress(stats["revision_done"] / stats["total_topics"])
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
 
-            st.markdown(f"🟡 **In Progress:** {stats['in_progress']}")
-            st.progress(stats["in_progress"] / stats["total_topics"])
+    # ══════════════════════════════════════════════════════════════════════════
+    # 4. EXAM READINESS & EXAM COUNTDOWN (2 Columns)
+    # ══════════════════════════════════════════════════════════════════════════
+    col_ready, col_count = st.columns([1.2, 1])
 
-            st.markdown(f"⚪ **Not Started:** {stats['not_started']}")
-            st.progress(stats["not_started"] / stats["total_topics"])
+    with col_ready:
+        st.subheader("🎓 Exam Readiness Score")
+        r_score = readiness["readiness_score"]
+        r_color = "#22C55E" if r_score >= 80 else ("#38BDF8" if r_score >= 60 else ("#F59E0B" if r_score >= 40 else "#EF4444"))
 
-            st.markdown(f"🧠 **Avg Understanding:** {stats['avg_understanding']} / 5")
+        st.markdown(f"""
+            <div class="readiness-container" style="text-align: center; padding: 20px 18px; border-top: 4px solid {r_color};">
+                <div style="font-size: 0.78rem; font-weight: 700; color: {r_color}; text-transform: uppercase; letter-spacing: 0.06em;">
+                    COMPOSITE PREPAREDNESS INDEX
+                </div>
+                <div class="readiness-score-big" style="margin: 6px 0; color: {r_color};">
+                    {r_score} <span style="font-size: 1.4rem; color: var(--nexus-text-sub);">/ 100</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 10px 0; font-size: 0.82rem; text-align: left;">
+                    <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px;">
+                        📚 <strong>Syllabus:</strong> {readiness['syllabus_pct']}%
+                    </div>
+                    <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px;">
+                        🧠 <strong>Mastery:</strong> {readiness['understanding_pct']}%
+                    </div>
+                    <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px;">
+                        🔄 <strong>Revisions:</strong> {readiness['revision_pct']}%
+                    </div>
+                    <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px;">
+                        ❌ <strong>Mistakes:</strong> {readiness.get('factors', {}).get('mistake_resolution', 100)}%
+                    </div>
+                </div>
+                <div style="text-align: left; font-size: 0.82rem; color: var(--nexus-text-sub); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+                    <strong style="color: #38BDF8;">⚡ Strategic Focus:</strong> {readiness['recommendations'][0] if readiness['recommendations'] else 'Maintain active daily review velocity.'}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col_count:
+        st.subheader("⏳ Upcoming Exams")
+        active_terms = get_active_upcoming_terms(user_id)
+        if not active_terms:
+            st.markdown("""
+                <div class="readiness-container" style="text-align: center; padding: 28px 16px;">
+                    <div style="font-size: 1.8rem; margin-bottom: 6px;">📅</div>
+                    <strong style="color: var(--nexus-text-title); font-size: 1.0rem;">No Upcoming Exams Configured</strong>
+                    <div style="font-size: 0.8rem; color: var(--nexus-text-sub); margin: 6px 0 14px 0;">
+                        Add your Term & Board exam dates in Settings to unlock dynamic countdown clocks.
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("➕ Configure Exam Dates", use_container_width=True, key="dash_add_exam_btn"):
+                st.session_state["current_page"] = "⚙️ Settings"
+                st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+                st.rerun()
         else:
-            st.caption("Add topics to see progress here.")
+            for t in active_terms[:3]:
+                days = t["days_remaining"]
+                badge_bg = "#EF4444" if days <= 7 else ("#F97316" if days <= 21 else "#38BDF8")
+                st.markdown(f"""
+                    <div class="priority-item-card" style="border-left-color: {badge_bg}; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 1.05rem; color: var(--nexus-text-title);">
+                                    {t['name']}
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--nexus-text-sub);">
+                                    📅 {t['exam_date']}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size: 1.4rem; font-weight: 800; color: {badge_bg};">
+                                    {days}
+                                </span>
+                                <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Days Left</div>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
 
-    st.markdown("---")
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
-    # ── Exam Countdown ──
-    _render_exam_countdown(user_id, user_theme)
+    # ══════════════════════════════════════════════════════════════════════════
+    # 5. SMART PRIORITY (Top 3 Topics with Direct Actions) & TODAY'S PROGRESS
+    # ══════════════════════════════════════════════════════════════════════════
+    col_prio_list, col_today_strip = st.columns([1.4, 1])
 
-    st.markdown("---")
-
-    # ── Revision Reminders ──
-    _render_revision_reminders(user_id)
-
-    st.markdown("---")
-
-    # ── Subject-wise Breakdown (Batch Rendered) ──
-    st.subheader("📚 Subject Summary")
-
-    if subjects_with_stats:
-        # Create rows of 3 columns
-        for row_start in range(0, len(subjects_with_stats), 3):
-            row_subjects = subjects_with_stats[row_start:row_start + 3]
-            cols = st.columns(3)
-            for idx, sub in enumerate(row_subjects):
-                pct = sub["percent_completed"]
-                color = sub["color"]
-
-                with cols[idx]:
+    with col_prio_list:
+        st.subheader("🎯 Smart Priorities (Top 3)")
+        if not priorities:
+            st.success("🎉 Outstanding! No critical syllabus bottlenecks detected.")
+        else:
+            for p in priorities[:3]:
+                reasons_str = " • ".join(p["reasons"])
+                c_p_card, c_p_act = st.columns([4, 1.2])
+                with c_p_card:
                     st.markdown(f"""
-                        <div class="nexus-card" style="border-left: 4px solid {color};">
-                            <h4 style="margin: 0;">{sub['name']}</h4>
-                            <p style="font-size: 0.85rem; margin: 4px 0 8px 0;">
-                                {sub['total_chapters']} Chapters • {sub['total_topics']} Topics
-                            </p>
-                            <h3 style="color: {color}; margin: 0;">{pct}% Done</h3>
-                            <p style="font-size: 0.82rem; margin: 4px 0 0 0;">
-                                {sub['completed']} of {sub['total_topics']} completed
-                                {f' • Avg: {sub["avg_understanding"]}/5' if sub['total_topics'] > 0 else ''}
-                            </p>
+                        <div class="priority-item-card" style="border-left-color: {p['badge_color']}; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <span class="nexus-pill-{p['tier'].lower()}">{p['tier_icon']} {p['tier']}</span>
+                                    <span style="font-size: 0.8rem; font-weight: 700; color: {p.get('subject_color', '#38BDF8')};">{p['subject_name']}</span>
+                                </div>
+                                <span style="font-size: 0.75rem; font-weight: 700; color: {p['badge_color']};">Score: {p['score']}</span>
+                            </div>
+                            <div style="font-size: 1.02rem; font-weight: 700; color: var(--nexus-text-title);">
+                                {p['topic_name']}
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--nexus-text-sub); margin-top: 2px;">
+                                {p['chapter_name']} {f'• <span style="color: {p["badge_color"]};">{reasons_str}</span>' if reasons_str else ''}
+                            </div>
                         </div>
                     """, unsafe_allow_html=True)
-    else:
-        board = profile.get("board", "CBSE")
-        class_name = profile.get("class_name", "Class 10")
-        with st.spinner(f"⚡ Auto-loading official {board} ({class_name}) syllabus..."):
-            loaded = preload_standard_syllabus(user_id, board, class_name)
-            if loaded:
-                st.toast(f"✅ Official {board} ({class_name}) syllabus loaded!", icon="🚀")
-                st.rerun()
+                with c_p_act:
+                    st.write("")
+                    if st.button("⏱️ Focus", key=f"dash_prio_foc_{p['topic_id']}", use_container_width=True):
+                        st.session_state["focus_target_topic_id"] = p["topic_id"]
+                        st.session_state["current_page"] = "⏱️ Focus"
+                        st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+                        st.rerun()
 
+    with col_today_strip:
+        st.subheader("📊 Today's Momentum")
+        st.markdown(f"""
+            <div class="readiness-container" style="padding: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #38BDF8;">
+                        <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Tasks Done</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #38BDF8;">{len([t for t in today_plans if t['is_completed']])}/{len(today_plans)}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #F97316;">
+                        <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Streak</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #F97316;">{xp_info['streak']} Days</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #22C55E;">
+                        <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Syllabus</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #22C55E;">{stats['percent_completed']}%</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; border-left: 3px solid #A855F7;">
+                        <div style="font-size: 0.72rem; color: var(--nexus-text-sub); text-transform: uppercase;">Nexus Level</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #A855F7;">Lvl {xp_info['level']}</div>
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-def _render_exam_countdown(user_id: int, theme: str = "Light"):
-    """Show a countdown to the next upcoming active exam (filters out completed/already-done terms)."""
-    terms = get_active_upcoming_terms(user_id)
-    if not terms:
-        return
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
-    today = datetime.date.today()
-    upcoming = []
+    # ══════════════════════════════════════════════════════════════════════════
+    # 6. WEAK AREAS & RECENT ACTIVITY (2 Columns)
+    # ══════════════════════════════════════════════════════════════════════════
+    col_weak, col_rec = st.columns([1.2, 1.2])
 
-    for term in terms:
-        try:
-            exam_date = datetime.datetime.strptime(term["exam_date"], "%Y-%m-%d").date()
-            days_left = (exam_date - today).days
-            if days_left >= 0:
-                upcoming.append({
-                    "name": term["name"],
-                    "date": exam_date,
-                    "days_left": days_left
-                })
-        except (ValueError, TypeError):
-            continue
+    with col_weak:
+        st.subheader("⚠️ Weak Areas Needing Remediation")
+        weak_list = get_weak_areas(user_id, limit=4)
+        if not weak_list:
+            st.info("✨ No weak areas recorded yet. Complete quizzes or rate topic understanding in Learn Hub.")
+        else:
+            for w in weak_list:
+                und_stars = "⭐" * max(1, min(5, w.get("understanding", 1)))
+                m_count = w.get("mistake_count", 0)
+                m_str = f" • <span style='color: #EF4444;'>{m_count} Mistake{'s' if m_count!=1 else ''}</span>" if m_count > 0 else ""
+                
+                st.markdown(f"""
+                    <div class="priority-item-card" style="border-left-color: #EF4444; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-weight: 700; color: var(--nexus-text-title); font-size: 0.95rem;">{w['topic_name']}</span>
+                                <div style="font-size: 0.78rem; color: var(--nexus-text-sub);">
+                                    {w['subject_name']} › {w['chapter_name']}{m_str}
+                                </div>
+                            </div>
+                            <div style="font-size: 0.85rem; color: #F59E0B; font-weight: 700;">
+                                {und_stars}
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
 
-    if not upcoming:
-        return
-
-    # Sort by closest first
-    upcoming.sort(key=lambda x: x["days_left"])
-    next_exam = upcoming[0]
-
-    st.subheader("⏰ Next Exam Countdown")
-
-    c1, c2, c3 = st.columns([2, 2, 2])
-    with c1:
-        render_metric_card(
-            "Next Exam",
-            next_exam["name"],
-            "#EC4899",
-            theme=theme
-        )
-    with c2:
-        render_metric_card(
-            "Exam Date",
-            next_exam["date"].strftime("%d %B %Y"),
-            "#38BDF8" if theme.lower() == "dark" else "#4F46E5",
-            theme=theme
-        )
-    with c3:
-        days = next_exam["days_left"]
-        urgency_color = "#22C55E" if days > 30 else "#EAB308" if days > 7 else "#EF4444"
-        render_metric_card(
-            "Days Remaining",
-            f"{days}",
-            urgency_color,
-            "days left" if days != 1 else "day left",
-            theme=theme
-        )
-
-    # Show all upcoming exams if more than one
-    if len(upcoming) > 1:
-        with st.expander("📅 All Active Upcoming Exams"):
-            for exam in upcoming:
-                e_col1, e_col2 = st.columns([3, 1])
-                with e_col1:
-                    st.write(f"**{exam['name']}** — {exam['date'].strftime('%d %B %Y')}")
-                with e_col2:
-                    days = exam["days_left"]
-                    if days == 0:
-                        st.warning("TODAY!")
-                    elif days <= 7:
-                        st.error(f"⚠️ {days} days")
-                    else:
-                        st.info(f"{days} days")
-
-
-def _render_revision_reminders(user_id: int):
-    """Show today's due spaced revision reminders."""
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
-    due = get_due_revisions(user_id, today_str)
-
-    if not due:
-        return
-
-    st.subheader(f"🔔 Revision Reminders ({len(due)} due)")
-    st.caption("Topics you completed that are due for spaced revision today.")
-
-    for rev in due:
-        item_name = rev.get("item_name") or f"{rev['item_type']} #{rev['item_id']}"
-        subject_name = rev.get("subject_name") or ""
-        interval = rev.get("interval_days", 0)
-        due_date = rev.get("due_date", "")
-        is_overdue = due_date < today_str
-
-        c1, c2, c3 = st.columns([5, 2, 1])
-        with c1:
-            overdue_badge = " <span style='color: #EF4444; font-size: 0.75rem;'>⚠️ OVERDUE</span>" if is_overdue else ""
-            st.markdown(
-                f"<span style='font-size: 0.85rem;'>{subject_name}</span> • "
-                f"<strong>{item_name}</strong>{overdue_badge}",
-                unsafe_allow_html=True
-            )
-        with c2:
-            label_map = {1: "1-day", 3: "3-day", 7: "1-week", 14: "2-week", 30: "1-month"}
-            label = label_map.get(interval, f"{interval}d")
-            st.caption(f"📅 {label} review • Due: {due_date}")
-        with c3:
-            if st.button("✅", key=f"rev_done_{rev['id']}", help="Mark as revised"):
-                complete_revision(user_id, rev["id"])
-                st.toast(f"✅ Revision completed for '{item_name}'", icon="🌟")
-                st.rerun()
-
+    with col_rec:
+        st.subheader("📜 Recent Activity Stream")
+        activity_stream = get_recent_activity_stream(user_id, limit=4)
+        if not activity_stream:
+            st.info("No recent study sessions or quizzes yet. Launch a session to populate your log!")
+        else:
+            for a in activity_stream:
+                st.markdown(f"""
+                    <div class="priority-item-card" style="border-left-color: {a['tag_color']}; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 700; color: var(--nexus-text-title); font-size: 0.92rem;">
+                                    {a['icon']} {a['title']}
+                                </div>
+                                <div style="font-size: 0.78rem; color: var(--nexus-text-sub); margin-top: 2px;">
+                                    {a['subtitle']}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size: 0.75rem; font-weight: 700; color: {a['tag_color']};">
+                                    {a['tag']}
+                                </span>
+                                <div style="font-size: 0.7rem; color: var(--nexus-text-sub);">{a['timestamp']}</div>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)

@@ -1,11 +1,11 @@
 """
-planner.py — Study Planner, Daily Schedule, Exam Term Allocation, and Study Sessions.
+planner.py — Nexus Unified Planner Module.
 
-Features:
-1. Daily Task & Study Planner (date-based todo with subject tagging)
-2. Study Goals & Targets
-3. Exam Term Allocation (assign chapters to specific terms and view term-specific progress)
-4. Study Sessions (log, view, weekly summary)
+Consolidates:
+1. 📋 Today's Plan (Date-based task checklist, subject tagging, XP rewards, overdue rebalancing)
+2. ⚡ Smart Auto-Scheduler (Target horizon, daily topic cap, interleaved study scheduling)
+3. 🏷️ Exam Term Allocator (Curriculum assignment to terms, term readiness)
+4. 🎯 Study Goals & Sessions (Target hours, target topics, session logs)
 """
 
 import streamlit as st
@@ -17,449 +17,311 @@ from models import (
     get_all_terms, get_all_subjects, get_chapters_for_subject,
     get_chapters_for_term, set_term_chapters, get_term_stats,
     add_study_session, get_study_sessions, delete_study_session,
-    get_weekly_study_summary, get_user_theme
+    get_weekly_study_summary, get_user_theme,
+    get_overdue_study_tasks, reschedule_overdue_tasks,
+    auto_generate_study_plan, get_top_nexus_priorities
 )
 from styles import render_header, render_metric_card, render_breadcrumbs, render_empty_state
 
 
 def render_planner_page(user_id: int):
     user_theme = get_user_theme(user_id)
-    render_breadcrumbs(["🏠 Dashboard", "🗓️ Study Planner"])
-    render_header("🗓️ Study Planner & Exam Allocation", "Schedule daily study tasks, track goals, and allocate chapters to exam terms.", theme=user_theme)
+    render_breadcrumbs(["🏠 Dashboard", "🗓️ Planner"])
+    render_header(
+        "🗓️ Academic Study Planner & Scheduler",
+        "Structure daily study missions, auto-schedule remaining curriculum, and allocate syllabus to exam terms.",
+        theme=user_theme
+    )
 
-    tab_daily, tab_sessions, tab_terms, tab_goals = st.tabs([
-        "📋 Daily Study Plan",
-        "📖 Study Sessions",
-        "🏷️ Exam Term Allocator", 
-        "🎯 Study Goals"
+    tab_daily, tab_scheduler, tab_terms, tab_goals = st.tabs([
+        "📋 Today's Plan",
+        "⚡ Smart Auto-Scheduler",
+        "🏷️ Exam Term Allocator",
+        "🎯 Study Goals & Logs"
     ])
 
-    # ── TAB 1: Daily Study Plan ──
     with tab_daily:
         _render_daily_planner_tab(user_id)
 
-    # ── TAB 2: Study Sessions ──
-    with tab_sessions:
-        _render_study_sessions_tab(user_id)
+    with tab_scheduler:
+        _render_auto_scheduler_tab(user_id)
 
-    # ── TAB 3: Exam Term Allocation ──
     with tab_terms:
         _render_term_allocation_tab(user_id)
 
-    # ── TAB 4: Study Goals ──
     with tab_goals:
         _render_goals_tab(user_id)
 
 
-def _render_daily_planner_tab(user_id: int):
-    st.subheader("📅 Daily Study Tasks")
+# ══════════════════════════════════════════════════════════════════════════
+# SUBVIEW 1: TODAY'S PLAN & DAILY SCHEDULE
+# ══════════════════════════════════════════════════════════════════════════
 
-    # ── 1. Missed Task Rescheduler Alert ──
-    from models import get_overdue_study_tasks, reschedule_overdue_tasks, auto_generate_study_plan, get_top_nexus_priorities
+def _render_daily_planner_tab(user_id: int):
+    # Overdue Task Alert
     overdue_tasks = get_overdue_study_tasks(user_id)
     if overdue_tasks:
         st.markdown(f"""
-            <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>
                     <strong style="color: #EF4444; font-size: 0.95rem;">⚠️ {len(overdue_tasks)} Overdue Study Task{'s' if len(overdue_tasks) != 1 else ''}</strong>
-                    <div style="font-size: 0.82rem; color: var(--nexus-text-sub);">Unfinished tasks from past days are waiting to be rescheduled.</div>
+                    <div style="font-size: 0.82rem; color: var(--nexus-text-sub);">Unfinished tasks from past days are waiting to be completed or rescheduled.</div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         col_res1, col_res2, _ = st.columns([1.5, 1.5, 2])
         with col_res1:
-            if st.button("⚡ Rebalance Across Upcoming Days", type="primary", use_container_width=True, key="reschedule_forward_btn"):
+            if st.button("⚡ Rebalance Across Upcoming Days", type="primary", use_container_width=True, key="plan_resched_forward_btn"):
                 count = reschedule_overdue_tasks(user_id, target_strategy="today_forward", max_per_day=3)
                 st.toast(f"✅ Rebalanced {count} overdue tasks across upcoming study days!", icon="🚀")
                 st.rerun()
         with col_res2:
-            if st.button("📅 Move All to Today", use_container_width=True, key="reschedule_today_btn"):
+            if st.button("📅 Move All to Today", use_container_width=True, key="plan_resched_today_btn"):
                 count = reschedule_overdue_tasks(user_id, target_strategy="today")
                 st.toast(f"✅ Moved {count} tasks to today's schedule!", icon="📅")
                 st.rerun()
 
-    # ── 2. Top Controls & Intelligent Auto-Scheduler Modal ──
-    col_date, col_actions = st.columns([2, 3])
-    with col_date:
+    c_d1, c_d2 = st.columns([2, 3])
+    with c_d1:
         selected_date = st.date_input("Select Date", value=datetime.date.today(), key="planner_date_picker")
         date_str = selected_date.strftime("%Y-%m-%d")
 
-    with col_actions:
-        with st.popover("⚡ Auto-Generate Study Plan", use_container_width=True):
-            st.markdown("### 🤖 Intelligent Study Plan Auto-Scheduler")
-            st.caption("Distributes unfinished & high-priority syllabus topics evenly across study days, interleaved for high retention.")
-            
-            terms = get_all_terms(user_id)
-            term_opts = {"🌟 Full Remaining Syllabus": None}
-            for t in terms:
-                if not t.get("is_already_done"):
-                    term_opts[f"🎯 Exam: {t['name']} ({t.get('exam_date', '')})"] = t["id"]
-                    
-            chosen_term_label = st.selectbox("Target Curriculum Scope:", list(term_opts.keys()), key="auto_plan_scope")
-            chosen_term_id = term_opts[chosen_term_label]
-            
-            c_p1, c_p2 = st.columns(2)
-            with c_p1:
-                horizon_days = st.slider("Planning Horizon (Days)", min_value=3, max_value=45, value=14, step=1, key="auto_plan_days")
-            with c_p2:
-                daily_topics = st.slider("Topics Per Day", min_value=1, max_value=6, value=3, step=1, key="auto_plan_cap")
-                
-            if st.button("🚀 Generate My Study Plan", type="primary", use_container_width=True, key="run_auto_plan_btn"):
-                with st.spinner("Analyzing syllabus, exam proximity, and understanding ratings..."):
-                    res = auto_generate_study_plan(
-                        user_id,
-                        term_id=chosen_term_id,
-                        days_count=horizon_days,
-                        topics_per_day=daily_topics,
-                        start_date=date_str
-                    )
-                if res.get("scheduled_count", 0) > 0:
-                    st.success(res["message"])
-                    st.rerun()
-                else:
-                    st.info(res["message"])
-
     plans = get_daily_plans(user_id, date_str)
+    completed_plans = [p for p in plans if p["is_completed"]]
     total_plans = len(plans)
-    completed_plans = sum(1 for p in plans if p["is_completed"])
-    pct = int(completed_plans / total_plans * 100) if total_plans > 0 else 0
+    pct = round((len(completed_plans) / total_plans) * 100) if total_plans > 0 else 0
 
-    st.markdown(f"""
-        <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 18px; margin: 12px 0 16px 0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <strong style="font-size: 1.05rem; color: var(--nexus-text-title);">Tasks for {selected_date.strftime('%A, %b %d')}</strong>
-                <span style="font-size: 0.9rem; font-weight: 700; color: #38BDF8;">{completed_plans}/{total_plans} Completed ({pct}%)</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    st.progress(pct / 100)
+    c_prog1, c_prog2 = st.columns([4, 1])
+    with c_prog1:
+        st.progress(pct / 100)
+    with c_prog2:
+        st.markdown(f"**{len(completed_plans)} / {total_plans} Done** ({pct}%)")
 
-    # ── 3. Nexus Smart Priority Quick-Add Bar ──
-    top_prios = get_top_nexus_priorities(user_id, limit=3)
-    if top_prios:
-        with st.expander("🔴 Nexus Smart Priority Recommendations for Today", expanded=False):
-            st.caption("High-urgency topics based on upcoming exams and low understanding scores:")
-            for p in top_prios:
-                c_pinfo, c_pbtn = st.columns([4, 1])
-                with c_pinfo:
-                    st.markdown(f"""
-                        <span class="nexus-pill-{p['tier'].lower()}">{p['tier_icon']} {p['tier']}</span>
-                        <strong style="margin-left: 6px; color: var(--nexus-text-title);">{p['topic_name']}</strong> 
-                        <span style="font-size: 0.8rem; color: var(--nexus-text-sub);">({p['subject_name']} › {p['chapter_name']})</span>
-                    """, unsafe_allow_html=True)
-                with c_pbtn:
-                    if st.button("+ Plan Today", key=f"quick_add_prio_{p['topic_id']}", use_container_width=True):
-                        desc = f"Study: {p['topic_name']} ({p['subject_name']})"
-                        add_daily_plan(user_id, date_str, desc, 45, subject_id=p["subject_id"], chapter_id=p["chapter_id"], topic_id=p["topic_id"])
-                        st.toast(f"Added {p['topic_name']} to today's schedule!", icon="✨")
-                        st.rerun()
-
-    st.markdown("---")
-
-    # Add task form
-    with st.expander("➕ Add Custom Task", expanded=(total_plans == 0)):
+    # Add Task Form
+    with st.expander("➕ Add Task for " + selected_date.strftime('%b %d, %Y'), expanded=(total_plans == 0)):
         subjects = get_all_subjects(user_id)
-        subject_options = {"None": None}
-        for s in subjects:
-            subject_options[s["name"]] = s["id"]
+        s_opts = {"General / Non-Subject": None}
+        if subjects:
+            s_opts.update({s["name"]: s["id"] for s in subjects})
 
-        with st.form("add_daily_task_form", clear_on_submit=True):
-            col_t1, col_t2 = st.columns([3, 1])
-            with col_t1:
-                desc = st.text_input("Task Description *", placeholder="e.g. Read Physics Chapter 2 & solve exercises")
-            with col_t2:
-                duration = st.number_input("Est. Minutes", min_value=5, max_value=480, value=30, step=5)
+        with st.form("add_daily_plan_form", clear_on_submit=True):
+            task_name = st.text_input("Task Description", placeholder="e.g. Read Light Refraction notes, Solve Exercise 10.2")
+            c_f1, c_f2 = st.columns(2)
+            with c_f1:
+                sel_subj = st.selectbox("Subject Tag (Optional)", list(s_opts.keys()), key="plan_add_subj_sel")
+            with c_f2:
+                est_dur = st.number_input("Estimated Minutes", min_value=5, max_value=240, value=30, step=5)
 
-            selected_sub_name = st.selectbox("Link to Subject (Optional)", list(subject_options.keys()))
-            sub_id = subject_options[selected_sub_name]
-
-            if st.form_submit_button("Add Task", use_container_width=True, type="primary"):
-                if desc.strip():
-                    add_daily_plan(user_id, date_str, desc.strip(), duration, subject_id=sub_id)
+            if st.form_submit_button("Add Task to Schedule", use_container_width=True):
+                if task_name.strip():
+                    add_daily_plan(user_id, date_str, task_name.strip(), s_opts[sel_subj], est_dur)
                     st.success("Task added!")
                     st.rerun()
-                else:
-                    st.error("Please enter a task description.")
 
-    # List tasks
     if not plans:
-        st.info(f"No study tasks scheduled for {selected_date.strftime('%b %d, %Y')}. Add one above!")
+        render_empty_state("📋", f"No tasks scheduled for {selected_date.strftime('%A, %b %d')}", "Add tasks manually above or use the Smart Auto-Scheduler to generate an optimal study plan.")
     else:
-        for task in plans:
-            c_check, c_desc, c_dur, c_del = st.columns([1, 6, 2, 1])
-            with c_check:
-                is_done = st.checkbox(
-                    "Done", 
-                    value=bool(task["is_completed"]), 
-                    key=f"task_chk_{task['id']}",
-                    label_visibility="collapsed"
+        for p in plans:
+            c1, c2, c3 = st.columns([5, 1.2, 0.8])
+            with c1:
+                done = bool(p["is_completed"])
+                sub_label = f" <span style='font-size: 0.75rem; color: {p.get('subject_color', '#38BDF8')}; background: rgba(56,189,248,0.1); padding: 2px 8px; border-radius: 10px; font-weight: 700;'>{p.get('subject_name')}</span>" if p.get("subject_name") else ""
+                
+                checked = st.checkbox(
+                    f"**{p['task_name']}**",
+                    value=done,
+                    key=f"plan_item_chk_{p['id']}"
                 )
-                if is_done != bool(task["is_completed"]):
-                    toggle_daily_plan(user_id, task["id"], is_done)
+                if checked != done:
+                    toggle_daily_plan(user_id, p["id"], 1 if checked else 0)
+                    if checked:
+                        st.toast(f"Completed '{p['task_name']}'! +15 XP", icon="⭐")
                     st.rerun()
 
-            with c_desc:
-                color = task.get("subject_color") or "#475569"
-                sub_name = task.get("subject_name")
-                tag = f"<span style='background: {color}; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; color: #fff;'>{sub_name}</span> " if sub_name else ""
-                style = "text-decoration: line-through; opacity: 0.6;" if task["is_completed"] else ""
-                st.markdown(f"{tag}<span style='{style} font-weight: 500;'>{task['description']}</span>", unsafe_allow_html=True)
+                if sub_label:
+                    st.markdown(f"<div style='margin-left: 28px; margin-top: -4px;'>{sub_label}</div>", unsafe_allow_html=True)
 
-            with c_dur:
-                st.caption(f"⏱️ {task['duration_minutes']} min")
+            with c2:
+                st.caption(f"⏱️ {p['estimated_minutes']} min")
 
-            with c_del:
-                if st.button("🗑️", key=f"del_task_{task['id']}", help="Delete Task"):
-                    delete_daily_plan(user_id, task["id"])
+            with c3:
+                if st.button("🗑️", key=f"plan_item_del_{p['id']}", help="Delete task"):
+                    delete_daily_plan(user_id, p["id"])
                     st.rerun()
+            st.markdown("<hr style='margin: 6px 0; border: none; border-top: 1px solid rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
 
 
-def _render_term_allocation_tab(user_id: int):
-    st.subheader("🏷️ Exam Term Syllabus Allocator")
-    st.caption("Assign chapters to each upcoming exam or term to track term-specific syllabus completion.")
+# ══════════════════════════════════════════════════════════════════════════
+# SUBVIEW 2: SMART AUTO-SCHEDULER
+# ══════════════════════════════════════════════════════════════════════════
+
+def _render_auto_scheduler_tab(user_id: int):
+    st.markdown("### 🤖 Intelligent Syllabus Auto-Scheduler")
+    st.caption("Distributes your remaining syllabus topics evenly across study days with cognitive interleaving to prevent burnout and maximize retention.")
 
     terms = get_all_terms(user_id)
-    subjects = get_all_subjects(user_id)
+    term_opts = {"🌟 Full Remaining Syllabus": None}
+    for t in terms:
+        if not t.get("is_already_done"):
+            term_opts[f"🎯 Exam: {t['name']} ({t.get('exam_date', '')})"] = t["id"]
 
+    c_s1, c_s2 = st.columns(2)
+    with c_s1:
+        chosen_term_label = st.selectbox("Target Curriculum Scope:", list(term_opts.keys()), key="auto_sched_tab_scope")
+        chosen_term_id = term_opts[chosen_term_label]
+    with c_s2:
+        start_date = st.date_input("Start Scheduling From:", value=datetime.date.today(), key="auto_sched_start_date")
+        start_date_str = start_date.strftime("%Y-%m-%d")
+
+    c_p1, c_p2 = st.columns(2)
+    with c_p1:
+        horizon_days = st.slider("Planning Horizon (Days)", min_value=3, max_value=60, value=14, step=1, key="auto_sched_horizon_days")
+    with c_p2:
+        daily_topics = st.slider("Topics Per Day", min_value=1, max_value=6, value=3, step=1, key="auto_sched_daily_cap")
+
+    if st.button("🚀 Auto-Generate & Schedule Study Plan", type="primary", use_container_width=True, key="run_auto_sched_tab_btn"):
+        with st.spinner("Analyzing syllabus, priority rankings, and exam proximity..."):
+            res = auto_generate_study_plan(
+                user_id,
+                term_id=chosen_term_id,
+                days_count=horizon_days,
+                topics_per_day=daily_topics,
+                start_date=start_date_str
+            )
+        if res.get("scheduled_count", 0) > 0:
+            st.success(res["message"])
+            st.rerun()
+        else:
+            st.info(res["message"])
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# SUBVIEW 3: EXAM TERM ALLOCATOR
+# ══════════════════════════════════════════════════════════════════════════
+
+def _render_term_allocation_tab(user_id: int):
+    st.subheader("🏷️ Allocate Chapters to Exam Terms")
+    st.markdown("Assign specific chapters to upcoming terms (e.g. Unit Tests, Mid-Terms, Pre-Boards) to isolate term-specific revision goals.")
+
+    terms = get_all_terms(user_id)
     if not terms:
-        st.warning("No exam terms found. Go to **Settings** to add terms first.")
+        st.info("No exam terms found. Add terms in Settings → Exams.")
         return
 
-    if not subjects:
-        st.warning("No subjects found. Go to **Syllabus Manager** to add subjects first.")
-        return
+    term_map = {t["name"]: t["id"] for t in terms}
+    sel_term_name = st.selectbox("Select Exam Term", list(term_map.keys()), key="plan_term_alloc_sel")
+    sel_term_id = term_map[sel_term_name]
 
-    term_names = [t["name"] for t in terms]
-    sel_term_idx = st.selectbox("Select Exam Term", range(len(term_names)), format_func=lambda i: f"🏆 {term_names[i]}")
-    selected_term = terms[sel_term_idx]
+    # Stats for term
+    stats = get_term_stats(user_id, sel_term_id)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        render_metric_card("Allocated Chapters", stats["total_chapters"], "Chapters in term")
+    with c2:
+        render_metric_card("Total Topics", stats["total_topics"], "Topics to master")
+    with c3:
+        render_metric_card("Term Completion", f"{stats['completion_pct']}%", f"{stats['completed_topics']}/{stats['total_topics']} done")
 
-    # Show Term Stats
-    term_stats = get_term_stats(user_id, selected_term["id"])
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        render_metric_card("Assigned Chapters", term_stats["total_chapters"], "#6366F1")
-    with m2:
-        render_metric_card("Total Topics", term_stats["total_topics"], "#8B5CF6")
-    with m3:
-        render_metric_card("Completed Topics", term_stats["completed"], "#22C55E")
-    with m4:
-        render_metric_card("Term Completion", f"{term_stats['percent_completed']}%", "#EC4899")
+    # Allocation Editor
+    st.markdown("### 📚 Select Chapters Included in this Term")
+    subjects = get_all_subjects(user_id)
+    allocated_chap_ids = get_chapters_for_term(user_id, sel_term_id)
 
-    st.markdown("---")
+    selected_chap_ids = list(allocated_chap_ids)
 
-    # Current chapter selections
-    assigned_chapter_ids = set(get_chapters_for_term(user_id, selected_term["id"]))
+    with st.form(f"term_alloc_form_{sel_term_id}"):
+        for s in subjects:
+            chaps = get_chapters_for_subject(user_id, s["id"])
+            if chaps:
+                st.markdown(f"**📖 {s['name']}**")
+                cols = st.columns(min(len(chaps), 3) or 1)
+                for idx, c in enumerate(chaps):
+                    col = cols[idx % len(cols)]
+                    is_in = c["id"] in allocated_chap_ids
+                    chk = col.checkbox(c["name"], value=is_in, key=f"t_alloc_chk_{sel_term_id}_{c['id']}")
+                    if chk and c["id"] not in selected_chap_ids:
+                        selected_chap_ids.append(c["id"])
+                    elif not chk and c["id"] in selected_chap_ids:
+                        selected_chap_ids.remove(c["id"])
 
-    st.markdown(f"### Select Chapters included in **{selected_term['name']}**")
-    
-    with st.form(f"term_chapters_form_{selected_term['id']}"):
-        new_assigned_ids = set()
-
-        for sub in subjects:
-            chaps = get_chapters_for_subject(user_id, sub["id"])
-            if not chaps:
-                continue
-            
-            st.markdown(f"**📖 {sub['name']}**")
-            cols = st.columns(2)
-            for idx, ch in enumerate(chaps):
-                with cols[idx % 2]:
-                    checked = st.checkbox(
-                        ch["name"],
-                        value=(ch["id"] in assigned_chapter_ids),
-                        key=f"term_ch_{selected_term['id']}_{ch['id']}"
-                    )
-                    if checked:
-                        new_assigned_ids.add(ch["id"])
-
-        save_alloc = st.form_submit_button("💾 Save Term Allocations", use_container_width=True)
-        if save_alloc:
-            set_term_chapters(user_id, selected_term["id"], list(new_assigned_ids))
-            st.success(f"Updated chapter allocations for {selected_term['name']}!")
+        if st.form_submit_button("💾 Save Term Chapter Allocation", type="primary", use_container_width=True):
+            set_term_chapters(user_id, sel_term_id, selected_chap_ids)
+            st.success("Term chapter allocation saved successfully!")
             st.rerun()
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# SUBVIEW 4: STUDY GOALS & SESSIONS
+# ══════════════════════════════════════════════════════════════════════════
+
 def _render_goals_tab(user_id: int):
-    st.subheader("🎯 Academic Goals & Targets")
+    tab_g_active, tab_g_new, tab_sessions_log = st.tabs(["🎯 Active Goals", "➕ New Goal", "⏱️ Study Sessions Log"])
 
-    goals = get_all_goals(user_id)
+    with tab_g_new:
+        st.subheader("Create Academic Target")
+        with st.form("add_goal_form_plan", clear_on_submit=True):
+            g_title = st.text_input("Goal Title", placeholder="e.g. Complete 50 MCQs this week, Study 15 hours")
+            c_g1, c_g2 = st.columns(2)
+            with c_g1:
+                g_type = st.selectbox("Goal Type", ["Weekly Hours", "Chapter Mastery", "Daily Consistency", "Quiz Target"])
+            with c_g2:
+                g_target = st.number_input("Target Value", min_value=1, value=10)
+            g_unit = st.text_input("Unit (e.g. hours, topics, quizzes)", value="hours")
 
-    with st.expander("➕ Add New Goal", expanded=(len(goals) == 0)):
-        with st.form("add_goal_form", clear_on_submit=True):
-            col_g1, col_g2 = st.columns([3, 1])
-            with col_g1:
-                title = st.text_input("Goal Title *", placeholder="e.g. Revise Math Chapter 1-3 before Friday")
-            with col_g2:
-                g_type = st.selectbox("Goal Type", ["Daily", "Weekly", "Monthly", "Exam Goal"])
-
-            col_g3, col_g4 = st.columns(2)
-            with col_g3:
-                target = st.number_input("Target Count / Hours", min_value=1, value=1)
-            with col_g4:
-                deadline = st.date_input("Target Date (Optional)", value=datetime.date.today() + datetime.timedelta(days=7))
-
-            if st.form_submit_button("Save Goal"):
-                if title.strip():
-                    add_goal(user_id, title.strip(), g_type, target, deadline.strftime("%Y-%m-%d"))
-                    st.success("Goal added!")
-                    st.rerun()
-                else:
-                    st.error("Please enter a goal title.")
-
-    if not goals:
-        st.info("No study goals added yet. Set a target above to stay motivated!")
-    else:
-        for g in goals:
-            is_done = bool(g["is_completed"])
-            with st.container():
-                c1, c2, c3, c4 = st.columns([1, 5, 3, 1])
-                with c1:
-                    chk = st.checkbox("Done", value=is_done, key=f"goal_chk_{g['id']}", label_visibility="collapsed")
-                    if chk != is_done:
-                        update_goal_progress(user_id, g["id"], g["target"] if chk else 0, is_completed=chk)
-                        st.rerun()
-
-                with c2:
-                    style = "text-decoration: line-through; opacity: 0.6;" if is_done else ""
-                    st.markdown(f"<strong style='{style} font-size: 1.05rem;'>{g['title']}</strong><br><span style='font-size: 0.8rem;'>{g['goal_type']} • Due: {g.get('deadline', 'N/A')}</span>", unsafe_allow_html=True)
-
-                with c3:
-                    new_prog = st.number_input(
-                        "Progress", 
-                        min_value=0, 
-                        max_value=max(100, g["target"]), 
-                        value=g["progress"], 
-                        key=f"goal_prog_{g['id']}",
-                        label_visibility="collapsed"
-                    )
-                    if new_prog != g["progress"]:
-                        update_goal_progress(user_id, g["id"], new_prog, is_completed=(new_prog >= g["target"]))
-                        st.rerun()
-
-                with c4:
-                    if st.button("🗑️", key=f"del_goal_{g['id']}"):
-                        delete_goal(user_id, g["id"])
-                        st.rerun()
-                st.markdown("---")
-
-
-def _render_study_sessions_tab(user_id: int):
-    """Log, view, and analyze study sessions."""
-    st.subheader("📖 Study Sessions")
-    st.caption("Track how long you study each subject. Review your weekly habits.")
-
-    # ── Weekly Study Summary Chart ──
-    weekly = get_weekly_study_summary(user_id)
-    day_labels = [d["day_label"] for d in weekly]
-    day_minutes = [d["minutes"] for d in weekly]
-    total_week = sum(day_minutes)
-
-    col_chart, col_stat = st.columns([3, 1])
-    with col_stat:
-        render_metric_card("This Week", f"{total_week} min", "#A855F7",
-                          f"{round(total_week / 60, 1)} hours")
-        today_mins = day_minutes[-1] if day_minutes else 0
-        render_metric_card("Today", f"{today_mins} min", "#22C55E")
-
-    user_theme = get_user_theme(user_id)
-    is_dark = (user_theme.strip().lower() == "dark")
-    text_col = "#FFFFFF" if is_dark else "#0F172A"
-    axis_col = "#CBD5E1" if is_dark else "#64748B"
-    grid_col = "rgba(255,255,255,0.06)" if is_dark else "rgba(0,0,0,0.06)"
-    empty_bar_col = "#334155" if is_dark else "#E2E8F0"
-
-    with col_chart:
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=day_labels,
-            y=day_minutes,
-            marker_color=[
-                "#4F46E5" if m > 0 else empty_bar_col for m in day_minutes
-            ],
-            text=[f"{m}m" if m > 0 else "" for m in day_minutes],
-            textposition="outside",
-            textfont=dict(color=text_col, size=12)
-        ))
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=axis_col),
-            xaxis=dict(showgrid=False),
-            yaxis=dict(title="Minutes", showgrid=True,
-                       gridcolor=grid_col),
-            margin=dict(t=10, b=30, l=40, r=20),
-            height=250
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("---")
-
-    # ── Log a Session ──
-    with st.expander("➕ Log a Study Session", expanded=True):
-        subjects = get_all_subjects(user_id)
-        subject_options = {"— Select Subject —": None}
-        for s in subjects:
-            subject_options[s["name"]] = s["id"]
-
-        with st.form("log_session_form", clear_on_submit=True):
-            col_a, col_b = st.columns([3, 1])
-            with col_a:
-                sel_sub = st.selectbox("Subject *", list(subject_options.keys()),
-                                      key="session_subject")
-                sub_id = subject_options[sel_sub]
-            with col_b:
-                duration = st.number_input("Duration (min) *", min_value=1,
-                                          max_value=720, value=30, step=5)
-
-            col_c, col_d = st.columns(2)
-            with col_c:
-                sess_date = st.date_input("Date", value=datetime.date.today(),
-                                         key="session_date")
-            with col_d:
-                sess_notes = st.text_input("Notes (optional)",
-                                          placeholder="What did you study?")
-
-            if st.form_submit_button("💾 Log Session", use_container_width=True):
-                if not sub_id:
-                    st.error("Please select a subject.")
-                else:
-                    add_study_session(
-                        user_id, subject_id=sub_id,
-                        duration_minutes=duration,
-                        session_date=sess_date.strftime("%Y-%m-%d"),
-                        notes=sess_notes
-                    )
-                    st.success("Study session logged!")
+            if st.form_submit_button("Create Target Goal", use_container_width=True, type="primary"):
+                if g_title.strip():
+                    add_goal(user_id, g_title.strip(), g_type, g_target, g_unit)
+                    st.success("Goal created!")
                     st.rerun()
 
-    st.markdown("---")
+    with tab_g_active:
+        goals = get_all_goals(user_id)
+        if not goals:
+            render_empty_state("🎯", "No Active Goals", "Set daily or weekly academic targets to stay focused and measure velocity.")
+        else:
+            for g in goals:
+                pct = min(100, round((g["current_value"] / g["target_value"]) * 100)) if g["target_value"] > 0 else 0
+                c_info, c_act = st.columns([4, 1.2])
+                with c_info:
+                    st.markdown(f"""
+                        <div style="font-weight: 700; font-size: 1.05rem; color: var(--nexus-text-title); margin-bottom: 2px;">
+                            {g['title']}
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--nexus-text-sub); margin-bottom: 6px;">
+                            {g['current_value']} / {g['target_value']} {g.get('unit', '')} ({pct}%)
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(pct / 100)
 
-    # ── Recent Sessions ──
-    st.subheader("📋 Recent Sessions")
-    sessions = get_study_sessions(user_id, limit=20)
+                with c_act:
+                    c_b1, c_b2 = st.columns(2)
+                    with c_b1:
+                        if st.button("➕1", key=f"g_inc_{g['id']}"):
+                            update_goal_progress(user_id, g['id'], g['current_value'] + 1)
+                            st.rerun()
+                    with c_b2:
+                        if st.button("🗑️", key=f"g_del_{g['id']}"):
+                            delete_goal(user_id, g['id'])
+                            st.rerun()
+                st.markdown("<hr style='margin: 8px 0; opacity: 0.15;'/>", unsafe_allow_html=True)
 
-    if not sessions:
-        st.info("No study sessions logged yet. Start by adding one above!")
-    else:
-        for sess in sessions:
-            c1, c2, c3, c4 = st.columns([4, 2, 2, 1])
-            with c1:
-                sub_name = sess.get("subject_name") or "Unknown"
-                color = sess.get("subject_color") or "#475569"
-                st.markdown(
-                    f"<span style='background: {color}; padding: 2px 8px; "
-                    f"border-radius: 4px; font-size: 0.75rem; color: #fff;'>"
-                    f"{sub_name}</span> "
-                    f"<span style='font-weight: 500;'>"
-                    f"{sess.get('notes') or ''}</span>",
-                    unsafe_allow_html=True
-                )
-
-            with c2:
-                st.caption(f"⏱️ {sess['duration_minutes']} min")
-            with c3:
-                st.caption(f"📅 {sess.get('session_date', '')}")
-            with c4:
-                if st.button("🗑️", key=f"del_sess_{sess['id']}", help="Delete"):
-                    delete_study_session(user_id, sess["id"])
-                    st.rerun()
+    with tab_sessions_log:
+        st.subheader("⏱️ Focus & Study Session History")
+        sessions = get_study_sessions(user_id, limit=15)
+        if not sessions:
+            render_empty_state("⏱️", "No Study Sessions Logged", "Launch a session in the Focus Studio to record your study time automatically.")
+        else:
+            for s in sessions:
+                st.markdown(f"""
+                    <div class="priority-item-card" style="border-left-color: {s.get('subject_color', '#38BDF8')}; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-weight: 700; color: var(--nexus-text-title);">{s.get('subject_name', 'Study Session')}</span>
+                                <div style="font-size: 0.8rem; color: var(--nexus-text-sub);">{s.get('topic_name') or 'Focused Study'} • {s['session_date']}</div>
+                            </div>
+                            <div style="font-size: 1.2rem; font-weight: 800; color: #38BDF8;">
+                                {s['duration_minutes']} min
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)

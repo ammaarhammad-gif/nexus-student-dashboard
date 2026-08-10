@@ -4005,3 +4005,107 @@ def get_focus_analytics(user_id: int, days: int = None) -> dict:
 log_focus_session = log_focus_session_and_sync
 get_all_quizzes = get_quiz_history
 
+
+def get_recent_activity_stream(user_id: int, limit: int = 6) -> list:
+    """Fetches a unified chronologically ordered stream of recent study activity."""
+    conn = get_connection()
+    try:
+        activities = []
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # 1. Recent Quizzes
+            cursor.execute("""
+                SELECT qa.id, q.title, qa.score, qa.total_questions, qa.created_at, s.name as subject_name, s.color as subject_color
+                FROM quiz_attempts qa
+                JOIN quizzes q ON qa.quiz_id = q.id
+                LEFT JOIN subjects s ON q.subject_id = s.id
+                WHERE qa.user_id = %s
+                ORDER BY qa.created_at DESC LIMIT %s
+            """, (user_id, limit))
+            for r in cursor.fetchall():
+                pct = round((r["score"] / r["total_questions"] * 100)) if r["total_questions"] else 0
+                activities.append({
+                    "type": "quiz",
+                    "icon": "🎯",
+                    "title": f"Completed Quiz: {r['title']}",
+                    "subtitle": f"{r['score']}/{r['total_questions']} correct ({pct}%) • {r['subject_name'] or 'General'}",
+                    "timestamp": str(r["created_at"])[:16],
+                    "raw_time": str(r["created_at"]),
+                    "tag": f"{pct}% Accuracy",
+                    "tag_color": "#22C55E" if pct >= 75 else ("#38BDF8" if pct >= 50 else "#EF4444")
+                })
+
+            # 2. Recent Focus Sessions
+            cursor.execute("""
+                SELECT ss.id, ss.duration_minutes, ss.notes, ss.created_at, ss.session_date, s.name as subject_name, t.name as topic_name
+                FROM study_sessions ss
+                LEFT JOIN subjects s ON ss.subject_id = s.id
+                LEFT JOIN topics t ON ss.topic_id = t.id
+                WHERE ss.user_id = %s
+                ORDER BY ss.created_at DESC LIMIT %s
+            """, (user_id, limit))
+            for r in cursor.fetchall():
+                topic_str = f"on {r['topic_name']}" if r["topic_name"] else ""
+                activities.append({
+                    "type": "focus",
+                    "icon": "⏱️",
+                    "title": f"Focus Session: {r['duration_minutes']} min {topic_str}",
+                    "subtitle": f"{r['subject_name'] or 'Focused Study'} • {r['session_date']}",
+                    "timestamp": str(r["created_at"])[:16],
+                    "raw_time": str(r["created_at"]),
+                    "tag": f"{r['duration_minutes']}m Deep Work",
+                    "tag_color": "#38BDF8"
+                })
+
+            # 3. Recent Completed Revisions
+            cursor.execute("""
+                SELECT r.id, r.completed_at, t.name as topic_name, s.name as subject_name
+                FROM revisions r
+                JOIN topics t ON r.item_id = t.id AND r.item_type = 'topic'
+                JOIN chapters c ON t.chapter_id = c.id
+                JOIN subjects s ON c.subject_id = s.id
+                WHERE r.user_id = %s AND r.is_completed = 1
+                ORDER BY r.completed_at DESC LIMIT %s
+            """, (user_id, limit))
+            for r in cursor.fetchall():
+                activities.append({
+                    "type": "revision",
+                    "icon": "🧠",
+                    "title": f"Spaced Revision: {r['topic_name']}",
+                    "subtitle": f"{r['subject_name']} • Retention reinforced",
+                    "timestamp": str(r["completed_at"])[:16],
+                    "raw_time": str(r["completed_at"]),
+                    "tag": "+50 XP",
+                    "tag_color": "#A855F7"
+                })
+
+        activities.sort(key=lambda x: x.get("raw_time", ""), reverse=True)
+        return activities[:limit]
+    finally:
+        conn.close()
+
+
+def get_weak_areas(user_id: int, limit: int = 5) -> list:
+    """Identifies topics requiring urgent remediation based on understanding level, difficult flags, and mistake counts."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT t.id, t.name as topic_name, c.name as chapter_name, s.name as subject_name, s.color as subject_color,
+                       COALESCE(p.understanding, 3) as understanding,
+                       COALESCE(p.is_difficult, 0) as is_difficult,
+                       COALESCE(p.needs_practice, 0) as needs_practice,
+                       (SELECT COUNT(*) FROM mistakes m WHERE m.topic_id = t.id AND m.user_id = %s AND m.is_reviewed = 0) as mistake_count
+                FROM topics t
+                JOIN chapters c ON t.chapter_id = c.id
+                JOIN subjects s ON c.subject_id = s.id
+                LEFT JOIN topic_progress p ON p.item_id = t.id AND p.item_type = 'topic' AND p.user_id = %s
+                WHERE s.user_id = %s AND (COALESCE(p.understanding, 3) <= 2 OR COALESCE(p.is_difficult, 0) = 1 OR (SELECT COUNT(*) FROM mistakes m WHERE m.topic_id = t.id AND m.user_id = %s AND m.is_reviewed = 0) > 0)
+                ORDER BY mistake_count DESC, COALESCE(p.understanding, 3) ASC, COALESCE(p.is_difficult, 0) DESC
+                LIMIT %s
+            """, (user_id, user_id, user_id, user_id, limit))
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+

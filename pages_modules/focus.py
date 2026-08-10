@@ -51,21 +51,50 @@ def render_focus_page(user_id: int):
             return
 
         s_map = {s["name"]: s["id"] for s in subjects}
+        
+        # Check prefill from topic shortcut or priority click
+        pre_s_id = st.session_state.get("focus_target_subject_id")
+        pre_t_id = st.session_state.get("focus_target_topic_id")
+        pre_c_id = st.session_state.get("focus_target_chapter_id")
+        
+        pre_s_idx = 0
+        if pre_s_id:
+            for i, (sn, sid) in enumerate(s_map.items()):
+                if sid == pre_s_id:
+                    pre_s_idx = i
+                    break
+
         c1, c2, c3 = st.columns(3)
         with c1:
-            sel_s_name = st.selectbox("Focus Subject", list(s_map.keys()), key="foc_subj")
+            sel_s_name = st.selectbox("Focus Subject", list(s_map.keys()), index=pre_s_idx, key="foc_subj")
         sel_s_id = s_map[sel_s_name]
 
         chapters = get_chapters_for_subject(user_id, sel_s_id)
         c_map = {c["name"]: c["id"] for c in chapters} if chapters else {}
+        
+        pre_c_idx = 0
+        if pre_c_id and c_map:
+            for i, (cn, cid) in enumerate(c_map.items()):
+                if cid == pre_c_id:
+                    pre_c_idx = i
+                    break
+
         with c2:
-            sel_c_name = st.selectbox("Chapter", list(c_map.keys()) if c_map else ["None"], key="foc_chap")
+            sel_c_name = st.selectbox("Chapter", list(c_map.keys()) if c_map else ["None"], index=pre_c_idx, key="foc_chap")
         sel_c_id = c_map.get(sel_c_name)
 
         topics = get_topics_for_chapter(user_id, sel_c_id) if sel_c_id else []
         t_map = {t["name"]: t["id"] for t in topics} if topics else {}
+        
+        pre_t_idx = 0
+        if pre_t_id and t_map:
+            for i, (tn, tid) in enumerate(t_map.items()):
+                if tid == pre_t_id:
+                    pre_t_idx = i + 1  # Account for "General Study" at index 0
+                    break
+
         with c3:
-            sel_t_name = st.selectbox("Target Topic", ["General Study"] + list(t_map.keys()), key="foc_top")
+            sel_t_name = st.selectbox("Target Topic", ["General Study"] + list(t_map.keys()), index=pre_t_idx, key="foc_top")
         sel_t_id = t_map.get(sel_t_name) if sel_t_name != "General Study" else None
 
         # Focus Modes & Durations
