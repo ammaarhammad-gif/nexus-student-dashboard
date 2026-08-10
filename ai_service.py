@@ -1046,8 +1046,13 @@ When solving tricky multiple-choice questions or numericals, errors typically ar
 
     # ── Ergonomic Method Aliases ──
     generate_custom_quiz = generate_ai_quiz
+    generate_study_plan = generate_ai_study_plan
+    analyze_progress = generate_progress_diagnostic
+    generate_progress_analysis = generate_progress_diagnostic
     recommend_revision_strategy = generate_revision_recommendations
+    generate_revision_strategy = generate_revision_recommendations
     diagnose_mistake_patterns = generate_mistake_root_cause_analysis
+    diagnose_mistakes = generate_mistake_root_cause_analysis
 
 
 # Global Singleton
