@@ -3895,7 +3895,7 @@ def log_focus_session_and_sync(user_id: int, duration_minutes: int, subject_id: 
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def get_focus_analytics(user_id: int) -> dict:
+def get_focus_analytics(user_id: int, days: int = None) -> dict:
     """Comprehensive focus session analytics: totals, weekly breakdown, subject distribution."""
     import datetime
     today = datetime.date.today()
