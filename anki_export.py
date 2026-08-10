@@ -175,7 +175,7 @@ def export_formulas_to_anki(user_id: int, subject_id: int = None, format_type: s
         s_name = f.get("subject_name", "General").replace(" ", "_")
         c_name = f.get("chapter_name", "").replace(" ", "_")
         title = f.get("title", "Formula")
-        latex = f.get("latex_code", "")
+        latex = f.get("formula_latex", "") or f.get("latex_code", "")
         desc = f.get("description", "")
 
         front_html = f"""<div style="font-family: -apple-system, sans-serif; font-size: 16px; color: #1E293B;">

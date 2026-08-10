@@ -451,11 +451,37 @@ def generate_weekly_progress_pdf(user_id: int, days: int = 7) -> bytes:
     # ══════════════════════════════════════════════════════════
     # SECTION 4: AI PEDAGOGICAL RECOMMENDATIONS & NEXT WEEK ACTION PLAN
     # ══════════════════════════════════════════════════════════
-    clean_ai_text = ai_text.replace("### ", "<b>").replace("## ", "<b>").replace("\n- ", "<br/>• ").replace("**", "<b>").replace("\n\n", "<br/><br/>")
+    import re
+    def _format_markdown_for_reportlab(text: str) -> str:
+        if not text:
+            return ""
+        # 1. Headers: ### Header -> <b>Header</b>
+        lines = []
+        for line in text.splitlines():
+            line_str = line.strip()
+            if not line_str:
+                lines.append("")
+                continue
+            if line_str.startswith("#"):
+                clean_h = re.sub(r"^#+\s*", "", line_str)
+                lines.append(f"<b>{clean_h}</b>")
+            elif line_str.startswith("- ") or line_str.startswith("* "):
+                clean_b = line_str[2:].strip()
+                # format bold inside bullets
+                clean_b = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", clean_b)
+                lines.append(f"• {clean_b}")
+            elif line_str == "---":
+                lines.append("<br/>────────────────────────────────────────<br/>")
+            else:
+                clean_line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", line_str)
+                lines.append(clean_line)
+        return "<br/>".join(lines)
+
+    clean_ai_text = _format_markdown_for_reportlab(ai_text)
     
     ai_box_data = [
         [
-            Paragraph(f"<b>🤖 NEXUS AI STRATEGIC ACTION PLAN & RETENTION ROADMAP</b><br/><br/>{clean_ai_text}", body_style)
+            Paragraph(f"<b>NEXUS AI STRATEGIC ACTION PLAN & RETENTION ROADMAP</b><br/><br/>{clean_ai_text}", body_style)
         ]
     ]
     ai_table = Table(ai_box_data, colWidths=[532])
@@ -468,7 +494,7 @@ def generate_weekly_progress_pdf(user_id: int, days: int = 7) -> bytes:
         ('RIGHTPADDING', (0, 0), (-1, -1), 12),
     ]))
     story.append(KeepTogether([
-        Paragraph("🧠 Autonomous Cognitive Interventions", section_heading),
+        Paragraph("Autonomous Cognitive Interventions", section_heading),
         ai_table
     ]))
 
