@@ -41,9 +41,12 @@ def render_dashboard_page(user_id: int):
     readiness = calculate_exam_readiness_score(user_id) or {}
     priorities = get_top_nexus_priorities(user_id, limit=3) or []
     queue = get_revision_queue(user_id) or {}
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    today_plans = get_daily_plans(user_id, today_str) or []
     unreviewed_mistakes = get_unreviewed_mistakes_for_quiz(user_id, limit=10) or []
-    today_plans = get_daily_plans(user_id) or []
     focus_data = get_focus_analytics(user_id, days=7) or {}
+
+
 
     # TOP APPLICATION HEADER BAR
     render_top_header_bar(
