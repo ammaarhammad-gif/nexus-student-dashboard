@@ -412,8 +412,10 @@ def tool_create_note(user_id: int, topic_name: str, title: str, content_markdown
 def tool_create_formula(user_id: int, topic_name: str, title: str, formula_latex: str, explanation: str = "") -> dict:
     """Adds a mathematical/scientific formula to the student's Formula Vault."""
     topic = resolve_topic_by_name(user_id, topic_name)
+    topic = resolve_topic_by_name(user_id, topic_name)
     s_id = topic["subject_id"] if topic else None
     c_id = topic["chapter_id"] if topic else None
+    t_id = topic["topic_id"] if topic else None
 
     if not s_id:
         subjects = get_all_subjects(user_id)
@@ -429,7 +431,8 @@ def tool_create_formula(user_id: int, topic_name: str, title: str, formula_latex
         chapter_id=c_id,
         title=f_title,
         formula_latex=clean_latex,
-        explanation=explanation
+        topic_id=t_id,
+        description=explanation
     )
     return {
         "success": True,
@@ -902,25 +905,18 @@ def execute_nexus_tool(user_id: int, tool_name: str, parameters: dict = None) ->
         return {"success": False, "error": f"Tool '{tool_name}' is not recognized."}
 
     func = TOOL_FUNCTION_MAP[tool_name]
-    params = parameters or {}
+    raw_params = dict(parameters or {})
+    # Strip user_id if present in dictionary to avoid multiple values error
+    raw_params.pop("user_id", None)
 
     try:
-        # Check if function takes user_id
         import inspect
         sig = inspect.signature(func)
+        filtered_params = {k: v for k, v in raw_params.items() if k in sig.parameters}
+        
         if "user_id" in sig.parameters:
-            return func(user_id=user_id, **params)
+            return func(user_id=user_id, **filtered_params)
         else:
-            return func(**params)
-    except TypeError as te:
-        # Parameter mismatch fallback: filter valid params
-        sig = inspect.signature(func)
-        filtered = {k: v for k, v in params.items() if k in sig.parameters}
-        if "user_id" in sig.parameters:
-            filtered["user_id"] = user_id
-        try:
-            return func(**filtered)
-        except Exception as e:
-            return {"success": False, "error": f"Tool execution failed: {str(e)}"}
+            return func(**filtered_params)
     except Exception as e:
         return {"success": False, "error": f"Tool execution failed: {str(e)}"}
