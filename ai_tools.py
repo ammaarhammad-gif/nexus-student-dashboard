@@ -905,18 +905,17 @@ def execute_nexus_tool(user_id: int, tool_name: str, parameters: dict = None) ->
         return {"success": False, "error": f"Tool '{tool_name}' is not recognized."}
 
     func = TOOL_FUNCTION_MAP[tool_name]
-    raw_params = dict(parameters or {})
-    # Strip user_id if present in dictionary to avoid multiple values error
-    raw_params.pop("user_id", None)
+    kwargs = dict(parameters or {})
+    kwargs.pop("user_id", None)
 
     try:
         import inspect
         sig = inspect.signature(func)
-        filtered_params = {k: v for k, v in raw_params.items() if k in sig.parameters}
+        valid_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters and k != "user_id"}
         
         if "user_id" in sig.parameters:
-            return func(user_id=user_id, **filtered_params)
+            return func(user_id, **valid_kwargs)
         else:
-            return func(**filtered_params)
+            return func(**valid_kwargs)
     except Exception as e:
         return {"success": False, "error": f"Tool execution failed: {str(e)}"}
