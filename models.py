@@ -813,7 +813,6 @@ def save_progress(user_id: int, item_type: str, item_id: int, status: str = "Not
             """, (user_id, item_type, item_id, status, understanding, notes,
                   is_important, is_difficult, needs_practice))
             conn.commit()
-            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -1358,7 +1357,6 @@ def toggle_daily_plan(user_id: int, plan_id: int, is_completed: bool):
                 (1 if is_completed else 0, user_id, plan_id)
             )
             conn.commit()
-            st.cache_data.clear()
     except Exception:
         conn.rollback()
         raise
@@ -2410,7 +2408,6 @@ def complete_adaptive_revision(user_id: int, revision_id: int, new_understanding
                 """, (user_id, item_type, item_id))
                 
             conn.commit()
-            st.cache_data.clear()
             
             # Award +50 XP for revision
             award_user_xp(user_id, "revision_completed", 50, f"Completed revision #{rev.get('interval_number', 1)}")

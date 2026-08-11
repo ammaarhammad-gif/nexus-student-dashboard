@@ -1943,6 +1943,111 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             padding-left: 2rem !important;
             padding-right: 2rem !important;
         }
+
+        /* ══════════════════════════════════════════════════════════ */
+        /* ⚡ NEXUS MOTION DESIGN SYSTEM & MICRO-ANIMATIONS           */
+        /* ══════════════════════════════════════════════════════════ */
+
+        @keyframes nexus-check-pop {
+            0% { transform: scale(0.85); opacity: 0.4; }
+            50% { transform: scale(1.18); }
+            100% { transform: scale(1.0); opacity: 1; }
+        }
+
+        @keyframes nexus-float-xp {
+            0% { opacity: 0; transform: translateY(10px) scale(0.85); }
+            20% { opacity: 1; transform: translateY(0) scale(1.06); }
+            80% { opacity: 1; transform: translateY(-6px) scale(1.0); }
+            100% { opacity: 0; transform: translateY(-20px) scale(0.92); }
+        }
+
+        @keyframes nexus-pulse-glow {
+            0%, 100% { box-shadow: 0 0 12px rgba(56, 189, 248, 0.25); }
+            50% { box-shadow: 0 0 26px rgba(56, 189, 248, 0.55); }
+        }
+
+        @keyframes nexus-shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        @keyframes nexus-fade-slide {
+            0% { opacity: 0; transform: translateY(8px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Checkbox Instant Interactive Feedback */
+        div[data-testid="stCheckbox"] label {
+            transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease !important;
+            cursor: pointer !important;
+        }
+        div[data-testid="stCheckbox"] label:active {
+            transform: scale(0.97) !important;
+        }
+        div[data-testid="stCheckbox"] input[type="checkbox"]:checked + div {
+            animation: nexus-check-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+        }
+
+        /* Smooth Progress Bar Easing */
+        .stProgress > div > div > div > div {
+            transition: width 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+            border-radius: 10px !important;
+        }
+
+        /* Floating XP Badge Animation */
+        .nexus-floating-xp {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: linear-gradient(135deg, #0284C7 0%, #6366F1 100%);
+            color: #FFFFFF;
+            font-weight: 800;
+            font-size: 0.82rem;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
+            animation: nexus-float-xp 1.8s ease-in-out forwards;
+            pointer-events: none;
+        }
+
+        /* Card Transitions & Smooth Motion */
+        .nexus-card, .nexus-kpi-card, .readiness-container {
+            transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .nexus-card:hover, .readiness-container:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Button Press Haptic Feedback */
+        div.stButton > button {
+            transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        div.stButton > button:active {
+            transform: scale(0.97) !important;
+        }
+
+        /* AI Thinking Skeleton Shimmer */
+        .nexus-ai-thinking {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 12px;
+            color: #38BDF8;
+            font-weight: 600;
+            font-size: 0.92rem;
+            animation: nexus-fade-slide 0.3s ease-out;
+        }
+        .nexus-ai-thinking-dot {
+            width: 8px;
+            height: 8px;
+            background: #38BDF8;
+            border-radius: 50%;
+            display: inline-block;
+            animation: nexus-pulse-glow 1.2s infinite;
+        }
     """
 
     st.markdown(f"<style>{theme_vars}\n{wallpaper_css}\n{theme_rules}\n{shared_css}</style>", unsafe_allow_html=True)

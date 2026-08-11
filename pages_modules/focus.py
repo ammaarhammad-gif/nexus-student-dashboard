@@ -125,23 +125,114 @@ def render_focus_page(user_id: int):
                 </div>
             """, unsafe_allow_html=True)
 
-        # Interactive Timer Card
-        st.markdown(f"""
-            <div class="readiness-container" style="text-align: center; margin-top: 16px; padding: 36px 20px;">
-                <div style="font-size: 0.85rem; font-weight: 700; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px;">
+        # Interactive High-Performance Client-Side Timer
+        timer_seconds = int(selected_duration) * 60
+        st.components.v1.html(f"""
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 16px; padding: 24px 16px; color: #F8FAFC;">
+                <div style="font-size: 0.8rem; font-weight: 700; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px;">
                     🎯 IMMERSIVE FOCUS TARGET
                 </div>
-                <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 800; color: var(--nexus-text-title); margin: 0 0 12px 0;">
+                <div style="font-size: 1.25rem; font-weight: 700; color: #F8FAFC; margin-bottom: 16px;">
                     {sel_s_name} → {sel_c_name} {f'→ {sel_t_name}' if sel_t_id else ''}
-                </h2>
-                <div style="font-family: 'Outfit', sans-serif; font-size: clamp(3.2rem, 7vw, 5.0rem); font-weight: 800; background: linear-gradient(135deg, #38BDF8, #F97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 6px 0;">
-                    {selected_duration}:00
                 </div>
-                <p style="color: var(--nexus-text-sub); max-width: 480px; margin: 0 auto; font-size: 0.88rem;">
-                    Silence notifications, engage full screen, and focus entirely on mastering this concept.
-                </p>
+                
+                <!-- Circular Progress & Display -->
+                <div style="position: relative; width: 200px; height: 200px; margin: 0 auto;">
+                    <svg width="200" height="200" viewBox="0 0 200 200" style="transform: rotate(-90deg);">
+                        <circle cx="100" cy="100" r="86" fill="transparent" stroke="rgba(255,255,255,0.08)" stroke-width="12" />
+                        <circle id="nexus-timer-ring" cx="100" cy="100" r="86" fill="transparent" stroke="url(#timerGradient)" stroke-width="12" stroke-dasharray="540.35" stroke-dashoffset="0" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease;" />
+                        <defs>
+                            <linearGradient id="timerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#38BDF8" />
+                                <stop offset="100%" stop-color="#F97316" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div id="nexus-timer-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5rem; font-weight: 800; color: #FFFFFF; font-family: 'Outfit', sans-serif; letter-spacing: -0.02em;">
+                        {selected_duration}:00
+                    </div>
+                </div>
+
+                <!-- Instant Response Controls -->
+                <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                    <button id="nexus-btn-start" onclick="nexusStartTimer()" style="background: linear-gradient(135deg, #0284C7, #2563EB); border: none; color: white; padding: 10px 22px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 4px 14px rgba(37,99,235,0.4);">
+                        ▶ Start Focus
+                    </button>
+                    <button id="nexus-btn-pause" onclick="nexusPauseTimer()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #F8FAFC; padding: 10px 18px; font-size: 0.95rem; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 0.15s ease;">
+                        ⏸ Pause
+                    </button>
+                    <button onclick="nexusAddMinutes(5)" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #38BDF8; padding: 10px 14px; font-size: 0.9rem; font-weight: 700; border-radius: 10px; cursor: pointer; transition: all 0.15s ease;">
+                        +5 Min
+                    </button>
+                    <button onclick="nexusResetTimer()" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #EF4444; padding: 10px 16px; font-size: 0.9rem; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 0.15s ease;">
+                        ↺ Reset
+                    </button>
+                </div>
             </div>
-        """, unsafe_allow_html=True)
+
+            <script>
+                var totalSecs = {timer_seconds};
+                var remainingSecs = totalSecs;
+                var timerInterval = null;
+                var circumference = 2 * Math.PI * 86; // 540.35
+
+                function formatTime(secs) {{
+                    var m = Math.floor(secs / 60);
+                    var s = secs % 60;
+                    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+                }}
+
+                function updateDisplay() {{
+                    document.getElementById('nexus-timer-text').innerText = formatTime(remainingSecs);
+                    var ring = document.getElementById('nexus-timer-ring');
+                    if (ring) {{
+                        var fraction = 1 - (remainingSecs / totalSecs);
+                        var offset = fraction * circumference;
+                        ring.style.strokeDashoffset = offset;
+                    }}
+                }}
+
+                function nexusStartTimer() {{
+                    if (timerInterval) return;
+                    document.getElementById('nexus-btn-start').style.opacity = '0.7';
+                    document.getElementById('nexus-btn-start').innerText = '🔥 Focusing...';
+                    timerInterval = setInterval(function() {{
+                        if (remainingSecs > 0) {{
+                            remainingSecs--;
+                            updateDisplay();
+                        }} else {{
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                            document.getElementById('nexus-btn-start').innerText = '🎉 Completed!';
+                            alert('🎯 Focus session complete! Log your progress below to claim your XP.');
+                        }}
+                    }}, 1000);
+                }}
+
+                function nexusPauseTimer() {{
+                    if (timerInterval) {{
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        document.getElementById('nexus-btn-start').style.opacity = '1.0';
+                        document.getElementById('nexus-btn-start').innerText = '▶ Resume';
+                    }}
+                }}
+
+                function nexusAddMinutes(mins) {{
+                    totalSecs += mins * 60;
+                    remainingSecs += mins * 60;
+                    updateDisplay();
+                }}
+
+                function nexusResetTimer() {{
+                    nexusPauseTimer();
+                    totalSecs = {timer_seconds};
+                    remainingSecs = totalSecs;
+                    document.getElementById('nexus-btn-start').innerText = '▶ Start Focus';
+                    updateDisplay();
+                }}
+            </script>
+        """, height=380)
 
         # Complete & Record Form
         st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)

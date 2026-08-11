@@ -86,16 +86,22 @@ def _render_daily_planner_tab(user_id: int):
         selected_date = st.date_input("Select Date", value=datetime.date.today(), key="planner_date_picker")
         date_str = selected_date.strftime("%Y-%m-%d")
 
-    plans = get_daily_plans(user_id, date_str)
-    completed_plans = [p for p in plans if p["is_completed"]]
-    total_plans = len(plans)
-    pct = round((len(completed_plans) / total_plans) * 100) if total_plans > 0 else 0
+    _render_planner_task_list_fragment(user_id, date_str, selected_date)
 
-    c_prog1, c_prog2 = st.columns([4, 1])
-    with c_prog1:
-        st.progress(pct / 100)
-    with c_prog2:
-        st.markdown(f"**{len(completed_plans)} / {total_plans} Done** ({pct}%)")
+
+@st.fragment
+def _render_planner_task_list_fragment(user_id: int, date_str: str, selected_date):
+    plans = get_daily_plans(user_id, date_str)
+    
+    # Calculate optimistic completion counts
+    completed_count = sum(
+        1 for p in plans
+        if get_optimistic_plan_status(p["id"], bool(p.get("is_completed", False)))
+    )
+    total_plans = len(plans)
+    pct = round((completed_count / total_plans) * 100) if total_plans > 0 else 0
+
+    render_animated_progress_bar(pct, color="#38BDF8", height_px=9, label=f"Daily Progress: {completed_count}/{total_plans} Tasks")
 
     # Add Task Form
     with st.expander("➕ Add Task for " + selected_date.strftime('%b %d, %Y'), expanded=(total_plans == 0)):
@@ -132,7 +138,7 @@ def _render_daily_planner_tab(user_id: int):
             with c1:
                 t_name = p.get("description") or p.get("task_name") or p.get("topic_name") or "Study Task"
                 t_dur = p.get("duration_minutes") or p.get("estimated_minutes") or 30
-                done = bool(p.get("is_completed", False))
+                done = get_optimistic_plan_status(p["id"], bool(p.get("is_completed", False)))
                 sub_label = f" <span style='font-size: 0.75rem; color: {p.get('subject_color', '#38BDF8')}; background: rgba(56,189,248,0.1); padding: 2px 8px; border-radius: 10px; font-weight: 700;'>{p.get('subject_name')}</span>" if p.get("subject_name") else ""
                 
                 checked = st.checkbox(
@@ -141,10 +147,13 @@ def _render_daily_planner_tab(user_id: int):
                     key=f"plan_item_chk_{p['id']}"
                 )
                 if checked != done:
-                    toggle_daily_plan(user_id, p["id"], 1 if checked else 0)
+                    def _save_task_db():
+                        toggle_daily_plan(user_id, p["id"], 1 if checked else 0)
+                    set_optimistic_plan_status(user_id, p["id"], checked, _save_task_db)
                     if checked:
-                        st.toast(f"Completed '{t_name}'! +15 XP", icon="⭐")
-                    st.rerun()
+                        render_floating_xp_toast(15, f"Completed: {t_name}")
+                    else:
+                        st.toast(f"Marked '{t_name}' as pending.", icon="⚪")
 
                 if sub_label:
                     st.markdown(f"<div style='margin-left: 28px; margin-top: -4px;'>{sub_label}</div>", unsafe_allow_html=True)

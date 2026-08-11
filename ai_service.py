@@ -632,6 +632,25 @@ class NexusAIService:
             "action_badge": badge
         }
 
+    def generate_explanation(self, user_id: int, topic_id: int = None, topic_name: str = "", style: str = "Intuitive & Practical") -> dict:
+        """Backward compatibility helper for test suites and legacy callers."""
+        name = topic_name
+        if topic_id and not name:
+            try:
+                from models import get_all_subjects_with_stats
+                for sub in get_all_subjects_with_stats(user_id):
+                    for ch in sub.get("chapters", []):
+                        for top in ch.get("topics", []):
+                            if top.get("id") == topic_id:
+                                name = top.get("name")
+                                break
+            except Exception:
+                pass
+        name = name or f"Topic #{topic_id}"
+        query = f"Explain {name} using {style}"
+        res = self.process_chat_message(user_id, query)
+        return res
+
     # ══════════════════════════════════════════════════════════
     # MAIN CONVERSATIONAL CHAT ENGINE (Dual-Engine with Intent Routing)
     # ══════════════════════════════════════════════════════════

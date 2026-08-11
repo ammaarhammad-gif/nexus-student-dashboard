@@ -173,21 +173,53 @@ def render_ai_command_center_page(user_id: int):
         user_query = prompt_to_process.strip()
         NexusConversationSession.add_message("user", user_query)
 
-        with st.spinner("Nexus is thinking & orchestrating academic workspace..."):
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(f"**{user_query}**")
+
+        with st.chat_message("assistant", avatar="🤖"):
+            thinking_placeholder = st.empty()
+            thinking_placeholder.markdown("""
+                <div class="nexus-ai-thinking">
+                    <span class="nexus-ai-thinking-dot"></span>
+                    <span>🧠 Nexus is analyzing your curriculum and formulating an optimal response...</span>
+                </div>
+            """, unsafe_allow_html=True)
+
             try:
                 ai_response = nexus_ai.process_chat_message(user_id, user_query)
+                thinking_placeholder.empty()
+
+                if ai_response.get("action_badge"):
+                    st.markdown(
+                        f'<div style="margin-bottom: 8px;"><span style="background: rgba(34, 197, 94, 0.18); color: #22C55E; font-size: 0.82rem; font-weight: 700; padding: 5px 14px; border-radius: 12px; border: 1px solid rgba(34, 197, 94, 0.35); display: inline-flex; align-items: center; gap: 6px;">{ai_response["action_badge"]}</span></div>',
+                        unsafe_allow_html=True
+                    )
+
+                response_text = ai_response.get("content", "I am ready to help with your academic goals.")
+                
+                # Stream the response text smoothly for instant conversational feel
+                import time
+                def _stream_text():
+                    for word in response_text.split(" "):
+                        yield word + " "
+                        time.sleep(0.012)
+                st.write_stream(_stream_text)
+
                 NexusConversationSession.add_message(
                     role="nexus",
-                    content=ai_response.get("content", "I am ready to help with your academic goals."),
+                    content=response_text,
                     action_badge=ai_response.get("action_badge"),
                     follow_ups=ai_response.get("follow_ups", [])
                 )
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).exception(f"Error in ai_command_center: {e}")
+                thinking_placeholder.empty()
+                err_msg = "I encountered a momentary issue while processing that request. Please rephrase or ask about a specific study topic!"
+                st.markdown(err_msg)
                 NexusConversationSession.add_message(
                     role="nexus",
-                    content="I encountered a momentary issue while processing that request. Please rephrase or ask about a specific study topic!",
+                    content=err_msg,
                     action_badge="⚠️ Copilot Notice"
                 )
 

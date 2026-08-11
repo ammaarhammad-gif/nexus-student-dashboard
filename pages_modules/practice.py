@@ -36,6 +36,7 @@ from models import (
 from styles import render_top_header_bar, render_metric_card, render_breadcrumbs, render_empty_state
 from components.math_keyboard import render_latex_math_keyboard
 from anki_export import export_active_recall_to_anki, export_mistakes_to_anki
+from ui_optimistic import render_animated_progress_bar, render_floating_xp_toast
 
 MISTAKE_TYPES = [
     "Conceptual Gap",
@@ -254,7 +255,7 @@ def _render_quiz_engine_view(user_id: int):
                     res_color = "#22C55E" if pct >= 80 else ("#38BDF8" if pct >= 60 else ("#F59E0B" if pct >= 40 else "#EF4444"))
 
                     st.markdown(f"""
-                        <div class="readiness-container" style="text-align: center; padding: 28px 20px; border-top: 4px solid {res_color};">
+                        <div class="readiness-container" style="text-align: center; padding: 28px 20px; border-top: 4px solid {res_color}; margin-bottom: 12px;">
                             <div style="font-size: 0.85rem; font-weight: 700; color: {res_color}; text-transform: uppercase; letter-spacing: 0.08em;">
                                 ASSESSMENT RESULT
                             </div>
@@ -269,6 +270,7 @@ def _render_quiz_engine_view(user_id: int):
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
+                    render_animated_progress_bar(pct, color=res_color, height_px=8)
 
                     st.markdown("### 📋 Question Review & Solutions")
                     for idx, q_res in enumerate(results.get("detailed_breakdown", []), 1):

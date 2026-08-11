@@ -25,6 +25,10 @@ from preloaded_syllabi import preload_standard_syllabus, reload_and_replace_syll
 from styles import render_top_header_bar, render_header, render_breadcrumbs, render_empty_state, render_html
 from components.math_keyboard import render_latex_math_keyboard
 from anki_export import export_formulas_to_anki
+from ui_optimistic import (
+    get_optimistic_topic_status, set_optimistic_topic_status,
+    render_animated_progress_bar, render_floating_xp_toast
+)
 
 
 STATUS_OPTIONS = ["Not Started", "In Progress", "Completed", "Revision Done"]
@@ -149,7 +153,7 @@ def _render_syllabus_view(user_id: int, board: str, class_name: str):
         sub_pct = round((completed_subject_topics / total_subject_topics * 100)) if total_subject_topics > 0 else 0
 
         st.markdown(f"""
-            <div class="nexus-card" style="border-top: 4px solid {selected_subject['color']}; margin-top: 10px; margin-bottom: 20px;">
+            <div class="nexus-card" style="border-top: 4px solid {selected_subject['color']}; margin-top: 10px; margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <h2 style="margin: 0; font-size: 1.6rem; color: var(--nexus-text-title);">{selected_subject['name']}</h2>
@@ -162,6 +166,7 @@ def _render_syllabus_view(user_id: int, board: str, class_name: str):
                 </div>
             </div>
         """, unsafe_allow_html=True)
+        render_animated_progress_bar(sub_pct, color=selected_subject['color'], height_px=8)
 
         # Add Chapter Form
         with st.expander(f"➕ Add Custom Chapter to {selected_subject['name']}", expanded=False):
@@ -240,9 +245,14 @@ def _render_syllabus_view(user_id: int, board: str, class_name: str):
         _render_csv_import_view(user_id)
 
 
+@st.fragment
 def _render_learn_topic_card(user_id: int, topic: dict, subject: dict, chapter: dict):
-    """Render a topic with 1-click status ticking, understanding slider, and direct shortcuts."""
-    is_completed = (topic["status"] in ["Completed", "Revision Done"])
+    """
+    Render an isolated topic card using @st.fragment for instant (<50ms) local updates,
+    micro-animations, floating XP badges, and background persistence.
+    """
+    curr_status = get_optimistic_topic_status(topic["id"], topic.get("status", "Not Started"))
+    is_completed = (curr_status in ["Completed", "Revision Done"])
 
     col_check, col_details_btn = st.columns([5, 1])
 
@@ -260,24 +270,24 @@ def _render_learn_topic_card(user_id: int, topic: dict, subject: dict, chapter: 
             new_status_select = st.selectbox(
                 "Status",
                 STATUS_OPTIONS,
-                index=STATUS_OPTIONS.index(topic["status"]) if topic["status"] in STATUS_OPTIONS else 0,
+                index=STATUS_OPTIONS.index(curr_status) if curr_status in STATUS_OPTIONS else 0,
                 key=f"learn_status_sel_{topic['id']}"
             )
             new_understanding = st.selectbox(
                 "Understanding Level",
                 options=[1, 2, 3, 4, 5],
                 format_func=lambda x: UNDERSTANDING_LABELS[x],
-                index=max(0, min(4, topic["understanding"] - 1)),
+                index=max(0, min(4, topic.get("understanding", 3) - 1)),
                 key=f"learn_und_sel_{topic['id']}"
             )
 
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
-                is_imp = st.checkbox("⭐ Important", value=bool(topic["is_important"]), key=f"learn_imp_{topic['id']}")
+                is_imp = st.checkbox("⭐ Important", value=bool(topic.get("is_important", 0)), key=f"learn_imp_{topic['id']}")
             with col_f2:
-                is_diff = st.checkbox("⚠️ Difficult", value=bool(topic["is_difficult"]), key=f"learn_diff_{topic['id']}")
+                is_diff = st.checkbox("⚠️ Difficult", value=bool(topic.get("is_difficult", 0)), key=f"learn_diff_{topic['id']}")
             with col_f3:
-                is_prac = st.checkbox("🔄 Practice", value=bool(topic["needs_practice"]), key=f"learn_prac_{topic['id']}")
+                is_prac = st.checkbox("🔄 Practice", value=bool(topic.get("needs_practice", 0)), key=f"learn_prac_{topic['id']}")
 
             edit_notes = st.text_input(
                 "Quick Key Formulae / Note",
@@ -286,21 +296,22 @@ def _render_learn_topic_card(user_id: int, topic: dict, subject: dict, chapter: 
             )
 
             if st.button("💾 Save Changes", key=f"learn_save_det_{topic['id']}", use_container_width=True):
-                save_progress(
-                    user_id=user_id,
-                    item_type="topic",
-                    item_id=topic["id"],
-                    status=new_status_select,
-                    understanding=new_understanding,
-                    notes=edit_notes,
-                    is_important=int(is_imp),
-                    is_difficult=int(is_diff),
-                    needs_practice=int(is_prac)
-                )
-                if new_status_select == "Completed" and topic["status"] != "Completed":
-                    schedule_revisions(user_id, "topic", topic["id"])
+                def _save_edit():
+                    save_progress(
+                        user_id=user_id,
+                        item_type="topic",
+                        item_id=topic["id"],
+                        status=new_status_select,
+                        understanding=new_understanding,
+                        notes=edit_notes,
+                        is_important=int(is_imp),
+                        is_difficult=int(is_diff),
+                        needs_practice=int(is_prac)
+                    )
+                    if new_status_select == "Completed" and curr_status != "Completed":
+                        schedule_revisions(user_id, "topic", topic["id"])
+                set_optimistic_topic_status(user_id, topic["id"], new_status_select, _save_edit)
                 st.toast("Saved changes!", icon="✅")
-                st.rerun()
 
             st.markdown("---")
             ren_t = st.text_input("Rename Topic", value=topic["name"], key=f"learn_ren_t_{topic['id']}")
@@ -316,21 +327,26 @@ def _render_learn_topic_card(user_id: int, topic: dict, subject: dict, chapter: 
     # Detect 1-click status tick change
     if checked != is_completed:
         new_status = "Completed" if checked else "Not Started"
-        save_progress(
-            user_id=user_id,
-            item_type="topic",
-            item_id=topic["id"],
-            status=new_status,
-            understanding=topic.get("understanding", 3),
-            notes=topic.get("notes", "") or "",
-            is_important=topic.get("is_important", 0),
-            is_difficult=topic.get("is_difficult", 0),
-            needs_practice=topic.get("needs_practice", 0)
-        )
+        def _save_tick():
+            save_progress(
+                user_id=user_id,
+                item_type="topic",
+                item_id=topic["id"],
+                status=new_status,
+                understanding=topic.get("understanding", 3),
+                notes=topic.get("notes", "") or "",
+                is_important=topic.get("is_important", 0),
+                is_difficult=topic.get("is_difficult", 0),
+                needs_practice=topic.get("needs_practice", 0)
+            )
+            if checked:
+                schedule_revisions(user_id, "topic", topic["id"])
+        
+        set_optimistic_topic_status(user_id, topic["id"], new_status, _save_tick)
         if checked:
-            schedule_revisions(user_id, "topic", topic["id"])
-            st.toast(f"🌟 Completed '{topic['name']}'! Revision reminders scheduled.", icon="🎉")
-        st.rerun()
+            render_floating_xp_toast(30, f"Completed '{topic['name']}'! (+30 XP)")
+        else:
+            st.toast(f"Marked '{topic['name']}' as not started.", icon="⚪")
 
     # Topic Shortcut Action Bar: Note, Recall, Focus
     c_sc1, c_sc2, c_sc3, c_sc_pad = st.columns([1.2, 1.4, 1.2, 3])
@@ -354,6 +370,7 @@ def _render_learn_topic_card(user_id: int, topic: dict, subject: dict, chapter: 
             st.session_state["focus_target_topic_id"] = topic["id"]
             st.session_state["current_page"] = "⏱️ Focus"
             st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
+            st.rerun()
             st.rerun()
 
     # Display Badges
