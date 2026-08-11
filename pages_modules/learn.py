@@ -413,6 +413,11 @@ def _render_csv_import_view(user_id: int):
 
     uploaded = st.file_uploader("Choose a CSV file", type=["csv"], key="learn_csv_syllabus_upload")
     if uploaded is not None:
+        file_size = getattr(uploaded, "size", 0)
+        if file_size > 2 * 1024 * 1024:
+            st.error("CSV file exceeds the 2MB size limit. Please upload a smaller syllabus file.")
+            return
+
         try:
             content = uploaded.getvalue().decode("utf-8-sig", errors="replace")
             reader = csv.DictReader(io.StringIO(content))
@@ -427,13 +432,15 @@ def _render_csv_import_view(user_id: int):
 
             rows = []
             for r in reader:
+                if len(rows) >= 500:
+                    break
                 s_val = r.get(sub_col, "").strip()
                 c_val = r.get(chap_col, "").strip()
                 t_val = r.get(top_col, "").strip()
                 if s_val and c_val and t_val:
-                    rows.append({"Subject": s_val, "Chapter": c_val, "Topic": t_val})
-        except Exception as e:
-            st.error(f"Failed to read CSV: {e}")
+                    rows.append({"Subject": s_val[:100], "Chapter": c_val[:150], "Topic": t_val[:200]})
+        except Exception:
+            st.error("Failed to read CSV file. Please ensure it is valid UTF-8 formatted CSV text.")
             return
 
         if not rows:

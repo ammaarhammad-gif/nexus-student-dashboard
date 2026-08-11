@@ -170,12 +170,17 @@ def render_auth_page():
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                 submitted = st.form_submit_button("🚀 Create Free Account & Get Started", use_container_width=True, type="primary")
                 if submitted:
+                    import re
                     if not new_username or not new_password or not confirm_password:
                         st.error("Please fill in all required fields.")
+                    elif not re.match(r"^[a-zA-Z0-9_]{3,30}$", new_username):
+                        st.error("Username must be 3–30 characters long and contain only letters, numbers, and underscores.")
                     elif new_password != confirm_password:
                         st.error("Passwords do not match.")
                     elif len(new_password) < 6:
                         st.error("Password must be at least 6 characters long.")
+                    elif len(new_password) > 128:
+                        st.error("Password must not exceed 128 characters.")
                     else:
                         from models import create_user
                         user_id = create_user(new_username, new_password)
@@ -472,9 +477,7 @@ def main():
         with col_logout:
             if st.button("🚪 Logout", key="sidebar_logout_btn", use_container_width=True):
                 clear_session_param()
-                for key in ["user_id", "username", "current_page", "nav_epoch", "authenticated"]:
-                    if key in st.session_state:
-                        del st.session_state[key]
+                st.session_state.clear()
                 st.rerun()
 
         footer_name_color = "#FFFFFF" if is_dark else "#0F172A"

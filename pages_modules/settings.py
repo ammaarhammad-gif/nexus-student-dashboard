@@ -33,11 +33,36 @@ from anki_export import export_all_to_anki
 from pdf_generator import generate_weekly_progress_pdf
 
 
+MAX_WALLPAPER_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
 def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: int = 80):
-    """Resizes and compresses an uploaded image into a high-performance JPEG data URL."""
+    """
+    Safely validates, bounds, resizes and compresses an uploaded wallpaper image.
+    Enforces a 5MB size limit and PIL decompression bomb protections.
+    """
+    if uploaded_file is None:
+        return None
+
     try:
+        # 1. Enforce file size limit
+        file_size = getattr(uploaded_file, "size", 0)
+        if file_size > MAX_WALLPAPER_SIZE_BYTES:
+            st.error("Uploaded image exceeds the 5MB file size limit. Please choose a smaller image.")
+            return None
+
         if HAS_PIL:
+            # Prevent DecompressionBomb attacks
+            Image.MAX_IMAGE_PIXELS = 10_000_000
+
+            uploaded_file.seek(0)
             image = Image.open(uploaded_file)
+            
+            # Validate format strictly
+            if image.format not in ("JPEG", "PNG", "WEBP", "JPG"):
+                st.error("Invalid image format. Only JPG, PNG, and WebP images are allowed.")
+                return None
+
             if image.mode in ("RGBA", "P"):
                 image = image.convert("RGB")
             if image.width > max_width:
@@ -51,10 +76,13 @@ def process_uploaded_wallpaper(uploaded_file, max_width: int = 1920, quality: in
         else:
             uploaded_file.seek(0)
             img_bytes = uploaded_file.read()
+            if len(img_bytes) > MAX_WALLPAPER_SIZE_BYTES:
+                return None
 
         b64_str = base64.b64encode(img_bytes).decode("utf-8")
         return f"data:image/jpeg;base64,{b64_str}"
-    except Exception:
+    except Exception as e:
+        st.error("Unable to process the uploaded image. Please ensure it is a valid, uncorrupted image file.")
         return None
 
 
