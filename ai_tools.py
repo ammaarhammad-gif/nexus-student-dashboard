@@ -92,13 +92,29 @@ def resolve_subject_by_name(user_id: int, name_query: str) -> dict:
     return subjects[0] if len(subjects) == 1 else None
 
 
+def _normalize_tokens(text: str) -> set:
+    """Helper to extract normalized, punctuation-free stemmed tokens."""
+    cleaned = re.sub(r"[^\w\s]", " ", text.lower())
+    tokens = set()
+    for w in cleaned.split():
+        if w in ["chapter", "topic", "on", "about", "the", "concept", "of", "in", "and", "as", "for", "to", "my"]:
+            continue
+        tokens.add(w)
+        # Add basic stemmed forms (remove trailing 's', 'es')
+        if len(w) > 4 and w.endswith("es"):
+            tokens.add(w[:-2])
+        elif len(w) > 3 and w.endswith("s"):
+            tokens.add(w[:-1])
+    return tokens
+
+
 def resolve_topic_by_name(user_id: int, topic_query: str, subject_hint: str = None) -> dict:
     """Fuzzy-matches a topic name to a topic record with subject & chapter details."""
     if not topic_query:
         return None
     q = topic_query.lower().strip()
     # Strip common noise words
-    noise = ["chapter", "topic", "on", "about", "the", "concept", "of", "in"]
+    noise = ["chapter", "topic", "on", "about", "the", "concept", "of", "in", "my", "as"]
     clean_q = " ".join([w for w in q.split() if w not in noise]) or q
 
     conn = get_connection()
@@ -133,18 +149,22 @@ def resolve_topic_by_name(user_id: int, topic_query: str, subject_hint: str = No
                 if clean_q in r["chapter_name"].lower() or r["chapter_name"].lower() in clean_q:
                     return dict(r)
 
-            # 4. Keyword token overlap
-            q_tokens = set(clean_q.split())
+            # 4. Normalized token overlap (handles plurals, punctuation, possessives)
+            q_tokens = _normalize_tokens(clean_q)
             best_match = None
             max_overlap = 0
             for r in rows:
-                t_tokens = set(r["topic_name"].lower().split())
+                t_tokens = _normalize_tokens(r["topic_name"]) | _normalize_tokens(r["chapter_name"])
                 overlap = len(q_tokens & t_tokens)
                 if overlap > max_overlap:
                     max_overlap = overlap
                     best_match = dict(r)
             if max_overlap >= 1:
                 return best_match
+
+            # 5. If user has only 1 topic seeded, return it
+            if len(rows) == 1:
+                return dict(rows[0])
 
             return None
     finally:
