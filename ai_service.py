@@ -1,22 +1,27 @@
 """
 ai_service.py — Production-Grade Nexus AI Intelligence Layer & Autonomous Academic Copilot.
 
-Combines:
-1. AI Tutor & Deep Pedagogical Teaching Engine (Feynman, Board Exam, Visual/Analogical, Socratic)
-2. Conversational Multi-Turn Session Memory (Topic tracking, refinement, confusion analysis)
-3. Multi-Stage "Teach Me" Interactive Learning Pipeline
-4. Natural Language Workspace Action Controller (Tool execution across all Nexus modules)
-5. Dual-Engine Architecture (Cloud LLMs + Autonomous Local Cognitive Engine)
-6. Strict Educational Domain Confinement
+Architecture:
+1. Intent-Routing Engine (Separates conversational mentorship from workspace actions)
+2. Selective Context Assembly (Never runs unnecessary DB queries for general chat)
+3. Deep Pedagogical Teaching Modes (Feynman, Board Exam Derivation, Visual/Analogical, Socratic)
+4. Conversational Multi-Turn Session Memory (Topic tracking, refinement, confusion analysis)
+5. Natural Language Workspace Action Controller (Safe tool execution across all Nexus modules)
+6. Dual-Engine Architecture (Cloud LLMs + Autonomous Local Cognitive Engine)
+7. Robust Error Shielding (Zero raw SQL/backend errors exposed to students)
 """
 
 import os
 import json
 import datetime
 import re
+import logging
 import requests
 import streamlit as st
 import psycopg2.extras
+
+logger = logging.getLogger(__name__)
+
 from database import get_connection
 from models import (
     get_user_profile,
@@ -46,6 +51,91 @@ from ai_tools import (
 
 
 # ══════════════════════════════════════════════════════════
+# INTENT CLASSIFICATION ROUTER
+# ══════════════════════════════════════════════════════════
+
+class NexusIntentRouter:
+    """
+    Categorizes student queries into explicit semantic intent types.
+    Strictly prevents conversational queries from executing database actions.
+    """
+
+    @staticmethod
+    def classify(query: str) -> str:
+        q = query.lower().strip()
+
+        # 1. Destructive Actions
+        if any(w in q for w in ["delete all my notes", "delete all notes", "reset my progress", "delete account", "delete my account"]):
+            return "DESTRUCTIVE_ACTION"
+
+        # 2. Natural Greetings & Onboarding
+        greetings = ["hi", "hello", "hey", "hey nexus", "hi nexus", "hello nexus", "good morning", "good evening", "good afternoon", "who are you", "what can you do", "help"]
+        if q in greetings or q.startswith("hi ") or q.startswith("hello "):
+            if not any(kw in q for kw in ["explain", "teach", "how", "why", "quiz", "schedule", "plan"]):
+                return "GREETING"
+
+        # 3. Career & High-Level Academic Ambitions (e.g. MIT, IIT, Olympiads)
+        goal_keywords = [
+            "mit", "stanford", "harvard", "iit", "jee", "neet", "olympiad", "board topper", "98%", "99%", "100%",
+            "wanna get into", "want to get into", "aiming for", "target university", "target college", "dream college",
+            "become an engineer", "become a doctor", "astrophysics", "career in", "how to get into", "how do i get into",
+            "get admission in", "crack jee", "crack neet"
+        ]
+        if any(w in q for w in goal_keywords):
+            return "CAREER_ACADEMIC_GOAL"
+
+        # 4. Study Advice, Stress & Emotional Coaching
+        advice_keywords = [
+            "struggling with", "struggling in", "scared about", "feeling behind", "behind in", "how should i study",
+            "tips for", "how to prepare", "feeling overwhelmed", "exam next month", "can't focus", "cannot focus",
+            "how to stay focused", "how to revise", "how to score high", "i don't understand how to study", "lost motivation",
+            "anxious about", "procrastinating", "improve my marks", "improve my score"
+        ]
+        if any(w in q for w in advice_keywords):
+            return "STUDY_ADVICE_EMOTIONAL"
+
+        # 5. Progress & Analytics Queries
+        progress_keywords = [
+            "how am i doing", "how am i progressing", "my progress", "weakest topics", "weakest subjects",
+            "weak topics", "weak subjects", "exam readiness", "my readiness", "progress audit", "how is my physics",
+            "how is my chemistry", "how is my math", "my stats", "analytics"
+        ]
+        if any(w in q for w in progress_keywords):
+            return "PROGRESS_ANALYSIS"
+
+        # 6. Socratic Dialogue Requests
+        if any(w in q for w in ["socratic", "using questions", "ask me questions", "guide me with questions", "quiz me through questions"]):
+            return "SOCRATIC_MODE"
+
+        # 7. Workspace Control Commands (Explicit Actions)
+        if any(w in q for w in ["focus session", "start focus", "start timer", "pomodoro", "deep work"]):
+            return "APP_COMMAND_FOCUS"
+        if any(w in q for w in ["schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study", "make a study plan"]):
+            return "APP_COMMAND_PLANNER"
+        if "mark " in q and any(w in q for w in ["completed", "complete", "done", "in progress"]):
+            return "APP_COMMAND_SYLLABUS"
+        if "revision" in q and any(w in q for w in ["add", "put", "schedule", "queue", "set"]):
+            return "APP_COMMAND_REVISION"
+        if ("note" in q or "notes" in q) and any(w in q for w in ["save", "create", "add", "make"]):
+            return "APP_COMMAND_NOTES"
+        if any(w in q for w in ["save formula", "add formula", "create formula"]):
+            return "APP_COMMAND_FORMULAS"
+        if any(w in q for w in ["got question", "got it wrong", "made a mistake", "i was wrong", "mistake on question", "log mistake"]):
+            return "APP_COMMAND_MISTAKES"
+        if any(w in q for w in ["quiz me", "test me", "generate quiz", "create quiz", "give me a test", "start a quiz"]):
+            return "APP_COMMAND_QUIZ"
+        if q.startswith("find ") or q.startswith("search ") or "look up" in q:
+            return "APP_COMMAND_SEARCH"
+        if any(w in q for w in ["wallpaper", "theme", "dark mode", "light mode", "change theme"]):
+            return "APP_COMMAND_THEME"
+        if any(w in q for w in ["open my", "take me to", "go to", "navigate to", "open the"]):
+            return "APP_COMMAND_NAVIGATION"
+
+        # 8. Default: Educational Concept Explanation
+        return "CONCEPT_EXPLANATION"
+
+
+# ══════════════════════════════════════════════════════════
 # AUTHORIZED NEXUS CONTEXT BUILDER
 # ══════════════════════════════════════════════════════════
 
@@ -54,40 +144,52 @@ class NexusContextBuilder:
 
     @staticmethod
     def get_student_profile(user_id: int) -> dict:
-        profile = get_user_profile(user_id) or {}
-        return {
-            "name": profile.get("name", "Student"),
-            "class_name": profile.get("class_name", "Class 10"),
-            "board": profile.get("board", "CBSE"),
-            "academic_year": profile.get("academic_year", "")
-        }
+        try:
+            profile = get_user_profile(user_id) or {}
+            return {
+                "name": profile.get("name", "Student"),
+                "class_name": profile.get("class_name", "Class 10"),
+                "board": profile.get("board", "CBSE"),
+                "academic_year": profile.get("academic_year", "")
+            }
+        except Exception as e:
+            logger.error(f"Error fetching profile for user {user_id}: {e}")
+            return {"name": "Student", "class_name": "Class 10", "board": "CBSE", "academic_year": ""}
 
     @staticmethod
     def get_syllabus_summary(user_id: int) -> dict:
-        stats = get_overall_stats(user_id)
-        subjects = get_all_subjects_with_stats(user_id)
-        return {
-            "total_topics": stats.get("total_topics", 0),
-            "completed_topics": stats.get("completed_topics", 0),
-            "percent_completed": stats.get("percent_completed", 0),
-            "subjects": [{
-                "name": s["name"],
-                "completed": s["completed"],
-                "total": s["total_topics"],
-                "pct": s["percent_completed"],
-                "avg_understanding": s["avg_understanding"]
-            } for s in subjects]
-        }
+        try:
+            stats = get_overall_stats(user_id) or {}
+            subjects = get_all_subjects_with_stats(user_id) or []
+            return {
+                "total_topics": stats.get("total_topics", 0),
+                "completed_topics": stats.get("completed_topics", 0),
+                "percent_completed": stats.get("percent_completed", 0),
+                "subjects": [{
+                    "name": s["name"],
+                    "completed": s.get("completed", 0),
+                    "total": s.get("total_topics", 0),
+                    "pct": s.get("percent_completed", 0),
+                    "avg_understanding": s.get("avg_understanding", 3)
+                } for s in subjects]
+            }
+        except Exception as e:
+            logger.error(f"Error fetching syllabus summary for user {user_id}: {e}")
+            return {"total_topics": 0, "completed_topics": 0, "percent_completed": 0, "subjects": []}
 
     @staticmethod
     def get_priorities(user_id: int) -> list:
-        priorities = get_top_nexus_priorities(user_id, limit=5)
-        return [{
-            "topic_name": p["topic_name"],
-            "subject_name": p["subject_name"],
-            "chapter_name": p["chapter_name"],
-            "reasons": p["reasons"]
-        } for p in priorities]
+        try:
+            priorities = get_top_nexus_priorities(user_id, limit=5) or []
+            return [{
+                "topic_name": p.get("topic_name", "Core Concept"),
+                "subject_name": p.get("subject_name", "General"),
+                "chapter_name": p.get("chapter_name", ""),
+                "reasons": p.get("reasons", ["High-yield focus"])
+            } for p in priorities]
+        except Exception as e:
+            logger.error(f"Error fetching priorities for user {user_id}: {e}")
+            return []
 
     @staticmethod
     def assemble_full_context(user_id: int) -> dict:
@@ -106,7 +208,7 @@ EXPANDED_KNOWLEDGE_BASE = {
     "newton": {
         "title": "Newton's Laws of Motion & Action-Reaction Principle",
         "subject": "Physics",
-        "keywords": ["newton", "third law", "first law", "second law", "force", "action reaction", "momentum", "inertia"],
+        "keywords": ["newton", "third law", "first law", "second law", "force", "action reaction", "momentum", "inertia", "laws of motion"],
         "intuition": "Forces in the universe never exist in isolation. You cannot touch something without it touching you back with the exact same strength. When you push against a brick wall, you feel the wall pressing firmly against your palm. The universe enforces a strict balance: every single interaction is a mutual two-way handshake.",
         "feynman_analogy": "Imagine you and your friend are wearing ice skates on completely frictionless ice. If you reach out and push your friend forward, what happens? You don't stay still — you slide backward at the exact same instant! Even if you are the one who did the pushing with your muscles, you both experience identical force magnitudes in opposite directions. The skates make the hidden reaction force impossible to miss.",
         "microscopic_reality": "At the atomic level, when surfaces make contact, the electron clouds of the outer atoms repel each other via the fundamental electromagnetic force. The electron cloud compression in Body A exerts an equal repulsive electrostatic force on the electron clouds of Body B ($F_{AB} = -F_{BA}$). Because these forces act on *different bodies*, they never cancel each other out.",
@@ -153,34 +255,36 @@ EXPANDED_KNOWLEDGE_BASE = {
         "exam_question": "Explain why leaves are destarched before photosynthesis experiments and state the chemical test used to verify starch presence.",
         "exam_solution": "**Destarching:** The potted plant is kept in continuous dark for 48 hours so stored starch in leaves is fully consumed by cellular respiration.\n**Starch Test:** Dip decolorized leaf in iodine solution. Mastered areas containing starch turn **blue-black**, while non-photosynthetic control areas turn **brownish-yellow**."
     },
-    "ohm": {
-        "title": "Ohm's Law, Resistance & Circuit Governing Equations",
+    "lens": {
+        "title": "Optics, Thin Lens Formula & Image Formation",
         "subject": "Physics",
-        "keywords": ["ohm", "resistance", "voltage", "current", "resistivity", "circuit", "potential difference", "rheostat"],
-        "intuition": "Electric current is not magic — it is the physical drift of billions of electrons bouncing through a metal wire. How fast they flow depends on two competing things: how hard the battery pushes them (Voltage) versus how many obstacles they hit on their way (Resistance).",
-        "feynman_analogy": "Imagine a water slide. Voltage ($V$) is the height of the slide — the higher it is, the more pressure pushing you down. Current ($I$) is how many people splash into the pool per minute. Resistance ($R$) is having speed bumps and friction on the slide surface. If you double the height, twice as many people splash down — unless you double the bumps, which cuts the flow in half ($I = V/R$).",
-        "microscopic_reality": "Under an applied electric field $E = V/L$, free electrons acquire an average drift velocity $v_d = \\frac{eE\\tau}{m}$. Collisions with vibrating positive metal ions in the crystal lattice impart resistance. This dissipation of kinetic energy converts electrical work into thermal heat ($H = I^2Rt$).",
-        "jargon_translator": "- *Potential Difference ($V$):* Work done per unit positive charge to move between two points ($V = W/Q$).\n- *Ohmic Conductor:* Materials that strictly obey $V \\propto I$ (straight-line V-I graph passing through origin).\n- *Resistivity ($\\rho$):* Intrinsic material property independent of dimensions.",
+        "keywords": ["lens", "lens formula", "focal length", "magnification", "convex lens", "concave lens", "refraction", "optics"],
+        "intuition": "A lens is simply a glass tool that alters the wavefront of light rays through refraction. A convex lens bends divergent light rays inward toward a real focus point, acting like a light funnel, whereas a concave lens spreads them outwards.",
+        "feynman_analogy": "Think of light as a marching band marching in unison across pavement. When they hit a patch of muddy grass (denser glass lens), the soldiers who enter the mud first slow down while the others continue at full speed, causing the whole marching column to wheel around and bend toward the focal spot.",
+        "microscopic_reality": "Light slows down inside the dielectric glass medium ($v = c/n$) due to electromagnetic phase delays during photon absorption and re-emission by glass atoms. By shaping the surface with spherical curvature, we make light at the thicker center travel through more glass than light at the thinner edges, causing all wave crests to arrive in phase at the focal point (Fermat's Principle of Least Time).",
+        "jargon_translator": "- *Real Image:* An image formed by actual intersection of refracted rays; can be captured on a physical screen.\n- *Virtual Image:* Formed by apparent intersection when rays are produced backwards; cannot be caught on a screen.\n- *Magnification ($m = v/u = h_i/h_o$):* Ratio of image height to object height.",
         "derivation_steps": [
-            "**Step 1 (Statement):** At constant temperature, current flowing through a metallic conductor is directly proportional to potential difference across its ends: $V \\propto I$.",
-            "**Step 2 (Resistance Constant):** $\\frac{V}{I} = \\text{constant} = R \\implies \\mathbf{V = IR}$.",
-            "**Step 3 (Geometric Factors):** Resistance is proportional to length ($R \\propto L$) and inversely proportional to area ($R \\propto 1/A$). Combining: $\\mathbf{R = \\rho \\frac{L}{A}}$, where $\\rho$ is Resistivity in $\\Omega \\cdot m$."
+            "**Step 1 (Geometry of Convex Lens):** Place object $AB$ of height $h_o$ at distance $u$ in front of a thin convex lens of focal length $f$. A ray parallel to the principal axis passes through second focus $F_2$, and a ray through optical center $O$ passes undeviated.",
+            "**Step 2 (Similar Triangles $\\Delta ABO \\sim \\Delta A'B'O$):** $\\frac{A'B'}{AB} = \\frac{OB'}{OB} \\implies \\frac{-h_i}{h_o} = \\frac{+v}{-u} \\implies \\frac{h_i}{h_o} = \\frac{v}{u}$.",
+            "**Step 3 (Similar Triangles $\\Delta A'B'F_2 \\sim \\Delta MOF_2$):** $\\frac{A'B'}{MO} = \\frac{F_2 B'}{OF_2} \\implies \\frac{-h_i}{h_o} = \\frac{v - f}{f}$.",
+            "**Step 4 (Equating Magnifications):** $\\frac{v}{u} = \\frac{v - f}{f} \\implies vf = uv - uf$.",
+            "**Step 5 (Dividing throughout by $uvf$):** $\\frac{vf}{uvf} = \\frac{uv}{uvf} - \\frac{uf}{uvf} \\implies \\frac{1}{u} = \\frac{1}{f} - \\frac{1}{v} \\implies \\mathbf{\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}}$."
         ],
-        "cartesian_signs": "SI Units: $V$ in Volts (V), $I$ in Amperes (A), $R$ in Ohms ($\\Omega$). Convert lengths from $cm$ to meters ($m$) and wire radius from $mm$ to $m$ ($A = \\pi r^2$).",
-        "diagram_blueprint": "Draw series circuit: Battery $\\to$ Key switch $\\to$ Ammeter in **series** $\\to$ Resistor $R$ $\\to$ Rheostat. Connect Voltmeter in **parallel** strictly across resistor $R$.",
-        "examiner_traps": "1. **Omitting 'Constant Temperature':** Missing this phrase in definition costs 1 mark.\n2. **Stretching Wire Numerical Trap:** If a wire is stretched to double its length ($L \\to 2L$), its area halves ($A \\to A/2$), making new resistance **$4R$** ($2^2 = 4$), NOT $2R$!",
+        "cartesian_signs": "New Cartesian Sign Convention:\n- Optical center $O$ is the origin $(0,0)$.\n- Object distance $u$ is ALWAYS negative $(-u)$.\n- For Convex Lens: Focal length $f$ is POSITIVE $(+f)$.\n- For Concave Lens: Focal length $f$ is NEGATIVE $(-f)$.\n- Real image: $v$ is positive $(+v)$, $m$ is negative $(-m)$.\n- Virtual image: $v$ is negative $(-v)$, $m$ is positive $(+m)$.",
+        "diagram_blueprint": "Draw principal axis with lens at center. Mark $2F_1, F_1, O, F_2, 2F_2$. Draw 2 standard rays: Ray 1 parallel to axis $\\to$ refracts through $F_2$. Ray 2 through optical center $O$ $\\to$ straight undeviated. Intersection gives inverted real image $A'B'$.",
+        "examiner_traps": "1. **Mirror vs Lens Formula:** Lens formula is $\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}$ (MINUS sign!). Do not write the mirror formula $\\frac{1}{f} = \\frac{1}{v} + \\frac{1}{u}$.\n2. **Missing Ray Arrowheads:** Rays without direction arrows lose 1 full mark in ICSE/CBSE board diagrams.",
         "what_if_matrix": [
-            ("Voltage is doubled across a fixed resistor", "Current doubles ($I \\to 2I$). Resistance remains completely unchanged."),
-            ("Wire cut into two equal halves in parallel", "Each half has resistance $R/2$. In parallel: $R_{eq} = \\frac{(R/2)(R/2)}{R/2 + R/2} = R/4$."),
-            ("Temperature of copper wire increases", "Lattice ions vibrate with greater amplitude, increasing electron collision frequency $\\implies R$ increases.")
+            ("Object placed at $2F_1$", "Image forms at $2F_2$, Real, Inverted, Same Size ($m = -1$)."),
+            ("Object placed between $F_1$ and $O$", "Image forms on same side behind object, Virtual, Erect, Magnified ($m > +1$, Magnifying Glass effect)."),
+            ("Lower half of lens is covered with black paper", "Full image is still formed, but its brightness/intensity is reduced to half.")
         ],
-        "exam_question": "A cylindrical wire of resistance $R = 16\\,\\Omega$ is stretched uniformly until its length is doubled. What is its new resistance?",
-        "exam_solution": "**Step 1:** Initial resistance $R_1 = \\rho \\frac{L_1}{A_1} = 16\\,\\Omega$.\n**Step 2:** When stretched, volume $V = L \\cdot A = \\text{constant}$. Since $L_2 = 2L_1$, cross-sectional area $A_2 = \\frac{A_1}{2}$.\n**Step 3:** New resistance $R_2 = \\rho \\frac{L_2}{A_2} = \\rho \\frac{2L_1}{A_1 / 2} = 4 \\left(\\rho \\frac{L_1}{A_1}\\right) = 4 R_1$.\n**Step 4:** $R_2 = 4 \\times 16 = \\mathbf{64\\,\\Omega}$."
+        "exam_question": "An object $5\\text{ cm}$ high is placed at a distance of $20\\text{ cm}$ in front of a convex lens of focal length $10\\text{ cm}$. Find the position, nature, and height of the image.",
+        "exam_solution": "**Step 1:** Given $h_o = +5\\text{ cm}$, $u = -20\\text{ cm}$, $f = +10\\text{ cm}$.\n**Step 2:** Lens Formula: $\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u} \\implies \\frac{1}{10} = \\frac{1}{v} - \\frac{1}{-20} = \\frac{1}{v} + \\frac{1}{20}$.\n**Step 3:** $\\frac{1}{v} = \\frac{1}{10} - \\frac{1}{20} = \\frac{1}{20} \\implies \\mathbf{v = +20\\text{ cm}}$ *(Image forms $20\\text{ cm}$ behind the lens, Real and Inverted)*.\n**Step 4:** Magnification $m = \\frac{v}{u} = \\frac{20}{-20} = -1$.\n**Step 5:** Image height $h_i = m \\times h_o = -1 \\times 5 = \\mathbf{-5\\text{ cm}}$ *(Same size, inverted)*."
     },
     "quadratic": {
         "title": "Quadratic Equations, Discriminant & Parabolic Roots",
         "subject": "Mathematics",
-        "keywords": ["quadratic", "discriminant", "roots", "completing square", "quadratic formula", "parabola", "nature of roots"],
+        "keywords": ["quadratic", "discriminant", "roots", "completing square", "quadratic formula", "parabola", "nature of roots", "equations"],
         "intuition": "A quadratic equation represents a curved parabolic flight path in geometry. Solving for roots is simply finding the exact coordinates where the curve touches or crosses the zero ground line.",
         "feynman_analogy": "Imagine throwing a basketball into the air. The path is a symmetrical parabola ($y = ax^2 + bx + c$). The **Discriminant ($D = b^2 - 4ac$)** is your ground detector: If $D > 0$, the ball cuts through the floor at two distinct points. If $D = 0$, the bottom tip of the ball touches the floor at exactly 1 single point. If $D < 0$, the ball is floating above the floor and never touches it in the real world.",
         "microscopic_reality": "By completing the square on $ax^2 + bx + c = 0$, we translate the coordinate frame so the parabola's vertex is at $\\left(-\\frac{b}{2a}, -\\frac{D}{4a}\\right)$. The symmetry of parabolas guarantees that real roots are spaced symmetrically at distances $\\pm \\frac{\\sqrt{D}}{2a}$ from the vertex line of symmetry.",
@@ -352,7 +456,6 @@ class NexusAIService:
         prov = self.provider.lower()
         full_system = f"{system_prompt}\n\nAvailable Tools:\n{json.dumps(NEXUS_TOOL_DEFINITIONS)}\nIf an action is required, respond with a JSON block ```json\n{{\"tool\": \"tool_name\", \"parameters\": {{...}}}}\n```"
         
-        # Build prompt
         formatted_history = "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in chat_history[-6:]])
         full_prompt = f"Chat History:\n{formatted_history}\n\nUser: {user_query}"
 
@@ -368,14 +471,15 @@ class NexusAIService:
                 if resp.status_code == 200:
                     text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
                     return self._process_llm_output(user_id, text)
-
-            elif prov == "openai" or prov == "groq":
+            elif prov in ["openai", "groq"]:
                 url = "https://api.openai.com/v1/chat/completions" if prov == "openai" else "https://api.groq.com/openai/v1/chat/completions"
-                model = self.model_name or ("gpt-4o-mini" if prov == "openai" else "llama-3.3-70b-versatile")
                 headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
                 payload = {
-                    "model": model,
-                    "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": full_prompt}],
+                    "model": self.model_name,
+                    "messages": [
+                        {"role": "system", "content": full_system},
+                        {"role": "user", "content": full_prompt}
+                    ],
                     "temperature": 0.4,
                     "max_tokens": 3000
                 }
@@ -383,8 +487,8 @@ class NexusAIService:
                 if resp.status_code == 200:
                     text = resp.json()["choices"][0]["message"]["content"]
                     return self._process_llm_output(user_id, text)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Cloud LLM call failed: {e}")
 
         return None
 
@@ -393,7 +497,6 @@ class NexusAIService:
         badge = None
         action_json = None
         
-        # Look for JSON tool block
         match = re.search(r"```json\s*(\{.*?\})\s*```", raw_text, re.DOTALL)
         if match:
             try:
@@ -417,51 +520,83 @@ class NexusAIService:
         }
 
     # ══════════════════════════════════════════════════════════
-    # MAIN CONVERSATIONAL CHAT ENGINE (Dual-Engine)
+    # MAIN CONVERSATIONAL CHAT ENGINE (Dual-Engine with Intent Routing)
     # ══════════════════════════════════════════════════════════
     def process_chat_message(self, user_id: int, user_message: str) -> dict:
         """
         Main entry point for Nexus conversational intelligence.
-        Dispatches to Cloud LLM if active, or Autonomous Cognitive Engine.
+        Routes user query through the NexusIntentRouter.
         """
-        query = user_message.strip()
-        context = NexusContextBuilder.assemble_full_context(user_id)
-        profile = context["profile"]
+        query = (user_message or "").strip()
+        if not query:
+            return {
+                "content": "I'm here to help with your studies! Ask me any concept question, request a quiz, or give a study command.",
+                "action_badge": "🤖 Ready"
+            }
+
+        # Safe, lightweight profile loading only
+        profile = NexusContextBuilder.get_student_profile(user_id)
         chat_history = NexusConversationSession.get_history()
 
-        # ── Check Destructive Action Confirmation ──
-        pending = st.session_state.get("pending_destructive_action")
-        if pending and "confirm" in query.lower():
-            if pending == "DELETE_ALL_NOTES":
-                res = execute_nexus_tool(user_id, "delete_all_notes", {"confirmed": True})
-                st.session_state["pending_destructive_action"] = None
+        try:
+            # ── 1. Destructive Action Guardrail ──
+            pending = st.session_state.get("pending_destructive_action")
+            if pending and "confirm" in query.lower():
+                if pending == "DELETE_ALL_NOTES":
+                    res = execute_nexus_tool(user_id, "delete_all_notes", {"confirmed": True})
+                    st.session_state["pending_destructive_action"] = None
+                    return {
+                        "content": f"✅ **Action Confirmed:** {res.get('message', 'All notes deleted.')}",
+                        "action_badge": "🗑️ All Notes Deleted",
+                        "follow_ups": ["View Syllabus", "Create New Note", "Plan Today's Study"]
+                    }
+
+            # ── 2. Classify Intent ──
+            intent = NexusIntentRouter.classify(query)
+
+            # ── 3. Handle Intent Specifically ──
+
+            # Intent A: Destructive Action Prompt
+            if intent == "DESTRUCTIVE_ACTION":
+                st.session_state["pending_destructive_action"] = "DELETE_ALL_NOTES"
                 return {
-                    "content": f"✅ **Action Confirmed:** {res['message']}",
-                    "action_badge": "🗑️ All Notes Deleted",
-                    "follow_ups": ["View Syllabus", "Create New Note", "Plan Today's Study"]
+                    "content": """
+⚠️ **Destructive Action Confirmation Required**
+
+Are you sure you want to permanently delete **all study notes** in your repository? This action cannot be undone.
+
+> To proceed, type **"confirm delete all notes"**. To cancel, simply ask any other study question.
+""",
+                    "action_badge": "⚠️ Confirmation Pending",
+                    "follow_ups": ["confirm delete all notes", "Cancel & View My Notes"]
                 }
 
-        # ── 1. Check Explicit Workspace Commands & Destructive Actions ──
-        action_keywords = [
-            "schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study",
-            "mark ", "as completed", "as complete", "as done",
-            "add to revision", "put in revision", "schedule revision", "revision queue",
-            "save this as a note", "save as note", "create note", "save to notes", "add note",
-            "focus session", "start focus", "start timer", "pomodoro",
-            "quiz me", "test me", "generate quiz", "create quiz",
-            "got question", "got it wrong", "made a mistake", "i was wrong",
-            "find ", "search ", "look up",
-            "wallpaper", "theme", "dark mode", "light mode",
-            "open my", "take me to", "go to", "navigate to", "open the",
-            "delete all my notes", "delete all notes",
-            "how am i doing", "how am i progressing", "progress", "my stats", "analytics", "preparedness",
-            "socratic", "using questions", "ask me questions"
-        ]
+            # Intent B: Natural Greeting & Onboarding
+            if intent == "GREETING":
+                return self._handle_greeting(profile)
 
-        is_action_command = any(kw in query.lower() for kw in action_keywords)
+            # Intent C: Career & High-Level Academic Goal (MIT, IIT, Stanford, Olympiads)
+            if intent == "CAREER_ACADEMIC_GOAL":
+                return self._handle_career_goal(profile, query)
 
-        if not is_action_command:
-            # ── 2. Try Cloud LLM for General Concept Questions ──
+            # Intent D: Study Advice, Stress & Emotional Mentorship
+            if intent == "STUDY_ADVICE_EMOTIONAL":
+                return self._handle_study_advice(profile, query)
+
+            # Intent E: Progress & Analytics Query
+            if intent == "PROGRESS_ANALYSIS":
+                return self._handle_progress_analysis(user_id)
+
+            # Intent F: Workspace Control Commands
+            if intent.startswith("APP_COMMAND_"):
+                return self._handle_workspace_command(user_id, intent, query, profile)
+
+            # Intent G: Socratic Mode
+            if intent == "SOCRATIC_MODE":
+                return self._handle_socratic_mode(query)
+
+            # Intent H: Concept Explanation (Pedagogical Engine)
+            # 1. Try Cloud LLM first if configured
             system_instruction = f"""
 You are Nexus AI, an intelligent, patient, academically rigorous private tutor and academic copilot for {profile['name']} ({profile['class_name']} • {profile['board']}).
 Guidelines:
@@ -477,145 +612,214 @@ Guidelines:
                     "follow_ups": ["Explain Simpler", "Show Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
                 }
 
-        # ── 3. Autonomous Cognitive Engine Dispatcher ──
-        return self._autonomous_cognitive_processor(user_id, query, context, chat_history)
+            # 2. Autonomous Local Pedagogical Synthesis
+            return self._handle_concept_explanation(user_id, query, profile)
 
-    def _autonomous_cognitive_processor(self, user_id: int, query: str, context: dict, chat_history: list) -> dict:
-        """
-        Advanced autonomous intent classification & pedagogical synthesis.
-        Guarantees zero static or fake behavior when running locally.
-        """
-        q_lower = query.lower()
-        profile = context["profile"]
+        except Exception as e:
+            logger.exception(f"Unexpected error in process_chat_message for query '{query}': {e}")
+            return {
+                "content": f"""
+I ran into a temporary technical issue while processing your request, but I am still here to help!
+
+Could you please rephrase your question, or ask about a specific concept you'd like to study?
+""",
+                "action_badge": "🤖 Nexus Copilot Ready",
+                "follow_ups": ["Explain Newton's Laws simply", "Plan my study sprints", "Quiz me on weak topics"]
+            }
+
+    # ══════════════════════════════════════════════════════════
+    # DEDICATED INTENT HANDLERS (Conversational & Safe)
+    # ══════════════════════════════════════════════════════════
+
+    def _handle_greeting(self, profile: dict) -> dict:
+        """Personalized, warm academic greeting with actionable shortcuts."""
         board = profile.get("board", "CBSE")
+        return {
+            "content": f"""
+👋 **Hello {profile.get('name', 'Student')}! I'm your Nexus Academic Copilot.**
+
+I'm here as your personal tutor and workspace assistant for **{profile.get('class_name', 'Class 10')} ({board})**. Here is how we can work together:
+
+1. 💡 **Master Concepts:** Ask me to teach anything (*"Explain Newton's Third Law simply"*, *"Teach me Photosynthesis from first principles"*, *"Show mathematical derivation of Lens Formula"*).
+2. 🎯 **Adaptive Quizzing:** Say *"Quiz me on Chemical Bonding"* or *"Test my weak topics"*.
+3. 🗓️ **Plan Your Study:** Say *"Schedule 45 minutes of Physics tomorrow"* or *"Plan today's study sprints"*.
+4. 🧠 **Spaced Repetition & Notes:** Tell me *"Add this to my revision queue"* or *"Save this explanation as a note"*.
+5. ❌ **Mistake Diagnostics:** Tell me *"I made a mistake on friction"* and I'll analyze the root cause.
+6. ⏱️ **Focus Studio:** Say *"Start a 25 min focus session for Chemistry"*.
+
+**What concept or goal are we tackling today?**
+""",
+            "action_badge": f"🤖 Nexus Academic Copilot • {board}",
+            "follow_ups": ["Explain Newton's Third Law simply", "Quiz me on weak areas", "Schedule 45 min Physics tomorrow", "How am I progressing?"]
+        }
+
+    def _handle_career_goal(self, profile: dict, query: str) -> dict:
+        """Dynamic, comprehensive roadmap for ambitious academic goals (MIT, Stanford, IIT, Olympiads). Zero DB queries!"""
+        target = "MIT / Ivy League"
+        q_lower = query.lower()
+        if "iit" in q_lower or "jee" in q_lower:
+            target = "IIT / JEE Advanced"
+        elif "neet" in q_lower or "doctor" in q_lower or "medical" in q_lower:
+            target = "NEET / Top Medical Colleges"
+        elif "olympiad" in q_lower:
+            target = "National & International Science Olympiads"
+        elif "stanford" in q_lower:
+            target = "Stanford University"
+        elif "harvard" in q_lower:
+            target = "Harvard University"
+        elif "mit" in q_lower:
+            target = "MIT (Massachusetts Institute of Technology)"
+
+        board = profile.get("board", "CBSE")
+        class_name = profile.get("class_name", "Class 10")
+
+        content = f"""
+🚀 **Aiming for {target} is a bold, inspiring goal — and absolutely achievable with disciplined, deliberate preparation!**
+
+As an ambitious student in **{class_name} ({board})**, the journey to a world-class institution begins right now. Top universities and competitive examinations do not look for superficial memorizers — they look for students with **unshakable first-principles intuition, deep problem-solving stamina, and authentic intellectual passion**.
+
+---
+
+### 🗺️ The Strategic 5-Pillar Roadmap
+
+1. 📚 **Uncompromising Academic Mastery (GPA & Board Exams)**
+   - Maintain a stellar academic record (**95%+ in your school/board curriculum**).
+   - Never treat school subjects as mere hurdles. Treat Physics, Chemistry, and Mathematics as the language of the universe.
+
+2. 🧠 **First-Principles Conceptual Thinking**
+   - Rote learning will fail at higher tiers. Always ask: *"Why does this equation work? What is the physical mechanism at the microscopic level?"*
+   - Use our **Feynman Mode** in Nexus AI to deconstruct every law from the ground up.
+
+3. 🏆 **Competitive Problem Solving & Olympiads**
+   - Start training for elite competitions:
+     - **Mathematics:** PRMO / RMO / INMO (Indian National Mathematical Olympiad) or AMC 10/12.
+     - **Physics & Astronomy:** NSEP / INPhO (National Standard Examination in Physics).
+     - **Informatics & Coding:** USACO / ZIO / ZCO (Competitive algorithmic programming in C++/Python).
+
+4. 🔬 **Independent Research & Tangible Projects**
+   - Don't just solve textbook problems; build real things! Build a physics engine simulation, write code for a machine learning tool, or design an experimental science fair project.
+
+5. ⏱️ **Daily Focus Discipline in Nexus**
+   - Long-term ambition is built in small daily increments. Two dedicated **45-minute Focus Sprints** every single day will compound into extraordinary mastery over 2 years.
+
+---
+
+### 🎯 Concrete Actions for This Week in Your Nexus Workspace:
+- 💡 **Build Core Intuition:** Ask me to teach you foundational concepts (e.g. *Newton's Laws, Geometric Optics, Parabolic Quadratic Functions*).
+- ⏱️ **Focus Sprint:** Use Nexus Focus Studio to complete a distraction-free deep work block.
+- 🎯 **Test Yourself:** Request hard adaptive quizzes to identify conceptual gaps and log every error into your **Mistake Vault**.
+
+**Which subject or concept would you like to master first today toward this goal?**
+"""
+        return {
+            "content": content,
+            "action_badge": f"🎯 Strategic Roadmap • Target: {target}",
+            "follow_ups": [
+                "Explain Newton's Laws from first principles",
+                "Plan a 45-min STEM Focus Sprint",
+                "Show Olympiad Level Math Quiz",
+                "How am I progressing towards my goals?"
+            ]
+        }
+
+    def _handle_study_advice(self, profile: dict, query: str) -> dict:
+        """Empathetic, structured study strategy and mindset coaching. Zero DB queries!"""
+        q_lower = query.lower()
+        subject = "your subjects"
+        for s in ["physics", "chemistry", "mathematics", "math", "biology", "english"]:
+            if s in q_lower:
+                subject = s.capitalize()
+                break
+
+        content = f"""
+🤝 **I hear you, and it is completely normal to feel this way.**
+
+When studying for rigorous examinations in **{profile.get('class_name', 'Class 10')}**, feeling stuck or behind in **{subject}** happens to every great student. Remember: **struggle is not a sign of failure — it's the exact moment your brain is rewiring for deeper understanding.**
+
+---
+
+### 🛠️ The 4-Step Recovery Protocol
+
+1. 🎯 **Triage & Narrow the Focus:**
+   - Don't try to study the entire textbook at once. We'll pick **one single subtopic** today (e.g. *Forces & Motion*, *Refraction*, or *Chemical Bonding*).
+
+2. 💡 **Ditch Passive Reading for First-Principles Intuition:**
+   - Re-reading and highlighting creates an illusion of competence. Instead, let me explain the concept using the **Feynman Technique** (simple everyday analogies + microscopic mechanisms).
+
+3. ✍️ **Active Recall & Mistake Vaulting:**
+   - Immediately solve 3–5 targeted practice questions. If you make an error, celebrate it! We'll diagnose the root cause and store it in your **Mistake Vault** so you never repeat it on exam day.
+
+4. 🧠 **Spaced Repetition Protection:**
+   - We will schedule automated reviews at optimal intervals (Day 1, Day 3, Day 7) so concepts stay permanently locked in long-term memory.
+
+---
+
+**Let's take immediate action together right now. What is the #1 topic in {subject} that is giving you trouble?**
+"""
+        return {
+            "content": content,
+            "action_badge": f"💡 Academic Coaching • {subject}",
+            "follow_ups": [
+                f"Explain {subject if subject != 'your subjects' else 'Physics'} simply",
+                "Start a 25 min Focus Sprint",
+                "Schedule a study sprint for tomorrow",
+                "Check my overall progress"
+            ]
+        }
+
+    def _handle_progress_analysis(self, user_id: int) -> dict:
+        """Safely queries student's progress and readiness score without crashing."""
+        try:
+            readiness = calculate_exam_readiness_score(user_id) or {}
+            stats = get_overall_stats(user_id) or {}
+            score = readiness.get("readiness_score", 0)
+            tier = readiness.get("readiness_tier", "Building Foundation")
+            completed = stats.get("completed_topics", 0)
+            total = stats.get("total_topics", 0)
+            pct = stats.get("percent_completed", 0)
+
+            content = f"""
+### 📊 Academic Velocity & Progress Audit
+
+- **Exam Readiness Score:** **{score} / 100** ({tier})
+- **Syllabus Coverage:** **{completed} of {total} topics** ({pct}% completed).
+
+---
+
+### 🟢 What Is Going Well
+- Foundation established in completed curriculum modules.
+- Active recall tracking configured in your workspace.
+
+### 🟡 Key Leverage Points for Fast Improvement
+- Clear pending items in your **Spaced Repetition queue** to prevent forgetting-curve decay.
+- Review unreviewed cards in your **Mistake Vault** through targeted re-testing.
+
+### 🚀 3 Strategic Actions for Today:
+1. Complete a **25-min Focus Sprint** on high-yield priority topics.
+2. Clear your active Spaced Repetition queue (+50 XP).
+3. Take a 5-question practice quiz to calibrate accuracy.
+"""
+            return {
+                "content": content,
+                "action_badge": f"📊 Progress Audit ({score}/100)",
+                "follow_ups": ["Plan My Day", "Show Weakest Topics", "Start Focus Sprint", "Export PDF Report"]
+            }
+        except Exception as e:
+            logger.error(f"Error in _handle_progress_analysis: {e}")
+            return {
+                "content": "Your progress tracking is active! You can view detailed subject completion, understanding heatmaps, and exam velocity in the **📊 Analytics** page.",
+                "action_badge": "📊 Progress Overview",
+                "follow_ups": ["Open Analytics Page", "Plan Today's Study", "Start Focus Session"]
+            }
+
+    def _handle_workspace_command(self, user_id: int, intent: str, query: str, profile: dict) -> dict:
+        """Executes explicit application control tools safely."""
+        q_lower = query.lower()
         active_topic = NexusConversationSession.get_active_topic()
+        board = profile.get("board", "CBSE")
 
-        # ── INTENT 0: NATURAL ACADEMIC GREETING & COPILOT ONBOARDING ──
-        if q_lower in ["hi", "hello", "hey", "hey nexus", "hi nexus", "hello nexus", "good morning", "good evening", "good afternoon", "who are you", "what can you do", "help"]:
-            return {
-                "content": f"""
-👋 **Hello {profile['name']}! I'm your Nexus Academic Copilot.**
-
-I'm here as your personal tutor and workspace assistant for **{profile['class_name']} ({board})**. Here's what I can do for you:
-
-1. 💡 **Explain Concepts:** *"Explain Newton's Third Law simply"*, *"Teach me Photosynthesis from first principles"*, *"Show mathematical derivation of Lens Formula"*.
-2. 🎯 **Adaptive Quizzing:** *"Quiz me on Chemical Bonding"* or *"Test my understanding"*.
-3. 🗓️ **Plan Your Study:** *"Schedule 45 minutes of Physics tomorrow"* or *"Plan today's study sprints"*.
-4. 🧠 **Spaced Repetition & Notes:** *"Add this to my revision queue"* or *"Save this explanation as a note"*.
-5. ❌ **Mistake Diagnostics:** *"I made a mistake on friction"* and I'll analyze the root cause.
-6. ⏱️ **Focus Sessions:** *"Start a 25 min focus session for Chemistry"*.
-
-**What would you like to study or accomplish right now?**
-""",
-                "action_badge": f"🤖 Nexus Academic Copilot • {board}",
-                "follow_ups": ["Explain Newton's Third Law simply", "Quiz me on weak areas", "Schedule 45 min Physics tomorrow", "How am I progressing?"]
-            }
-
-        # ── INTENT 1: DESTRUCTIVE ACTION (Delete All Notes) ──
-        if "delete all my notes" in q_lower or "delete all notes" in q_lower:
-            st.session_state["pending_destructive_action"] = "DELETE_ALL_NOTES"
-            return {
-                "content": """
-⚠️ **Destructive Action Confirmation Required**
-
-Are you sure you want to permanently delete **all study notes** in your repository? This action cannot be undone.
-
-> To proceed, type **"confirm delete all notes"**. To cancel, simply ask any other study question.
-""",
-                "action_badge": "⚠️ Confirmation Pending",
-                "follow_ups": ["confirm delete all notes", "Cancel & View My Notes"]
-            }
-
-        # ── INTENT 2: STUDY PLANNER ("Schedule 45 minutes of Physics tomorrow") ──
-        if any(w in q_lower for w in ["schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study", "put in schedule"]):
-            # Extract duration
-            dur_match = re.search(r"(\d+)\s*(?:min|minute|hr|hour)", q_lower)
-            dur = 45
-            if dur_match:
-                val = int(dur_match.group(1))
-                dur = val * 60 if "hr" in dur_match.group(0) or "hour" in dur_match.group(0) else val
-
-            # Extract date
-            date_target = "tomorrow" if "tomorrow" in q_lower else "today"
-
-            # Extract subject / task
-            subject = None
-            for s in ["Physics", "Chemistry", "Mathematics", "Biology", "English", "History", "Geography", "Computer Science"]:
-                if s.lower() in q_lower:
-                    subject = s
-                    break
-
-            task_desc = f"Study {subject or 'Core Concepts'}"
-            if "of " in q_lower:
-                task_desc = f"Study {query.split('of ', 1)[1].split('tomorrow')[0].split('today')[0].strip()}"
-            elif "for " in q_lower and "min" not in q_lower.split("for ", 1)[1][:10]:
-                task_desc = query.split("for ", 1)[1].strip()
-
-            res = execute_nexus_tool(user_id, "create_study_task", {
-                "task_description": task_desc,
-                "plan_date": date_target,
-                "duration_minutes": dur,
-                "subject_name": subject
-            })
-
-            return {
-                "content": f"""
-I've scheduled this into your **Daily Study Planner**:
-
-- 🗓️ **Date:** {date_target.capitalize()} ({res.get('date', 'Upcoming')})
-- ⏱️ **Duration:** {dur} Minutes
-- 📚 **Mission:** **{task_desc}**
-
-*Consistency is key to high-stakes exam performance. Win this study block!*
-""",
-                "action_badge": f"🗓️ Scheduled Task ({dur} min)",
-                "follow_ups": ["Show Today's Planner", "Plan Entire Week", "Start Focus Session"]
-            }
-
-        # ── INTENT 3: SYLLABUS STATUS ("Mark Newton's Laws as completed") ──
-        if "mark " in q_lower and any(w in q_lower for w in ["completed", "complete", "done", "in progress"]):
-            status = "Completed" if ("completed" in q_lower or "complete" in q_lower or "done" in q_lower) else "In Progress"
-            t_query = q_lower.replace("mark", "").replace("as completed", "").replace("as complete", "").replace("as done", "").replace("completed", "").strip()
-            res = execute_nexus_tool(user_id, "update_topic_status", {"topic_name": t_query, "status": status})
-            if res.get("success"):
-                return {
-                    "content": f"✅ **Syllabus Updated:** {res['message']}\n\nYour curriculum completion percentage and velocity metrics have been updated in your dashboard analytics.",
-                    "action_badge": f"✅ {res['new_status']}: {res['topic_name']}",
-                    "follow_ups": ["Add to Spaced Revision", "Quiz Me on This", "View Syllabus"]
-                }
-
-        # ── INTENT 4: SPACED REVISION ("Add Newton's Laws to revision") ──
-        if any(w in q_lower for w in ["add to revision", "put in revision", "schedule revision", "revision queue", "review queue"]):
-            t_query = q_lower.replace("add", "").replace("to revision", "").replace("put in revision", "").replace("schedule revision", "").replace("queue", "").strip() or active_topic
-            res = execute_nexus_tool(user_id, "schedule_revision", {"topic_name": t_query})
-            if res.get("success"):
-                return {
-                    "content": f"🧠 **Spaced Repetition Scheduled:** {res['message']}\n\nNexus will prompt you at optimal SuperMemo SM-2 intervals (Day 1, Day 3, Day 7, Day 14) to cement this concept into long-term memory.",
-                    "action_badge": f"🧠 Scheduled Spaced Revision",
-                    "follow_ups": ["View Revision Queue", "Quiz Me on It", "Feynman Active Recall"]
-                }
-
-        # ── INTENT 5: SAVE AS NOTE ("Save this explanation as a note") ──
-        if any(w in q_lower for w in ["save this as a note", "save as note", "create note", "save to notes", "add note"]):
-            last_ai_msg = ""
-            for m in reversed(chat_history):
-                if m["role"] == "nexus":
-                    last_ai_msg = m["content"]
-                    break
-            note_content = last_ai_msg or f"Summary and key principles of {active_topic}."
-            res = execute_nexus_tool(user_id, "create_note", {
-                "topic_name": active_topic,
-                "title": f"Nexus Notes: {active_topic}",
-                "content_markdown": note_content
-            })
-            return {
-                "content": f"📝 **Note Saved:** {res['message']}\n\nSaved under **{active_topic}** with full Markdown and mathematical equations.",
-                "action_badge": "📝 Note Saved to Repository",
-                "follow_ups": ["View All Notes", "Add Key Formula", "Quiz Me"]
-            }
-
-        # ── INTENT 6: FOCUS STUDIO ("Start a 25 minute focus session for Physics") ──
-        if any(w in q_lower for w in ["focus session", "start focus", "start timer", "pomodoro", "deep work"]):
+        # Focus Session
+        if intent == "APP_COMMAND_FOCUS":
             dur_match = re.search(r"(\d+)\s*(?:min|minute)", q_lower)
             dur = int(dur_match.group(1)) if dur_match else 25
             subject = None
@@ -635,8 +839,103 @@ I've scheduled this into your **Daily Study Planner**:
                 "follow_ups": ["Start Timer", "Set Ambient Audio", "Plan Next Task"]
             }
 
-        # ── INTENT 7: MISTAKE ANALYSIS ("I got question 3 wrong") ──
-        if any(w in q_lower for w in ["got question", "got it wrong", "made a mistake", "i was wrong", "mistake on question"]):
+        # Planner
+        if intent == "APP_COMMAND_PLANNER":
+            dur_match = re.search(r"(\d+)\s*(?:min|minute|hr|hour)", q_lower)
+            dur = 45
+            if dur_match:
+                val = int(dur_match.group(1))
+                dur = val * 60 if "hr" in dur_match.group(0) or "hour" in dur_match.group(0) else val
+            date_target = "tomorrow" if "tomorrow" in q_lower else "today"
+
+            subject = None
+            for s in ["Physics", "Chemistry", "Mathematics", "Biology", "English", "History", "Geography"]:
+                if s.lower() in q_lower:
+                    subject = s
+                    break
+
+            task_desc = f"Study {subject or 'Core Concepts'}"
+            if "of " in q_lower:
+                task_desc = f"Study {query.split('of ', 1)[1].split('tomorrow')[0].split('today')[0].strip()}"
+            elif "for " in q_lower and "min" not in q_lower.split("for ", 1)[1][:10]:
+                task_desc = query.split("for ", 1)[1].strip()
+
+            res = execute_nexus_tool(user_id, "create_study_task", {
+                "task_description": task_desc,
+                "plan_date": date_target,
+                "duration_minutes": dur,
+                "subject_name": subject
+            })
+            return {
+                "content": f"""
+I've scheduled this into your **Daily Study Planner**:
+
+- 🗓️ **Date:** {date_target.capitalize()} ({res.get('date', 'Upcoming')})
+- ⏱️ **Duration:** {dur} Minutes
+- 📚 **Mission:** **{task_desc}**
+
+*Consistency is key to high-stakes exam performance. Win this study block!*
+""",
+                "action_badge": f"🗓️ Scheduled Task ({dur} min)",
+                "follow_ups": ["Show Today's Planner", "Plan Entire Week", "Start Focus Session"]
+            }
+
+        # Syllabus
+        if intent == "APP_COMMAND_SYLLABUS":
+            status = "Completed" if ("completed" in q_lower or "complete" in q_lower or "done" in q_lower) else "In Progress"
+            t_query = q_lower.replace("mark", "").replace("as completed", "").replace("as complete", "").replace("as done", "").replace("completed", "").strip()
+            res = execute_nexus_tool(user_id, "update_topic_status", {"topic_name": t_query, "status": status})
+            if res.get("success"):
+                return {
+                    "content": f"✅ **Syllabus Updated:** {res['message']}\n\nYour curriculum completion percentage and velocity metrics have been updated in your dashboard analytics.",
+                    "action_badge": f"✅ {res['new_status']}: {res['topic_name']}",
+                    "follow_ups": ["Add to Spaced Revision", "Quiz Me on This", "View Syllabus"]
+                }
+            return {
+                "content": f"I checked your syllabus for '{t_query}'. {res.get('error', 'Topic updated.')}",
+                "action_badge": "✅ Syllabus Updated",
+                "follow_ups": ["View Syllabus", "Quiz Me"]
+            }
+
+        # Revision
+        if intent == "APP_COMMAND_REVISION":
+            t_query = q_lower.replace("add", "").replace("to revision", "").replace("put in revision", "").replace("schedule revision", "").replace("queue", "").strip() or active_topic
+            res = execute_nexus_tool(user_id, "schedule_revision", {"topic_name": t_query})
+            return {
+                "content": f"🧠 **Spaced Repetition Scheduled:** {res.get('message', 'Scheduled for revision.')}\n\nNexus will prompt you at optimal intervals to cement this concept into long-term memory.",
+                "action_badge": "🧠 Scheduled Spaced Revision",
+                "follow_ups": ["View Revision Queue", "Quiz Me on It", "Feynman Active Recall"]
+            }
+
+        # Notes
+        if intent == "APP_COMMAND_NOTES":
+            last_ai_msg = ""
+            for m in reversed(NexusConversationSession.get_history()):
+                if m["role"] == "nexus":
+                    last_ai_msg = m["content"]
+                    break
+            note_content = last_ai_msg or f"Summary and key principles of {active_topic}."
+            res = execute_nexus_tool(user_id, "create_note", {
+                "topic_name": active_topic,
+                "title": f"Nexus Notes: {active_topic}",
+                "content_markdown": note_content
+            })
+            return {
+                "content": f"📝 **Note Saved:** {res.get('message', 'Saved note.')}\n\nSaved under **{active_topic}** with full Markdown and mathematical equations.",
+                "action_badge": "📝 Note Saved to Repository",
+                "follow_ups": ["View All Notes", "Add Key Formula", "Quiz Me"]
+            }
+
+        # Formulas
+        if intent == "APP_COMMAND_FORMULAS":
+            return {
+                "content": "To save a formula, specify the title and LaTeX expression (e.g. *'Save formula Lens Formula \\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}'*).",
+                "action_badge": "📐 Formula Assistant",
+                "follow_ups": ["Save Lens Formula", "View Formula Vault"]
+            }
+
+        # Mistakes
+        if intent == "APP_COMMAND_MISTAKES":
             return {
                 "content": f"""
 ### ❌ Diagnostic Mistake Breakdown
@@ -653,8 +952,8 @@ Let's diagnose exactly where the error occurred on **{active_topic}**:
                 "follow_ups": ["Log Mistake to Vault", "Try Similar Question", "Explain Concept Again"]
             }
 
-        # ── INTENT 8: QUIZ ME ("Quiz me on it") ──
-        if any(w in q_lower for w in ["quiz me", "test me", "generate quiz", "create quiz", "give me a test"]):
+        # Quiz
+        if intent == "APP_COMMAND_QUIZ":
             target = active_topic if (active_topic and active_topic != "General Academic Mastery") else "Core High-Yield Concepts"
             res = execute_nexus_tool(user_id, "generate_and_launch_quiz", {
                 "topic_or_subject": target,
@@ -676,38 +975,8 @@ I have crafted a 5-question high-rigor quiz on **{target}** targeting standard {
                 "follow_ups": ["Play Quiz Now", "Quiz on Mistakes Only", "Explain Concept First"]
             }
 
-        # ── INTENT 9: PROGRESS ANALYTICS ("How am I progressing?") ──
-        if any(w in q_lower for w in ["how am i doing", "how am i progressing", "progress", "my stats", "analytics", "preparedness"]):
-            readiness = calculate_exam_readiness_score(user_id)
-            stats = get_overall_stats(user_id)
-            return {
-                "content": f"""
-### 📊 Academic Velocity & Progress Audit
-
-- **Exam Readiness Score:** **{readiness.get('readiness_score', 0)} / 100** ({readiness.get('readiness_tier', 'Building Foundation')})
-- **Syllabus Coverage:** **{stats.get('completed_topics', 0)} of {stats.get('total_topics', 0)} topics** ({stats.get('percent_completed', 0)}% completed).
-
----
-
-### 🟢 What Is Going Well
-- Consistent active recall engagements.
-- Core foundation established in completed modules.
-
-### 🟡 What Is Holding You Back
-- Pending spaced repetitions require clearing to avoid forgetting-curve decay.
-- Unreviewed items in your Mistake Vault need targeted re-testing.
-
-### 🚀 3 Strategic Actions for Today:
-1. Complete a **25-min Focus Sprint** on high-yield priority topics.
-2. Clear your active Spaced Repetition queue (+50 XP).
-3. Take a 5-question practice quiz to calibrate accuracy.
-""",
-                "action_badge": "📊 Progress Audit Complete",
-                "follow_ups": ["Plan My Day", "Show Weakest Topics", "Export PDF Report"]
-            }
-
-        # ── INTENT 10: SEARCH ("Find everything related to Newton") ──
-        if q_lower.startswith("find ") or q_lower.startswith("search ") or "look up" in q_lower:
+        # Search
+        if intent == "APP_COMMAND_SEARCH":
             search_term = q_lower.replace("find", "").replace("search", "").replace("everything related to", "").replace("for", "").strip()
             res = execute_nexus_tool(user_id, "search_nexus_workspace", {"query": search_term})
             return {
@@ -716,7 +985,7 @@ I have crafted a 5-question high-rigor quiz on **{target}** targeting standard {
 
 Found **{res.get('total_matches', 0)} matching records** across your study operating system:
 
-- 📚 **Syllabus Topics:** {res.get('topics_found', 0)} matches {f"({', '.join(res.get('sample_topics', []))})" if res.get('sample_topics') else ''}
+- 📚 **Syllabus Topics:** {res.get('topics_found', 0)} matches
 - 📝 **Study Notes:** {res.get('notes_found', 0)} matches
 - ❌ **Mistake Vault Cards:** {res.get('mistakes_found', 0)} matches
 - 🗓️ **Planner Tasks:** {res.get('tasks_found', 0)} matches
@@ -725,8 +994,8 @@ Found **{res.get('total_matches', 0)} matching records** across your study opera
                 "follow_ups": [f"Open Search for '{search_term}'", "Teach Me This", "Quiz Me"]
             }
 
-        # ── INTENT 11: WALLPAPER / UI CONTROL ("Set Cyberpunk wallpaper") ──
-        if "wallpaper" in q_lower or "theme" in q_lower or "dark mode" in q_lower or "light mode" in q_lower:
+        # Theme
+        if intent == "APP_COMMAND_THEME":
             res = execute_nexus_tool(user_id, "set_wallpaper_theme", {"theme_or_preset": query})
             return {
                 "content": f"🎨 **Appearance Updated:** {res.get('message', 'Settings applied.')}",
@@ -734,21 +1003,24 @@ Found **{res.get('total_matches', 0)} matching records** across your study opera
                 "follow_ups": ["Open Settings", "Make Background Darker", "Set Cosmic Nebula"]
             }
 
-        # ── INTENT 12: NAVIGATION ("Open my Mistake Vault", "Take me to Physics") ──
-        if any(w in q_lower for w in ["open my", "take me to", "go to", "navigate to", "open the"]):
+        # Navigation
+        if intent == "APP_COMMAND_NAVIGATION":
             dest = q_lower.replace("open my", "").replace("take me to", "").replace("go to", "").replace("navigate to", "").replace("open the", "").strip()
             res = execute_nexus_tool(user_id, "navigate_to_page", {"page_name": dest})
             return {
-                "content": f"🚀 **Navigating to {res['target_page']}...**",
-                "action_badge": f"🚀 Switched Page: {res['target_page']}",
+                "content": f"🚀 **Navigating to {res.get('target_page', 'Workspace')}...**",
+                "action_badge": f"🚀 Switched Page: {res.get('target_page', 'Workspace')}",
                 "follow_ups": ["Return to Nexus AI", "Start Focus Sprint"]
             }
 
-        # ── INTENT 13: SOCRATIC MODE ("Teach me using questions") ──
-        if "socratic" in q_lower or "using questions" in q_lower or "ask me questions" in q_lower:
-            kb = _match_knowledge(active_topic) or EXPANDED_KNOWLEDGE_BASE["newton"]
-            return {
-                "content": f"""
+        return {"content": "Action processed.", "action_badge": "⚡ Executed"}
+
+    def _handle_socratic_mode(self, query: str) -> dict:
+        """Guides the student through step-by-step inquiry."""
+        active_topic = NexusConversationSession.get_active_topic()
+        kb = _match_knowledge(active_topic) or EXPANDED_KNOWLEDGE_BASE["newton"]
+        return {
+            "content": f"""
 ### 🧠 Socratic Guided Discovery: {kb['title']}
 
 Let's build this understanding from the ground up through guided reasoning.
@@ -760,27 +1032,30 @@ Here is your first diagnostic observation:
 
 Think about the physical interaction and tell me what you predict!
 """,
-                "action_badge": "🎓 Socratic Dialogue Active",
-                "follow_ups": ["I slide backward!", "I stay still.", "Give me a hint."]
-            }
+            "action_badge": "🎓 Socratic Dialogue Active",
+            "follow_ups": ["I slide backward!", "I stay still.", "Give me a hint."]
+        }
 
-        # ── INTENT 14: DEEP PEDAGOGICAL LESSON (Feynman / Board Exam / Visual) ──
+    def _handle_concept_explanation(self, user_id: int, query: str, profile: dict) -> dict:
+        """Deep pedagogical lesson synthesis across Feynman, Board Exam, and Visual modes."""
+        q_lower = query.lower()
+        active_topic = NexusConversationSession.get_active_topic()
+        board = profile.get("board", "CBSE")
+
         kb = _match_knowledge(query)
         if not kb and active_topic and active_topic != "General Academic Mastery":
             kb = _match_knowledge(active_topic)
         if not kb:
-            # Match against student's syllabus
             matched_top = resolve_topic_by_name(user_id, query)
             if matched_top:
                 NexusConversationSession.set_active_topic(matched_top["topic_name"])
                 kb = _match_knowledge(matched_top["topic_name"])
 
         if not kb:
-            kb = EXPANDED_KNOWLEDGE_BASE["newton"]  # High-yield benchmark topic
+            kb = EXPANDED_KNOWLEDGE_BASE["newton"]
 
         NexusConversationSession.set_active_topic(kb["title"])
 
-        # Determine mode
         if "board" in q_lower or "exam" in q_lower or "icse" in q_lower or "derivation" in q_lower or "mathematical" in q_lower:
             return self._build_board_exam_lesson(kb, board)
         elif "visual" in q_lower or "analogy" in q_lower:
@@ -789,7 +1064,7 @@ Think about the physical interaction and tell me what you predict!
             return self._build_feynman_lesson(kb)
 
     def _build_feynman_lesson(self, kb: dict) -> dict:
-        """Constructs an ultra-deep, comprehensive Feynman pedagogical lesson (800+ words)."""
+        """Constructs an ultra-deep, comprehensive Feynman pedagogical lesson."""
         content = f"""
 Let's build **{kb['title']}** from the ground up. Don't memorize formulas yet — first understand the physical reality.
 
@@ -826,7 +1101,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
         return {
             "content": content,
             "action_badge": "💡 Deep Feynman Lesson",
-            "follow_ups": ["Explain Simpler", "Show ICSE Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
+            "follow_ups": ["Explain Simpler", "Show Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
         }
 
     def _build_board_exam_lesson(self, kb: dict, board: str = "CBSE") -> dict:
@@ -871,7 +1146,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
         }
 
     def _build_visual_lesson(self, kb: dict) -> dict:
-        """Constructs a visual mental model lesson with ASCII architecture and parameter matrices."""
+        """Constructs a visual mental model lesson with parameter matrices."""
         matrix_rows = "\n".join([f"| **{cond}** | {effect} |" for cond, effect in kb.get("what_if_matrix", [])])
         content = f"""
 ### 🗺️ Visual Mental Model Blueprint
@@ -887,7 +1162,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
 ### 📊 Metaphor-to-Reality Mapping Table
 | Metaphor Element | Physical Component | Governing Function |
 | :--- | :--- | :--- |
-| **Pushing Mechanism** | Source / Applied Field | Imparts kinetic momentum |
+| **Driving Mechanism** | Source / Applied Field | Imparts energy/momentum |
 | **Opposing Medium** | Inertia / Lattice Resistance | Enforces action-reaction equilibrium |
 | **Observable Output** | Net System Displacement | Measured experimental outcome |
 
@@ -896,6 +1171,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
 ### ⚙️ Dynamic "What-If" Parameter Matrix
 | Scenario / Change | Physical Consequence |
 | :--- | :--- |
+| **Standard Baseline** | Reference operating equilibrium |
 {matrix_rows}
 """
         return {
@@ -905,7 +1181,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
         }
 
     # ══════════════════════════════════════════════════════════
-    # STANDALONE GENERATORS (Daily recommendations, Quizzes, Planner)
+    # STANDALONE GENERATORS (Daily recommendations, Quizzes)
     # ══════════════════════════════════════════════════════════
     def generate_daily_recommendations(self, user_id: int) -> dict:
         context = NexusContextBuilder.assemble_full_context(user_id)
@@ -933,22 +1209,25 @@ Target **{top_p['topic_name']}** ({top_p['subject_name']}) today. Your curriculu
 
     def generate_ai_quiz(self, user_id: int, subject_id: int = None, chapter_id: int = None, topic_id: int = None, difficulty: str = "Adaptive", count: int = 5, question_count: int = None, focus_prompt: str = "") -> dict:
         effective_count = question_count if question_count is not None else count
-        conn = get_connection()
         s_name, c_name, t_name = "General", "", ""
         try:
-            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-                if topic_id:
-                    cursor.execute("SELECT t.name as t_name, c.name as c_name, s.name as s_name FROM topics t JOIN chapters c ON t.chapter_id = c.id JOIN subjects s ON c.subject_id = s.id WHERE t.id = %s", (topic_id,))
-                    r = cursor.fetchone()
-                    if r:
-                        t_name, c_name, s_name = r["t_name"], r["c_name"], r["s_name"]
-                elif subject_id:
-                    cursor.execute("SELECT name as s_name FROM subjects WHERE id = %s", (subject_id,))
-                    r = cursor.fetchone()
-                    if r:
-                        s_name = r["s_name"]
-        finally:
-            conn.close()
+            conn = get_connection()
+            try:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                    if topic_id:
+                        cursor.execute("SELECT t.name as t_name, c.name as c_name, s.name as s_name FROM topics t JOIN chapters c ON t.chapter_id = c.id JOIN subjects s ON c.subject_id = s.id WHERE t.id = %s", (topic_id,))
+                        r = cursor.fetchone()
+                        if r:
+                            t_name, c_name, s_name = r["t_name"], r["c_name"], r["s_name"]
+                    elif subject_id:
+                        cursor.execute("SELECT name as s_name FROM subjects WHERE id = %s", (subject_id,))
+                        r = cursor.fetchone()
+                        if r:
+                            s_name = r["s_name"]
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.error(f"Error fetching quiz target metadata: {e}")
 
         target_label = t_name or s_name or "Core Curriculum"
         questions = [

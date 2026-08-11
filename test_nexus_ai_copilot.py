@@ -32,7 +32,7 @@ def safe_print(msg: str):
 
 def run_tests():
     safe_print("=" * 60)
-    safe_print("RUNNING NEXUS AI COPILOT 16-SCENARIO TEST SUITE")
+    safe_print("RUNNING NEXUS AI COPILOT 20-SCENARIO TEST SUITE")
     safe_print("=" * 60)
 
     init_db()
@@ -54,22 +54,26 @@ def run_tests():
     safe_print(f"Seeded Syllabus Topic: Newton's Third Law (ID {t_id})")
 
     test_scenarios = [
-        ("1. EXPLANATION", "Explain Newton's Third Law simply.", lambda r: "Newton" in r["content"] and len(r["content"]) > 300),
-        ("2. DEEP", "Explain it mathematically.", lambda r: "Derivation" in r["content"] or "Mathematical" in r["content"] or "Newton" in r["content"]),
-        ("3. CONFUSION", "I still don't understand.", lambda r: len(r["content"]) > 200),
-        ("4. SOCRATIC", "Teach me using questions.", lambda r: "Socratic" in str(r.get("action_badge", "")) or "question" in r["content"].lower()),
-        ("5. QUIZ", "Quiz me on it.", lambda r: "Quiz" in str(r.get("action_badge", "")) or "question" in r["content"].lower()),
-        ("6. MISTAKE", "I got question 3 wrong.", lambda r: "Error" in str(r.get("action_badge", "")) or "mistake" in r["content"].lower()),
-        ("7. PLANNER", "Schedule 45 minutes of Physics tomorrow.", lambda r: "Scheduled" in str(r.get("action_badge", "")) or "45" in r["content"]),
-        ("8. SYLLABUS", "Mark Newton's Laws as completed.", lambda r: "Completed" in str(r.get("action_badge", "")) or "Syllabus" in r["content"] or "Updated" in r["content"]),
-        ("9. REVISION", "Add Newton's Laws to revision.", lambda r: "Revision" in str(r.get("action_badge", "")) or "queue" in r["content"].lower() or "Spaced" in r["content"]),
-        ("10. NOTES", "Save this explanation as a note.", lambda r: "Note" in str(r.get("action_badge", "")) or "Saved" in r["content"]),
-        ("11. FOCUS", "Start a 25 minute focus session for Physics.", lambda r: "Focus" in str(r.get("action_badge", "")) or "25" in r["content"]),
-        ("12. ANALYTICS", "How am I progressing?", lambda r: "Progress" in str(r.get("action_badge", "")) or "Readiness" in r["content"]),
-        ("13. SEARCH", "Find everything related to Newton.", lambda r: "Found" in str(r.get("action_badge", "")) or "match" in r["content"].lower()),
-        ("14. NAVIGATION", "Open my Mistake Vault.", lambda r: "Switched Page" in str(r.get("action_badge", "")) or "Navigating" in r["content"]),
-        ("15. WALLPAPER", "Set Cyberpunk wallpaper.", lambda r: "Appearance" in str(r.get("action_badge", "")) or "wallpaper" in r["content"].lower()),
-        ("16. DESTRUCTIVE CONFIRMATION", "Delete all my notes.", lambda r: "Confirmation Pending" in str(r.get("action_badge", "")) or "Caution" in r["content"].lower())
+        ("1. GREETING", "hi", lambda r: "Hello" in r["content"] or "Copilot" in r["content"]),
+        ("2. MIT CAREER GOAL", "I wanna get into MIT", lambda r: "MIT" in r["content"] and "Roadmap" in r["action_badge"] and "Execution Error" not in r["content"]),
+        ("3. IIT GOAL", "I want to crack JEE Advanced and get into IIT", lambda r: "IIT" in r["content"] or "Roadmap" in r["action_badge"]),
+        ("4. STUDY ADVICE & STRESS", "I'm struggling with physics", lambda r: "Physics" in r["content"] and "Coaching" in r["action_badge"]),
+        ("5. FEYNMAN EXPLANATION", "Explain Newton's Third Law simply.", lambda r: "Newton" in r["content"] and len(r["content"]) > 300),
+        ("6. MATHEMATICAL DERIVATION", "Explain it mathematically.", lambda r: "Derivation" in r["content"] or "Mathematical" in r["content"] or "Newton" in r["content"]),
+        ("7. LENS FORMULA", "Teach me Lens Formula from first principles", lambda r: "Lens" in r["content"] and len(r["content"]) > 300),
+        ("8. SOCRATIC MODE", "Teach me using questions.", lambda r: "Socratic" in str(r.get("action_badge", "")) or "question" in r["content"].lower()),
+        ("9. QUIZ REQUEST", "Quiz me on it.", lambda r: "Quiz" in str(r.get("action_badge", "")) or "question" in r["content"].lower()),
+        ("10. MISTAKE DIAGNOSTIC", "I got question 3 wrong.", lambda r: "Error" in str(r.get("action_badge", "")) or "mistake" in r["content"].lower()),
+        ("11. PLANNER COMMAND", "Schedule 45 minutes of Physics tomorrow.", lambda r: "Scheduled" in str(r.get("action_badge", "")) or "45" in r["content"]),
+        ("12. SYLLABUS COMMAND", "Mark Newton's Laws as completed.", lambda r: "Completed" in str(r.get("action_badge", "")) or "Syllabus" in r["content"] or "Updated" in r["content"]),
+        ("13. REVISION COMMAND", "Add Newton's Laws to revision.", lambda r: "Revision" in str(r.get("action_badge", "")) or "queue" in r["content"].lower() or "Spaced" in r["content"]),
+        ("14. NOTES COMMAND", "Save this explanation as a note.", lambda r: "Note" in str(r.get("action_badge", "")) or "Saved" in r["content"]),
+        ("15. FOCUS STUDIO", "Start a 25 minute focus session for Physics.", lambda r: "Focus" in str(r.get("action_badge", "")) or "25" in r["content"]),
+        ("16. ANALYTICS AUDIT", "How am I progressing?", lambda r: "Progress" in str(r.get("action_badge", "")) or "Readiness" in r["content"]),
+        ("17. WORKSPACE SEARCH", "Find everything related to Newton.", lambda r: "Found" in str(r.get("action_badge", "")) or "match" in r["content"].lower()),
+        ("18. NAVIGATION", "Open my Mistake Vault.", lambda r: "Switched Page" in str(r.get("action_badge", "")) or "Navigating" in r["content"]),
+        ("19. THEME/WALLPAPER", "Set Cyberpunk wallpaper.", lambda r: "Appearance" in str(r.get("action_badge", "")) or "wallpaper" in r["content"].lower()),
+        ("20. DESTRUCTIVE GUARDRAIL", "Delete all my notes.", lambda r: "Confirmation Pending" in str(r.get("action_badge", "")) or "Caution" in r["content"].lower() or "Destructive" in r["content"])
     ]
 
     passed = 0
@@ -83,7 +87,7 @@ def run_tests():
                 safe_print(f"  [PASS] {name}")
                 passed += 1
             else:
-                safe_print(f"  [FAIL] {name} validation failed")
+                safe_print(f"  [FAIL] {name} validation failed: {res.get('action_badge')} | {res.get('content')[:100]}...")
                 failed += 1
         except Exception as e:
             safe_print(f"  [ERROR] {name} Exception: {e}")

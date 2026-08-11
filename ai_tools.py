@@ -114,61 +114,65 @@ def resolve_topic_by_name(user_id: int, topic_query: str, subject_hint: str = No
         return None
     q = topic_query.lower().strip()
     # Strip common noise words
-    noise = ["chapter", "topic", "on", "about", "the", "concept", "of", "in", "my", "as"]
+    noise = ["chapter", "topic", "on", "about", "the", "concept", "of", "in", "my", "as", "teach", "me", "explain"]
     clean_q = " ".join([w for w in q.split() if w not in noise]) or q
 
-    conn = get_connection()
     try:
-        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            cursor.execute("""
-                SELECT t.id as topic_id, t.name as topic_name, t.understanding,
-                       c.id as chapter_id, c.name as chapter_name,
-                       s.id as subject_id, s.name as subject_name
-                FROM topics t
-                JOIN chapters c ON t.chapter_id = c.id
-                JOIN subjects s ON c.subject_id = s.id
-                WHERE t.user_id = %s
-            """, (user_id,))
-            rows = cursor.fetchall()
-            if not rows:
-                return None
+        conn = get_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT t.id as topic_id, t.name as topic_name,
+                           COALESCE(tp.understanding, 3) as understanding,
+                           COALESCE(tp.status, 'Not Started') as status,
+                           c.id as chapter_id, c.name as chapter_name,
+                           s.id as subject_id, s.name as subject_name
+                    FROM topics t
+                    JOIN chapters c ON t.chapter_id = c.id
+                    JOIN subjects s ON c.subject_id = s.id
+                    LEFT JOIN topic_progress tp ON tp.item_id = t.id AND tp.item_type = 'topic' AND tp.user_id = t.user_id
+                    WHERE t.user_id = %s
+                """, (user_id,))
+                rows = cursor.fetchall()
+                if not rows:
+                    return None
 
-            # 1. Exact match on topic name
-            for r in rows:
-                if r["topic_name"].lower() == q or r["topic_name"].lower() == clean_q:
-                    return dict(r)
-
-            # 2. Substring match on topic name
-            for r in rows:
-                if clean_q in r["topic_name"].lower() or r["topic_name"].lower() in clean_q:
-                    if not subject_hint or subject_hint.lower() in r["subject_name"].lower():
+                # 1. Exact match on topic name
+                for r in rows:
+                    if r["topic_name"].lower() == q or r["topic_name"].lower() == clean_q:
                         return dict(r)
 
-            # 3. Match against chapter name
-            for r in rows:
-                if clean_q in r["chapter_name"].lower() or r["chapter_name"].lower() in clean_q:
-                    return dict(r)
+                # 2. Substring match on topic name
+                for r in rows:
+                    if clean_q in r["topic_name"].lower() or r["topic_name"].lower() in clean_q:
+                        if not subject_hint or subject_hint.lower() in r["subject_name"].lower():
+                            return dict(r)
 
-            # 4. Normalized token overlap (handles plurals, punctuation, possessives)
-            q_tokens = _normalize_tokens(clean_q)
-            best_match = None
-            max_overlap = 0
-            for r in rows:
-                t_tokens = _normalize_tokens(r["topic_name"]) | _normalize_tokens(r["chapter_name"])
-                overlap = len(q_tokens & t_tokens)
-                if overlap > max_overlap:
-                    max_overlap = overlap
-                    best_match = dict(r)
-            if max_overlap >= 1:
-                return best_match
+                # 3. Match against chapter name
+                for r in rows:
+                    if clean_q in r["chapter_name"].lower() or r["chapter_name"].lower() in clean_q:
+                        return dict(r)
 
-            # 5. If user has only 1 topic seeded, return it
-            if len(rows) == 1:
-                return dict(rows[0])
+                # 4. Normalized token overlap (handles plurals, punctuation, possessives)
+                q_tokens = _normalize_tokens(clean_q)
+                best_match = None
+                max_overlap = 0
+                for r in rows:
+                    t_tokens = _normalize_tokens(r["topic_name"]) | _normalize_tokens(r["chapter_name"])
+                    overlap = len(q_tokens & t_tokens)
+                    if overlap > max_overlap:
+                        max_overlap = overlap
+                        best_match = dict(r)
+                if max_overlap >= 1:
+                    return best_match
 
-            return None
-    finally:
-        conn.close()
+                return None
+        finally:
+            conn.close()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error resolving topic '{topic_query}' for user {user_id}: {e}")
+        return None
 
 
 # ══════════════════════════════════════════════════════════

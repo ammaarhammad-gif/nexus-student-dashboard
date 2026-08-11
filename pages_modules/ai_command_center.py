@@ -183,10 +183,12 @@ def render_ai_command_center_page(user_id: int):
                     follow_ups=ai_response.get("follow_ups", [])
                 )
             except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception(f"Error in ai_command_center: {e}")
                 NexusConversationSession.add_message(
                     role="nexus",
-                    content=f"⚠️ **Error encountered:** {str(e)}\n\nPlease try rephrasing your request or ask another study question.",
-                    action_badge="⚠️ Execution Error"
+                    content="I encountered a momentary issue while processing that request. Please rephrase or ask about a specific study topic!",
+                    action_badge="⚠️ Copilot Notice"
                 )
 
         st.rerun()
