@@ -490,6 +490,27 @@ Guidelines:
         board = profile.get("board", "CBSE")
         active_topic = NexusConversationSession.get_active_topic()
 
+        # ── INTENT 0: NATURAL ACADEMIC GREETING & COPILOT ONBOARDING ──
+        if q_lower in ["hi", "hello", "hey", "hey nexus", "hi nexus", "hello nexus", "good morning", "good evening", "good afternoon", "who are you", "what can you do", "help"]:
+            return {
+                "content": f"""
+👋 **Hello {profile['name']}! I'm your Nexus Academic Copilot.**
+
+I'm here as your personal tutor and workspace assistant for **{profile['class_name']} ({board})**. Here's what I can do for you:
+
+1. 💡 **Explain Concepts:** *"Explain Newton's Third Law simply"*, *"Teach me Photosynthesis from first principles"*, *"Show mathematical derivation of Lens Formula"*.
+2. 🎯 **Adaptive Quizzing:** *"Quiz me on Chemical Bonding"* or *"Test my understanding"*.
+3. 🗓️ **Plan Your Study:** *"Schedule 45 minutes of Physics tomorrow"* or *"Plan today's study sprints"*.
+4. 🧠 **Spaced Repetition & Notes:** *"Add this to my revision queue"* or *"Save this explanation as a note"*.
+5. ❌ **Mistake Diagnostics:** *"I made a mistake on friction"* and I'll analyze the root cause.
+6. ⏱️ **Focus Sessions:** *"Start a 25 min focus session for Chemistry"*.
+
+**What would you like to study or accomplish right now?**
+""",
+                "action_badge": f"🤖 Nexus Academic Copilot • {board}",
+                "follow_ups": ["Explain Newton's Third Law simply", "Quiz me on weak areas", "Schedule 45 min Physics tomorrow", "How am I progressing?"]
+            }
+
         # ── INTENT 1: DESTRUCTIVE ACTION (Delete All Notes) ──
         if "delete all my notes" in q_lower or "delete all notes" in q_lower:
             st.session_state["pending_destructive_action"] = "DELETE_ALL_NOTES"

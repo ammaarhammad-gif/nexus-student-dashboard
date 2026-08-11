@@ -130,7 +130,7 @@ def render_ai_command_center_page(user_id: int):
             if st.button("📊 \"How am I progressing?\"", use_container_width=True, key="emp_p6"):
                 st.session_state["queued_ai_prompt"] = "How am I progressing towards my exams?"
                 st.rerun()
-
+    else:
         # Render Chat Thread
         for idx, msg in enumerate(history):
             if msg["role"] == "user":
@@ -162,26 +162,12 @@ def render_ai_command_center_page(user_id: int):
     # ══════════════════════════════════════════════════════════
     # CHAT INPUT BAR & PROMPT DISPATCHER
     # ══════════════════════════════════════════════════════════
-    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-
     # Check queued prompt from quick chips
-    initial_val = st.session_state.pop("queued_ai_prompt", None)
-
-    with st.form("nexus_chat_input_form", clear_on_submit=True):
-        col_inp, col_snd = st.columns([5, 1])
-        with col_inp:
-            chat_input = st.text_input(
-                "Chat with Nexus",
-                value=initial_val or "",
-                placeholder="Ask Nexus anything about your studies, or give an action command (e.g. 'Schedule 45 min Physics tomorrow', 'Quiz me', 'Explain photosynthesis')...",
-                label_visibility="collapsed",
-                key="nexus_chat_text_box"
-            )
-        with col_snd:
-            send_btn = st.form_submit_button("⚡ Send", type="primary", use_container_width=True)
-
-    # Dispatch Query
-    prompt_to_process = initial_val if (initial_val and not send_btn) else (chat_input if send_btn else None)
+    queued_prompt = st.session_state.pop("queued_ai_prompt", None)
+    
+    # Native Streamlit Chat Input (or fallback triggered via quick chip)
+    chat_prompt = st.chat_input("Ask Nexus anything about your studies, or give an action command...")
+    prompt_to_process = chat_prompt or queued_prompt
 
     if prompt_to_process and prompt_to_process.strip():
         user_query = prompt_to_process.strip()
