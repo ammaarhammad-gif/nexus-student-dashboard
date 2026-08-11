@@ -18,6 +18,7 @@ from models import (
     get_user_theme
 )
 from styles import render_top_header_bar, render_empty_state
+from ui_optimistic import render_floating_xp_toast
 
 
 def render_review_page(user_id: int):
