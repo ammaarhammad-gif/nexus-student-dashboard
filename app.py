@@ -297,19 +297,25 @@ def main():
 
         st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
         
-        # 10 Primary Sidebar Modules
-        page_options = [
+        # ── Primary Navigation (7 Core Modules) ──
+        primary_pages = [
             "🏠 Dashboard",
             "📚 Learn",
             "🗓️ Planner",
             "🎯 Practice",
             "🧠 Review",
             "⏱️ Focus",
-            "🤖 Nexus AI",
+            "🤖 Nexus AI"
+        ]
+
+        # ── More Section (3 Utility Modules) ──
+        more_pages = [
             "📊 Analytics",
             "🔍 Search",
             "⚙️ Settings"
         ]
+
+        all_pages = primary_pages + more_pages
 
         # Normalize legacy or redirect page names
         page_aliases = {
@@ -330,12 +336,12 @@ def main():
 
         curr_page = st.session_state.get("current_page", "🏠 Dashboard")
         curr_page = page_aliases.get(curr_page, curr_page)
-        if curr_page not in page_options:
-            curr_page = page_options[0]
+        if curr_page not in all_pages:
+            curr_page = all_pages[0]
         st.session_state["current_page"] = curr_page
 
         nav_epoch = st.session_state.get("nav_epoch", 0)
-        current_nav_index = page_options.index(curr_page)
+        is_in_more = curr_page in more_pages
 
         render_html("""
             <style>
@@ -407,16 +413,50 @@ def main():
             </style>
         """)
 
+        # Primary Navigation Radio (7 core modules)
+        primary_index = primary_pages.index(curr_page) if not is_in_more else None
 
-        page_selection = st.radio(
-            "Navigation Menu",
-            page_options,
-            index=current_nav_index,
-            key=f"nav_selector_{nav_epoch}",
+        primary_selection = st.radio(
+            "Primary Navigation",
+            primary_pages,
+            index=primary_index if primary_index is not None else None,
+            key=f"nav_primary_{nav_epoch}",
             label_visibility="collapsed"
         )
-        st.session_state["current_page"] = page_selection
-        page = page_selection
+
+        # ── "More" Divider ──
+        divider_color = "rgba(255,255,255,0.12)" if is_dark else "#E2E8F0"
+        label_color = "#64748B" if is_dark else "#94A3B8"
+        render_html(f"""
+            <div style="display: flex; align-items: center; gap: 8px; margin: 12px 0 6px 0;">
+                <div style="flex: 1; height: 1px; background: {divider_color};"></div>
+                <span style="font-family: 'Outfit', sans-serif; font-size: 0.72rem; font-weight: 700; color: {label_color}; text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap;">More</span>
+                <div style="flex: 1; height: 1px; background: {divider_color};"></div>
+            </div>
+        """)
+
+        # More Navigation Radio (3 utility modules)
+        more_index = more_pages.index(curr_page) if is_in_more else None
+
+        more_selection = st.radio(
+            "More Navigation",
+            more_pages,
+            index=more_index if more_index is not None else None,
+            key=f"nav_more_{nav_epoch}",
+            label_visibility="collapsed"
+        )
+
+        # Determine active page: whichever radio was last clicked
+        if primary_selection and primary_selection != st.session_state.get("_prev_primary"):
+            page = primary_selection
+        elif more_selection and more_selection != st.session_state.get("_prev_more"):
+            page = more_selection
+        else:
+            page = curr_page
+
+        st.session_state["_prev_primary"] = primary_selection
+        st.session_state["_prev_more"] = more_selection
+        st.session_state["current_page"] = page
 
         render_html("<div style='margin-top: 12px;'></div>")
 
