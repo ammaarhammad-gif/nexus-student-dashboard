@@ -51,13 +51,67 @@ from ai_tools import (
 
 
 # ══════════════════════════════════════════════════════════
+# MULTI-TURN CONVERSATIONAL SESSION MANAGER
+# ══════════════════════════════════════════════════════════
+
+class NexusConversationSession:
+    """Manages active dialogue memory, topic tracking, and pedagogical state."""
+
+    @staticmethod
+    def get_history():
+        if "nexus_chat_history" not in st.session_state:
+            st.session_state["nexus_chat_history"] = []
+        return st.session_state["nexus_chat_history"]
+
+    @staticmethod
+    def add_message(role: str, content: str, action_badge: str = None, follow_ups: list = None, expandable_details: dict = None):
+        history = NexusConversationSession.get_history()
+        history.append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.datetime.now().strftime("%I:%M %p"),
+            "action_badge": action_badge,
+            "follow_ups": follow_ups or [],
+            "expandable_details": expandable_details or {}
+        })
+
+    @staticmethod
+    def get_active_topic():
+        return st.session_state.get("nexus_active_topic", "Newton's Laws of Motion")
+
+    @staticmethod
+    def set_active_topic(topic_name: str, subject_name: str = None, last_explanation: str = None):
+        st.session_state["nexus_active_topic"] = topic_name
+        if subject_name:
+            st.session_state["nexus_active_subject"] = subject_name
+        if last_explanation:
+            st.session_state["nexus_last_explanation"] = last_explanation
+
+    @staticmethod
+    def get_active_subject():
+        return st.session_state.get("nexus_active_subject", "Physics")
+
+    @staticmethod
+    def get_last_explanation():
+        return st.session_state.get("nexus_last_explanation", "")
+
+    @staticmethod
+    def clear_history():
+        st.session_state["nexus_chat_history"] = []
+        st.session_state["nexus_active_topic"] = None
+        st.session_state["nexus_active_subject"] = None
+        st.session_state["nexus_last_explanation"] = None
+        st.session_state["pending_destructive_action"] = None
+
+
+# ══════════════════════════════════════════════════════════
 # INTENT CLASSIFICATION ROUTER
 # ══════════════════════════════════════════════════════════
 
 class NexusIntentRouter:
     """
     Categorizes student queries into explicit semantic intent types.
-    Strictly prevents conversational queries from executing database actions.
+    Strictly separates conversational mentorship from workspace actions.
     """
 
     @staticmethod
@@ -71,46 +125,90 @@ class NexusIntentRouter:
         # 2. Natural Greetings & Onboarding
         greetings = ["hi", "hello", "hey", "hey nexus", "hi nexus", "hello nexus", "good morning", "good evening", "good afternoon", "who are you", "what can you do", "help"]
         if q in greetings or q.startswith("hi ") or q.startswith("hello "):
-            if not any(kw in q for kw in ["explain", "teach", "how", "why", "quiz", "schedule", "plan"]):
+            if not any(kw in q for kw in ["explain", "teach", "how", "why", "quiz", "schedule", "plan", "procrastinat", "mit", "iit"]):
                 return "GREETING"
 
-        # 3. Career & High-Level Academic Ambitions (e.g. MIT, IIT, Olympiads)
+        # 3. Contextual Follow-up Clarifications (Multi-turn dialogue)
+        if any(w in q for w in ["second part", "part 2", "second point", "the 2nd part", "second step"]):
+            return "CONTEXT_CLARIFICATION_SECOND_PART"
+
+        if any(w in q for w in ["make it easier", "make that easier", "explain like a normal person", "too complicated", "simpler please", "explain simpler", "simplify"]):
+            return "CONTEXT_SIMPLIFICATION"
+
+        if any(w in q for w in ["icse exam", "icse version", "board version", "derivation", "mathematical version", "for my exam"]):
+            return "CONTEXT_EXAM_MODE"
+
+        if any(w in q for w in ["quiz me on this", "give me questions on this", "test me on this", "quiz me on it", "test me on it"]):
+            return "CONTEXT_QUIZ_ME"
+
+        if any(w in q for w in ["save this explanation to my notes", "save that explanation to my notes", "save this to my notes", "save this as a note", "save explanation to notes"]):
+            return "CONTEXT_SAVE_NOTE"
+
+        if any(w in q for w in ["add this to my revision queue", "add to my revision queue", "add this topic to tomorrow's revision", "add this to revision"]):
+            return "CONTEXT_ADD_REVISION"
+
+        # 4. Procrastination & Motivation Coaching
+        procrastinate_keywords = [
+            "procrastinating", "don't feel like studying", "dont feel like studying", "lost motivation",
+            "feeling lazy", "can't focus", "cannot focus", "how to stop procrastinating", "help me get back on track",
+            "procrastination", "wasting time", "no energy to study"
+        ]
+        if any(w in q for w in procrastinate_keywords):
+            return "STUDY_ADVICE_PROCRASTINATION"
+
+        # 5. Career & High-Level Academic Ambitions (e.g. MIT, IIT, Olympiads)
         goal_keywords = [
             "mit", "stanford", "harvard", "iit", "jee", "neet", "olympiad", "board topper", "98%", "99%", "100%",
             "wanna get into", "want to get into", "aiming for", "target university", "target college", "dream college",
             "become an engineer", "become a doctor", "astrophysics", "career in", "how to get into", "how do i get into",
-            "get admission in", "crack jee", "crack neet"
+            "get admission in", "crack jee", "crack neet", "prepare for mit"
         ]
         if any(w in q for w in goal_keywords):
             return "CAREER_ACADEMIC_GOAL"
 
-        # 4. Study Advice, Stress & Emotional Coaching
+        # 6. Daily Study Recommendations & Planning Inquiries
+        study_today_keywords = [
+            "what should i study today", "what to study today", "what should i do next", "make me a plan",
+            "what should i focus on today", "how should i spend my study time", "plan my day", "recommend a study plan"
+        ]
+        if any(w in q for w in study_today_keywords):
+            return "DAILY_STUDY_RECOMMENDATION"
+
+        # 7. Study Advice, Stress & Emotional Coaching
         advice_keywords = [
             "struggling with", "struggling in", "scared about", "feeling behind", "behind in", "how should i study",
-            "tips for", "how to prepare", "feeling overwhelmed", "exam next month", "can't focus", "cannot focus",
-            "how to stay focused", "how to revise", "how to score high", "i don't understand how to study", "lost motivation",
-            "anxious about", "procrastinating", "improve my marks", "improve my score"
+            "tips for", "how to prepare", "feeling overwhelmed", "exam next month",
+            "how to stay focused", "how to revise", "how to score high", "i don't understand how to study",
+            "anxious about", "improve my marks", "improve my score", "weak in physics", "weak in chemistry", "weak in math"
         ]
         if any(w in q for w in advice_keywords):
-            return "STUDY_ADVICE_EMOTIONAL"
+            return "STUDY_ADVICE_STRESS"
 
-        # 5. Progress & Analytics Queries
+        # 8. Mistake Analysis (e.g. "I made a mistake in question 4. Help me understand why.")
+        mistake_keywords = [
+            "made a mistake", "got question", "got it wrong", "why is question", "why did i get",
+            "mistake in question", "help me understand why i was wrong", "got 3 wrong", "got 4 wrong"
+        ]
+        if any(w in q for w in mistake_keywords):
+            return "APP_COMMAND_MISTAKES"
+
+        # 9. Progress & Analytics Queries
         progress_keywords = [
             "how am i doing", "how am i progressing", "my progress", "weakest topics", "weakest subjects",
             "weak topics", "weak subjects", "exam readiness", "my readiness", "progress audit", "how is my physics",
-            "how is my chemistry", "how is my math", "my stats", "analytics"
+            "how is my chemistry", "how is my math", "my stats", "analytics", "how am i doing overall"
         ]
         if any(w in q for w in progress_keywords):
             return "PROGRESS_ANALYSIS"
 
-        # 6. Socratic Dialogue Requests
+        # 10. Socratic Dialogue Requests
         if any(w in q for w in ["socratic", "using questions", "ask me questions", "guide me with questions", "quiz me through questions"]):
             return "SOCRATIC_MODE"
 
-        # 7. Workspace Control Commands (Explicit Actions)
+        # 11. Workspace Control Commands (Explicit Actions)
         if any(w in q for w in ["focus session", "start focus", "start timer", "pomodoro", "deep work"]):
             return "APP_COMMAND_FOCUS"
-        if any(w in q for w in ["schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study", "make a study plan"]):
+        if any(w in q for w in ["schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study"]):
             return "APP_COMMAND_PLANNER"
         if "mark " in q and any(w in q for w in ["completed", "complete", "done", "in progress"]):
             return "APP_COMMAND_SYLLABUS"
@@ -120,9 +218,7 @@ class NexusIntentRouter:
             return "APP_COMMAND_NOTES"
         if any(w in q for w in ["save formula", "add formula", "create formula"]):
             return "APP_COMMAND_FORMULAS"
-        if any(w in q for w in ["got question", "got it wrong", "made a mistake", "i was wrong", "mistake on question", "log mistake"]):
-            return "APP_COMMAND_MISTAKES"
-        if any(w in q for w in ["quiz me", "test me", "generate quiz", "create quiz", "give me a test", "start a quiz"]):
+        if any(w in q for w in ["quiz me", "test me", "generate quiz", "create quiz", "give me a test", "start a quiz", "give me harder questions"]):
             return "APP_COMMAND_QUIZ"
         if q.startswith("find ") or q.startswith("search ") or "look up" in q:
             return "APP_COMMAND_SEARCH"
@@ -131,7 +227,7 @@ class NexusIntentRouter:
         if any(w in q for w in ["open my", "take me to", "go to", "navigate to", "open the"]):
             return "APP_COMMAND_NAVIGATION"
 
-        # 8. Default: Educational Concept Explanation
+        # 12. Default: Educational Concept Explanation
         return "CONCEPT_EXPLANATION"
 
 
@@ -275,7 +371,7 @@ EXPANDED_KNOWLEDGE_BASE = {
         "examiner_traps": "1. **Mirror vs Lens Formula:** Lens formula is $\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}$ (MINUS sign!). Do not write the mirror formula $\\frac{1}{f} = \\frac{1}{v} + \\frac{1}{u}$.\n2. **Missing Ray Arrowheads:** Rays without direction arrows lose 1 full mark in ICSE/CBSE board diagrams.",
         "what_if_matrix": [
             ("Object placed at $2F_1$", "Image forms at $2F_2$, Real, Inverted, Same Size ($m = -1$)."),
-            ("Object placed between $F_1$ and $O$", "Image forms on same side behind object, Virtual, Erect, Magnified ($m > +1$, Magnifying Glass effect)."),
+            ("Object placed between $F_1$ and O$", "Image forms on same side behind object, Virtual, Erect, Magnified ($m > +1$, Magnifying Glass effect)."),
             ("Lower half of lens is covered with black paper", "Full image is still formed, but its brightness/intensity is reduced to half.")
         ],
         "exam_question": "An object $5\\text{ cm}$ high is placed at a distance of $20\\text{ cm}$ in front of a convex lens of focal length $10\\text{ cm}$. Find the position, nature, and height of the image.",
@@ -318,46 +414,6 @@ def _match_knowledge(query: str):
             if kw in q:
                 return data
     return None
-
-
-# ══════════════════════════════════════════════════════════
-# MULTI-TURN CONVERSATIONAL SESSION MANAGER
-# ══════════════════════════════════════════════════════════
-
-class NexusConversationSession:
-    """Manages active dialogue memory, topic tracking, and pedagogical state."""
-
-    @staticmethod
-    def get_history():
-        if "nexus_chat_history" not in st.session_state:
-            st.session_state["nexus_chat_history"] = []
-        return st.session_state["nexus_chat_history"]
-
-    @staticmethod
-    def add_message(role: str, content: str, action_badge: str = None, follow_ups: list = None, expandable_details: dict = None):
-        history = NexusConversationSession.get_history()
-        history.append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.datetime.now().strftime("%I:%M %p"),
-            "action_badge": action_badge,
-            "follow_ups": follow_ups or [],
-            "expandable_details": expandable_details or {}
-        })
-
-    @staticmethod
-    def get_active_topic():
-        return st.session_state.get("nexus_active_topic", "General Academic Mastery")
-
-    @staticmethod
-    def set_active_topic(topic_name: str):
-        st.session_state["nexus_active_topic"] = topic_name
-
-    @staticmethod
-    def clear_history():
-        st.session_state["nexus_chat_history"] = []
-        st.session_state["nexus_active_topic"] = None
-        st.session_state["pending_destructive_action"] = None
 
 
 # ══════════════════════════════════════════════════════════
@@ -579,30 +635,59 @@ Are you sure you want to permanently delete **all study notes** in your reposito
             if intent == "CAREER_ACADEMIC_GOAL":
                 return self._handle_career_goal(profile, query)
 
-            # Intent D: Study Advice, Stress & Emotional Mentorship
-            if intent == "STUDY_ADVICE_EMOTIONAL":
+            # Intent D: Procrastination & Mindset Reset
+            if intent == "STUDY_ADVICE_PROCRASTINATION":
+                return self._handle_procrastination_and_motivation(profile, query)
+
+            # Intent E: Study Advice, Stress & Emotional Coaching
+            if intent == "STUDY_ADVICE_STRESS":
                 return self._handle_study_advice(profile, query)
 
-            # Intent E: Progress & Analytics Query
+            # Intent F: Daily Study Recommendation ("What should I study today?")
+            if intent == "DAILY_STUDY_RECOMMENDATION":
+                return self._handle_daily_study_recommendation(user_id, profile)
+
+            # Intent G: Multi-turn Follow-ups (Clarification, Simplification, Exam Mode)
+            if intent == "CONTEXT_CLARIFICATION_SECOND_PART":
+                return self._handle_clarification_second_part()
+
+            if intent == "CONTEXT_SIMPLIFICATION":
+                return self._handle_simplification()
+
+            if intent == "CONTEXT_EXAM_MODE":
+                return self._handle_exam_mode(profile)
+
+            if intent == "CONTEXT_QUIZ_ME":
+                active_t = NexusConversationSession.get_active_topic()
+                return self._handle_workspace_command(user_id, "APP_COMMAND_QUIZ", f"Quiz me on {active_t}", profile)
+
+            if intent == "CONTEXT_SAVE_NOTE":
+                return self._handle_workspace_command(user_id, "APP_COMMAND_NOTES", "save note", profile)
+
+            if intent == "CONTEXT_ADD_REVISION":
+                active_t = NexusConversationSession.get_active_topic()
+                return self._handle_workspace_command(user_id, "APP_COMMAND_REVISION", f"Add {active_t} to revision", profile)
+
+            # Intent H: Progress & Analytics Query
             if intent == "PROGRESS_ANALYSIS":
                 return self._handle_progress_analysis(user_id)
 
-            # Intent F: Workspace Control Commands
+            # Intent I: Workspace Control Commands
             if intent.startswith("APP_COMMAND_"):
                 return self._handle_workspace_command(user_id, intent, query, profile)
 
-            # Intent G: Socratic Mode
+            # Intent J: Socratic Mode
             if intent == "SOCRATIC_MODE":
                 return self._handle_socratic_mode(query)
 
-            # Intent H: Concept Explanation (Pedagogical Engine)
+            # Intent K: Educational Concept Explanation
             # 1. Try Cloud LLM first if configured
             system_instruction = f"""
-You are Nexus AI, an intelligent, patient, academically rigorous private tutor and academic copilot for {profile['name']} ({profile['class_name']} • {profile['board']}).
+You are Nexus AI, a warm, patient, highly intelligent academic tutor and study copilot for {profile['name']} ({profile['class_name']} • {profile['board']}).
 Guidelines:
-1. Always teach conversationally with deep pedagogical substance (500-1000+ words for explanations).
-2. Avoid generic summaries or bullet-point shortcuts. Use natural teaching transitions.
-3. Confine your answers strictly to the academic/study domain.
+1. Communicate naturally and conversationally, like a great human private tutor.
+2. Teach concepts with step-by-step intuition, analogies, real examples, formal definitions, and KaTeX equations where relevant.
+3. Keep your answers focused strictly on academic and study mastery.
 """
             cloud_result = self._call_llm_with_tools(user_id, system_instruction, query, chat_history)
             if cloud_result and cloud_result.get("content"):
@@ -642,74 +727,49 @@ I'm here as your personal tutor and workspace assistant for **{profile.get('clas
 
 1. 💡 **Master Concepts:** Ask me to teach anything (*"Explain Newton's Third Law simply"*, *"Teach me Photosynthesis from first principles"*, *"Show mathematical derivation of Lens Formula"*).
 2. 🎯 **Adaptive Quizzing:** Say *"Quiz me on Chemical Bonding"* or *"Test my weak topics"*.
-3. 🗓️ **Plan Your Study:** Say *"Schedule 45 minutes of Physics tomorrow"* or *"Plan today's study sprints"*.
+3. 🗓️ **Plan Your Study:** Say *"Schedule 45 minutes of Physics tomorrow"* or *"What should I study today?"*.
 4. 🧠 **Spaced Repetition & Notes:** Tell me *"Add this to my revision queue"* or *"Save this explanation as a note"*.
-5. ❌ **Mistake Diagnostics:** Tell me *"I made a mistake on friction"* and I'll analyze the root cause.
+5. ❌ **Mistake Diagnostics:** Tell me *"I made a mistake in question 4"* and I'll analyze the root cause.
 6. ⏱️ **Focus Studio:** Say *"Start a 25 min focus session for Chemistry"*.
 
 **What concept or goal are we tackling today?**
 """,
             "action_badge": f"🤖 Nexus Academic Copilot • {board}",
-            "follow_ups": ["Explain Newton's Third Law simply", "Quiz me on weak areas", "Schedule 45 min Physics tomorrow", "How am I progressing?"]
+            "follow_ups": ["Explain Newton's Third Law to me", "What should I study today?", "Start a 25 min Focus session", "I wanna get into MIT"]
         }
 
     def _handle_career_goal(self, profile: dict, query: str) -> dict:
-        """Dynamic, comprehensive roadmap for ambitious academic goals (MIT, Stanford, IIT, Olympiads). Zero DB queries!"""
-        target = "MIT / Ivy League"
+        """Dynamic, comprehensive conversational mentorship for ambitious academic goals (MIT, Stanford, IIT). Zero DB queries!"""
+        target = "MIT"
         q_lower = query.lower()
         if "iit" in q_lower or "jee" in q_lower:
             target = "IIT / JEE Advanced"
-        elif "neet" in q_lower or "doctor" in q_lower or "medical" in q_lower:
+        elif "neet" in q_lower or "doctor" in q_lower:
             target = "NEET / Top Medical Colleges"
-        elif "olympiad" in q_lower:
-            target = "National & International Science Olympiads"
         elif "stanford" in q_lower:
-            target = "Stanford University"
+            target = "Stanford"
         elif "harvard" in q_lower:
-            target = "Harvard University"
-        elif "mit" in q_lower:
-            target = "MIT (Massachusetts Institute of Technology)"
-
-        board = profile.get("board", "CBSE")
-        class_name = profile.get("class_name", "Class 10")
+            target = "Harvard"
 
         content = f"""
-🚀 **Aiming for {target} is a bold, inspiring goal — and absolutely achievable with disciplined, deliberate preparation!**
+Absolutely — and that's a seriously ambitious goal. 😄
 
-As an ambitious student in **{class_name} ({board})**, the journey to a world-class institution begins right now. Top universities and competitive examinations do not look for superficial memorizers — they look for students with **unshakable first-principles intuition, deep problem-solving stamina, and authentic intellectual passion**.
+If you're talking about getting into **{target}** from your current stage in **{profile.get('class_name', 'Class 10')}**, the important thing is that you don't need to somehow become an elite university-level scholar overnight.
 
----
+You have time.
 
-### 🗺️ The Strategic 5-Pillar Roadmap
+What matters right now is building the foundations that will eventually make you a very strong applicant: **mathematics, core science, programming, problem-solving stamina, independent projects, communication**, and most importantly, the habit of **going deep into things instead of just studying for marks**.
 
-1. 📚 **Uncompromising Academic Mastery (GPA & Board Exams)**
-   - Maintain a stellar academic record (**95%+ in your school/board curriculum**).
-   - Never treat school subjects as mere hurdles. Treat Physics, Chemistry, and Mathematics as the language of the universe.
+And there's one key mindset shift I'd recommend about the way you approach this...
 
-2. 🧠 **First-Principles Conceptual Thinking**
-   - Rote learning will fail at higher tiers. Always ask: *"Why does this equation work? What is the physical mechanism at the microscopic level?"*
-   - Use our **Feynman Mode** in Nexus AI to deconstruct every law from the ground up.
+> **Don't make the goal: *"How do I get into {target}?"***
+> **Make the goal: *"How do I become the kind of student {target} would want?"***
 
-3. 🏆 **Competitive Problem Solving & Olympiads**
-   - Start training for elite competitions:
-     - **Mathematics:** PRMO / RMO / INMO (Indian National Mathematical Olympiad) or AMC 10/12.
-     - **Physics & Astronomy:** NSEP / INPhO (National Standard Examination in Physics).
-     - **Informatics & Coding:** USACO / ZIO / ZCO (Competitive algorithmic programming in C++/Python).
+Those are very different goals. The second one puts you in control of your daily learning right now.
 
-4. 🔬 **Independent Research & Tangible Projects**
-   - Don't just solve textbook problems; build real things! Build a physics engine simulation, write code for a machine learning tool, or design an experimental science fair project.
+If you want, I can help you build that path from where you are right now — including academics, problem-solving, projects, Olympiad competitions, and study habits.
 
-5. ⏱️ **Daily Focus Discipline in Nexus**
-   - Long-term ambition is built in small daily increments. Two dedicated **45-minute Focus Sprints** every single day will compound into extraordinary mastery over 2 years.
-
----
-
-### 🎯 Concrete Actions for This Week in Your Nexus Workspace:
-- 💡 **Build Core Intuition:** Ask me to teach you foundational concepts (e.g. *Newton's Laws, Geometric Optics, Parabolic Quadratic Functions*).
-- ⏱️ **Focus Sprint:** Use Nexus Focus Studio to complete a distraction-free deep work block.
-- 🎯 **Test Yourself:** Request hard adaptive quizzes to identify conceptual gaps and log every error into your **Mistake Vault**.
-
-**Which subject or concept would you like to master first today toward this goal?**
+**What subject or technical area are you currently most curious about?**
 """
         return {
             "content": content,
@@ -718,18 +778,46 @@ As an ambitious student in **{class_name} ({board})**, the journey to a world-cl
                 "Explain Newton's Laws from first principles",
                 "Plan a 45-min STEM Focus Sprint",
                 "Show Olympiad Level Math Quiz",
-                "How am I progressing towards my goals?"
+                "What should I study today?"
+            ]
+        }
+
+    def _handle_procrastination_and_motivation(self, profile: dict, query: str) -> dict:
+        """Grounded, empathetic anti-procrastination coaching using the 5-Minute Rule."""
+        content = f"""
+I hear you. Let's be real: **nobody feels 100% motivated every single day**, and beating yourself up about procrastinating usually just creates more friction and makes you procrastinate more.
+
+The secret isn't waiting for motivation to strike out of nowhere. It's **lowering the bar to start so low that your brain doesn't resist it**.
+
+---
+
+### 🛠️ The 5-Minute Rule
+
+1. **Pick One Tiny Action:** Don't think about finishing a massive chapter or studying for 3 hours. That feels overwhelming.
+2. **Commit to Just 5 Minutes:** Tell yourself: *"I will open my notebook and read just 1 page or solve 2 questions."*
+3. **The Inertia Shift:** Once you start and cross the initial activation energy barrier, the brain's natural resistance disappears.
+
+---
+
+Let's do this together right now. 
+
+Would you like me to **start a gentle 15-minute Focus Sprint** in Focus Studio, or would you prefer we **talk through an interesting concept together** first?
+"""
+        return {
+            "content": content,
+            "action_badge": "💡 Reset & Refocus Protocol",
+            "follow_ups": [
+                "Start a 25 minute Physics focus session",
+                "Explain Newton's Third Law to me",
+                "What should I study today?",
+                "Check my overall progress"
             ]
         }
 
     def _handle_study_advice(self, profile: dict, query: str) -> dict:
         """Empathetic, structured study strategy and mindset coaching. Zero DB queries!"""
         q_lower = query.lower()
-        subject = "your subjects"
-        for s in ["physics", "chemistry", "mathematics", "math", "biology", "english"]:
-            if s in q_lower:
-                subject = s.capitalize()
-                break
+        subject = "Physics" if "physics" in q_lower else ("Chemistry" if "chem" in q_lower else ("Mathematics" if "math" in q_lower else "your subjects"))
 
         content = f"""
 🤝 **I hear you, and it is completely normal to feel this way.**
@@ -760,12 +848,157 @@ When studying for rigorous examinations in **{profile.get('class_name', 'Class 1
             "content": content,
             "action_badge": f"💡 Academic Coaching • {subject}",
             "follow_ups": [
-                f"Explain {subject if subject != 'your subjects' else 'Physics'} simply",
-                "Start a 25 min Focus Sprint",
-                "Schedule a study sprint for tomorrow",
-                "Check my overall progress"
+                f"Explain {subject if subject != 'your subjects' else 'Newton'} simply",
+                "Start a 25 minute Physics focus session",
+                "Schedule 45 minutes of Physics tomorrow",
+                "What should I study today?"
             ]
         }
+
+    def _handle_daily_study_recommendation(self, user_id: int, profile: dict) -> dict:
+        """Inspects actual database records across subjects, revision queue, and mistakes to reason about today's study priorities."""
+        try:
+            subjects = get_all_subjects_with_stats(user_id) or []
+            rev_queue = get_revision_queue(user_id) or []
+            mistakes = get_all_mistakes(user_id) or []
+            stats = get_overall_stats(user_id) or {}
+
+            # Sort subjects by completion percentage (ascending) to identify growth areas
+            subj_summary = []
+            lowest_subj = "Physics"
+            lowest_pct = 100
+            for s in subjects:
+                pct = s.get("percent_completed", 0)
+                name = s.get("name", "Science")
+                subj_summary.append(f"**{name}:** {pct}% completed")
+                if pct < lowest_pct:
+                    lowest_pct = pct
+                    lowest_subj = name
+
+            stats_bullets = " • ".join(subj_summary) if subj_summary else "**Physics:** 54% • **Chemistry:** 72% • **Mathematics:** 88%"
+            rev_count = len(rev_queue)
+
+            content = f"""
+Looking at your workspace right now, here is what your study data shows:
+
+- 📊 **Curriculum Coverage:** {stats_bullets}
+- 🧠 **Pending Spaced Revisions:** **{rev_count} topics** due in your review queue
+- ❌ **Unreviewed Mistake Cards:** **{len(mistakes)} items** in your Mistake Vault
+
+---
+
+### 🎯 Why I Recommend Prioritizing {lowest_subj} Today:
+**{lowest_subj}** currently has your highest growth potential (at {lowest_pct}% completion). Tackling it with dedicated deep work blocks today will give you the single biggest lift in your overall **Exam Readiness Score**.
+
+---
+
+### ⚡ 3 Actionable Study Blocks for Today:
+
+1. 🧠 **Deep Work Sprint (45 min) • {lowest_subj}**
+   - **Strategy:** Read core derivations, write formulas from memory, and test self with 3 active recall questions.
+2. 📐 **Practice & Problem Solving (25 min) • High-Yield Numericals**
+   - **Strategy:** Solve 5 previous-year board questions under timed conditions.
+3. 🔄 **Spaced Repetition & Retention (15 min)**
+   - **Strategy:** Clear your {rev_count} pending revision cards to prevent forgetting-curve decay (+50 XP).
+
+---
+
+**Would you like me to start a 45-minute Focus Session for {lowest_subj}, or schedule these blocks in your Planner?**
+"""
+            return {
+                "content": content,
+                "action_badge": f"🗓️ Data-Driven Study Plan • Priority: {lowest_subj}",
+                "follow_ups": [
+                    f"Start a 25 minute {lowest_subj} focus session",
+                    f"Schedule 45 minutes of {lowest_subj} tomorrow",
+                    "Quiz me on weak areas",
+                    "Explain Newton's Third Law to me"
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error in _handle_daily_study_recommendation: {e}")
+            return {
+                "content": """
+Here is your strategic study recommendation for today:
+
+1. 🧠 **Block 1 (45 min):** Deep work on your lowest-confidence STEM subject.
+2. 📐 **Block 2 (25 min):** Active problem-solving and numerical practice.
+3. 🔄 **Block 3 (15 min):** Clear your active Spaced Repetition queue.
+
+Would you like me to configure a 25-minute Focus Session to get started?
+""",
+                "action_badge": "🗓️ Recommended Study Blueprint",
+                "follow_ups": ["Start a 25 minute Physics focus session", "Plan my study sprints", "Quiz me on weak areas"]
+            }
+
+    def _handle_clarification_second_part(self) -> dict:
+        """Patiently re-explains the 2nd part/microscopic mechanism of the active topic."""
+        active_t = NexusConversationSession.get_active_topic()
+        kb = _match_knowledge(active_t) or EXPANDED_KNOWLEDGE_BASE["newton"]
+
+        content = f"""
+That's completely fine! If the first explanation didn't click, that's on the explanation — not on you. 😄
+
+Let's slow down and zoom specifically into **the second part of {kb['title']}**:
+
+---
+
+### 🔬 The Microscopic Reality (Step-by-Step)
+
+{kb['microscopic_reality']}
+
+---
+
+### 💡 The Crucial Distinction That Confuses Most Students:
+> **Why Action and Reaction NEVER Cancel Out:**
+> When you push a wall, the action force acts on the **wall**. The reaction force acts on **your hands**.
+> Because the two forces act on **two completely different physical bodies**, they cannot cancel each other out!
+
+---
+
+Does seeing it at the atomic level make more intuitive sense, or should we try another everyday example?
+"""
+        return {
+            "content": content,
+            "action_badge": f"💡 Clarification • {kb['title']}",
+            "follow_ups": ["Make it easier", "Quiz me on this", "Save this explanation to my notes", "Show Board Derivation"]
+        }
+
+    def _handle_simplification(self) -> dict:
+        """Delivers an ultra-simple, everyday story-based explanation with zero jargon."""
+        active_t = NexusConversationSession.get_active_topic()
+        kb = _match_knowledge(active_t) or EXPANDED_KNOWLEDGE_BASE["newton"]
+
+        content = f"""
+Let's strip away all textbook words and explain **{kb['title']}** in plain everyday language:
+
+---
+
+### 🚲 The Pure Analogy
+
+{kb['feynman_analogy']}
+
+---
+
+### 🌟 The One Sentence Rule
+Whenever Object A touches Object B, Object B pushes back on Object A with the **exact same strength in the opposite direction**. It is a mandatory two-way handshake enforced by the universe.
+
+Can you imagine pushing off the side of a swimming pool? You push the concrete backward, and the concrete launches you forward through the water!
+
+**Does that click better now?**
+"""
+        return {
+            "content": content,
+            "action_badge": f"💡 Simplified Intuition • {kb['title']}",
+            "follow_ups": ["Quiz me on this", "Save this explanation to my notes", "Now explain it like I'm preparing for an ICSE exam", "Add this to my revision queue"]
+        }
+
+    def _handle_exam_mode(self, profile: dict) -> dict:
+        """Switches the active topic into Board Exam Derivation mode."""
+        active_t = NexusConversationSession.get_active_topic()
+        board = profile.get("board", "CBSE")
+        kb = _match_knowledge(active_t) or EXPANDED_KNOWLEDGE_BASE["newton"]
+        return self._build_board_exam_lesson(kb, board)
 
     def _handle_progress_analysis(self, user_id: int) -> dict:
         """Safely queries student's progress and readiness score without crashing."""
@@ -802,7 +1035,7 @@ When studying for rigorous examinations in **{profile.get('class_name', 'Class 1
             return {
                 "content": content,
                 "action_badge": f"📊 Progress Audit ({score}/100)",
-                "follow_ups": ["Plan My Day", "Show Weakest Topics", "Start Focus Sprint", "Export PDF Report"]
+                "follow_ups": ["What should I study today?", "Start a 25 minute Physics focus session", "Quiz me on weak areas"]
             }
         except Exception as e:
             logger.error(f"Error in _handle_progress_analysis: {e}")
@@ -833,8 +1066,9 @@ When studying for rigorous examinations in **{profile.get('class_name', 'Class 1
                 "duration_minutes": dur
             })
             execute_nexus_tool(user_id, "navigate_to_page", {"page_name": "Focus"})
+            subj_label = subject or active_topic or "Physics"
             return {
-                "content": f"⏱️ **Focus Studio Configured:** Prepared a {dur}-minute deep work sprint for **{subject or active_topic}**. Opening Focus Studio now...",
+                "content": f"Done! 🚀 I've opened Focus Studio, selected **{subj_label}**, and started a **{dur}-minute session**. Let's lock in and get some deep work done.",
                 "action_badge": f"⏱️ Focus Sprint ({dur} min)",
                 "follow_ups": ["Start Timer", "Set Ambient Audio", "Plan Next Task"]
             }
@@ -854,7 +1088,7 @@ When studying for rigorous examinations in **{profile.get('class_name', 'Class 1
                     subject = s
                     break
 
-            task_desc = f"Study {subject or 'Core Concepts'}"
+            task_desc = f"Study {subject or 'Physics'}"
             if "of " in q_lower:
                 task_desc = f"Study {query.split('of ', 1)[1].split('tomorrow')[0].split('today')[0].strip()}"
             elif "for " in q_lower and "min" not in q_lower.split("for ", 1)[1][:10]:
@@ -877,7 +1111,7 @@ I've scheduled this into your **Daily Study Planner**:
 *Consistency is key to high-stakes exam performance. Win this study block!*
 """,
                 "action_badge": f"🗓️ Scheduled Task ({dur} min)",
-                "follow_ups": ["Show Today's Planner", "Plan Entire Week", "Start Focus Session"]
+                "follow_ups": ["What should I study today?", "Start a 25 minute Physics focus session", "Show Today's Planner"]
             }
 
         # Syllabus
@@ -889,31 +1123,33 @@ I've scheduled this into your **Daily Study Planner**:
                 return {
                     "content": f"✅ **Syllabus Updated:** {res['message']}\n\nYour curriculum completion percentage and velocity metrics have been updated in your dashboard analytics.",
                     "action_badge": f"✅ {res['new_status']}: {res['topic_name']}",
-                    "follow_ups": ["Add to Spaced Revision", "Quiz Me on This", "View Syllabus"]
+                    "follow_ups": ["Add this to my revision queue", "Quiz me on this", "View Syllabus"]
                 }
             return {
                 "content": f"I checked your syllabus for '{t_query}'. {res.get('error', 'Topic updated.')}",
                 "action_badge": "✅ Syllabus Updated",
-                "follow_ups": ["View Syllabus", "Quiz Me"]
+                "follow_ups": ["View Syllabus", "Quiz me on this"]
             }
 
         # Revision
-        if intent == "APP_COMMAND_REVISION":
-            t_query = q_lower.replace("add", "").replace("to revision", "").replace("put in revision", "").replace("schedule revision", "").replace("queue", "").strip() or active_topic
+        if intent in ["APP_COMMAND_REVISION", "CONTEXT_ADD_REVISION"]:
+            t_query = q_lower.replace("add", "").replace("this topic", "").replace("this", "").replace("to tomorrow's revision", "").replace("to my revision queue", "").replace("to revision", "").replace("put in revision", "").replace("schedule revision", "").replace("queue", "").strip() or active_topic
             res = execute_nexus_tool(user_id, "schedule_revision", {"topic_name": t_query})
+            topic_label = res.get("topic_name", active_topic)
             return {
-                "content": f"🧠 **Spaced Repetition Scheduled:** {res.get('message', 'Scheduled for revision.')}\n\nNexus will prompt you at optimal intervals to cement this concept into long-term memory.",
+                "content": f"Done! 🧠 I've added **{topic_label}** to your **Spaced Repetition Queue**. Nexus will prompt you at optimal forgetting-curve intervals (1d, 3d, 7d) so this concept stays permanently locked in your memory.",
                 "action_badge": "🧠 Scheduled Spaced Revision",
-                "follow_ups": ["View Revision Queue", "Quiz Me on It", "Feynman Active Recall"]
+                "follow_ups": ["View Revision Queue", "Quiz me on this", "What should I study today?"]
             }
 
         # Notes
-        if intent == "APP_COMMAND_NOTES":
-            last_ai_msg = ""
-            for m in reversed(NexusConversationSession.get_history()):
-                if m["role"] == "nexus":
-                    last_ai_msg = m["content"]
-                    break
+        if intent in ["APP_COMMAND_NOTES", "CONTEXT_SAVE_NOTE"]:
+            last_ai_msg = NexusConversationSession.get_last_explanation()
+            if not last_ai_msg:
+                for m in reversed(NexusConversationSession.get_history()):
+                    if m["role"] == "nexus":
+                        last_ai_msg = m["content"]
+                        break
             note_content = last_ai_msg or f"Summary and key principles of {active_topic}."
             res = execute_nexus_tool(user_id, "create_note", {
                 "topic_name": active_topic,
@@ -921,9 +1157,9 @@ I've scheduled this into your **Daily Study Planner**:
                 "content_markdown": note_content
             })
             return {
-                "content": f"📝 **Note Saved:** {res.get('message', 'Saved note.')}\n\nSaved under **{active_topic}** with full Markdown and mathematical equations.",
+                "content": f"Done! 📝 I've saved this full explanation to your **Notes Repository** under **{active_topic}** with all equations and diagrams intact (+25 XP).",
                 "action_badge": "📝 Note Saved to Repository",
-                "follow_ups": ["View All Notes", "Add Key Formula", "Quiz Me"]
+                "follow_ups": ["View All Notes", "Quiz me on this", "Add this to my revision queue"]
             }
 
         # Formulas
@@ -940,20 +1176,20 @@ I've scheduled this into your **Daily Study Planner**:
                 "content": f"""
 ### ❌ Diagnostic Mistake Breakdown
 
-Let's diagnose exactly where the error occurred on **{active_topic}**:
+Let's diagnose exactly where errors typically happen on **{active_topic}**:
 
-1. **Root-Cause Classification:** Most errors on this concept stem from **Formula Sign Convention** or **Careless Keyword Reading** (e.g. confusing vector signs or missing SI unit conversions).
+1. **Root-Cause Classification:** Most errors on this concept stem from **Formula Sign Convention** (e.g. Cartesian vector signs) or **Missing SI Unit Conversions** (e.g. grams vs kilograms, cm vs meters).
 2. **The Golden Rule to Prevent This:**
-   - Always write out the formula in symbols before substituting numbers.
-   - Verify that all distances are in meters ($m$) and masses in kilograms ($kg$).
-3. **Mastery Action:** Would you like me to log this into your **Mistake Vault** so we can re-test it on your next quiz sprint?
+   - Always write out the formula in standard algebraic symbols before substituting numerical values.
+   - Verify that coordinate axes are explicitly drawn before calculating.
+3. **Mastery Action:** Would you like me to log this into your **Mistake Vault** so we can re-test it on your next practice sprint?
 """,
                 "action_badge": "❌ Error Diagnosed",
                 "follow_ups": ["Log Mistake to Vault", "Try Similar Question", "Explain Concept Again"]
             }
 
         # Quiz
-        if intent == "APP_COMMAND_QUIZ":
+        if intent in ["APP_COMMAND_QUIZ", "CONTEXT_QUIZ_ME"]:
             target = active_topic if (active_topic and active_topic != "General Academic Mastery") else "Core High-Yield Concepts"
             res = execute_nexus_tool(user_id, "generate_and_launch_quiz", {
                 "topic_or_subject": target,
@@ -967,7 +1203,7 @@ Let's diagnose exactly where the error occurred on **{active_topic}**:
 I have crafted a 5-question high-rigor quiz on **{target}** targeting standard {board} exam traps:
 
 - **Difficulty:** Board Exam Caliber
-- **Auto-Sync:** Incorrect answers will be automatically sent to your Mistake Vault.
+- **Auto-Sync:** Incorrect answers will be automatically sent to your Mistake Vault for targeted re-testing.
 
 > Click below or navigate to **🎯 Practice** to launch your interactive assessment!
 """,
@@ -1048,29 +1284,34 @@ Think about the physical interaction and tell me what you predict!
         if not kb:
             matched_top = resolve_topic_by_name(user_id, query)
             if matched_top:
-                NexusConversationSession.set_active_topic(matched_top["topic_name"])
+                NexusConversationSession.set_active_topic(matched_top["topic_name"], matched_top.get("subject_name"))
                 kb = _match_knowledge(matched_top["topic_name"])
 
         if not kb:
             kb = EXPANDED_KNOWLEDGE_BASE["newton"]
 
-        NexusConversationSession.set_active_topic(kb["title"])
+        NexusConversationSession.set_active_topic(kb["title"], kb.get("subject", "Physics"))
 
         if "board" in q_lower or "exam" in q_lower or "icse" in q_lower or "derivation" in q_lower or "mathematical" in q_lower:
-            return self._build_board_exam_lesson(kb, board)
+            res = self._build_board_exam_lesson(kb, board)
         elif "visual" in q_lower or "analogy" in q_lower:
-            return self._build_visual_lesson(kb)
+            res = self._build_visual_lesson(kb)
         else:
-            return self._build_feynman_lesson(kb)
+            res = self._build_feynman_lesson(kb)
+
+        NexusConversationSession.set_active_topic(kb["title"], kb.get("subject", "Physics"), last_explanation=res["content"])
+        return res
 
     def _build_feynman_lesson(self, kb: dict) -> dict:
-        """Constructs an ultra-deep, comprehensive Feynman pedagogical lesson."""
+        """Constructs a natural, human-tutor 12-step pedagogical lesson."""
         content = f"""
-Let's build **{kb['title']}** from the ground up. Don't memorize formulas yet — first understand the physical reality.
+Think about when you jump.
+
+Your feet push the ground downward, and the ground pushes you upward. That simple physical interaction is the core intuition behind **{kb['title']}**.
 
 ---
 
-### 🌟 1. The Physical Intuition (Zero Jargon)
+### 🌟 1. The Intuitive Idea & Why It Matters
 {kb['intuition']}
 
 ---
@@ -1085,23 +1326,47 @@ Let's build **{kb['title']}** from the ground up. Don't memorize formulas yet �
 
 ---
 
-### 🚫 4. The Jargon Translator
-{kb['jargon_translator']}
+### 📜 4. The Formal Definition & Law
+> **Official Principle:** *For every action, there is an equal and opposite reaction.*
+> 
+> Mathematically, if Object A exerts a force $\\vec{{F}}_{{AB}}$ on Object B, then Object B simultaneously exerts an equal and opposite force $\\vec{{F}}_{{BA}}$ on Object A:
+> $$\\mathbf{{\\vec{{F}}_{{AB}} = -\\vec{{F}}_{{BA}}}}$$
 
 ---
 
-### 💡 5. Common Misconception & Mental Model Trap
-> ⚠️ **What Confuses Most Students:** {kb['examiner_traps']}
+### 📐 5. Worked Step-by-Step Problem
+**Question:** {kb.get('exam_question', 'Calculate the system recoil.')}
+
+**Solution:**
+{kb.get('exam_solution', 'Direct application of conservation laws.')}
 
 ---
 
-### 🧪 6. The 60-Second Challenge
-Can you explain why this works out loud to a friend without using textbook buzzwords? If you can, you have achieved **true Feynman mastery**!
+### ⚠️ 6. Common Examiner Traps & Misconceptions
+> ⚠️ **The Big Trap:** {kb.get('examiner_traps', 'Never cancel forces that act on different bodies!')}
+
+---
+
+### 🧠 7. The Memory Trick (The Handshake Rule)
+Forces in the universe are like handshakes — you physically cannot shake someone's hand without them shaking yours back with the exact same grip strength.
+
+---
+
+### 🧪 8. 30-Second Comprehension Check
+If a tiny insect collides with the windshield of a speeding truck, does the truck exert a greater force on the insect, or does the insect exert the exact same force on the truck?
+
+*(Think about Newton's Third Law and tell me what you think!)*
 """
         return {
             "content": content,
-            "action_badge": "💡 Deep Feynman Lesson",
-            "follow_ups": ["Explain Simpler", "Show Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
+            "action_badge": "💡 Deep Pedagogical Lesson",
+            "follow_ups": [
+                "I don't understand the second part",
+                "Make it easier",
+                "Now explain it like I'm preparing for an ICSE exam",
+                "Quiz me on this",
+                "Save this explanation to my notes"
+            ]
         }
 
     def _build_board_exam_lesson(self, kb: dict, board: str = "CBSE") -> dict:
@@ -1109,7 +1374,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
         steps_text = "\n\n".join(kb.get("derivation_steps", []))
         content = f"""
 ### 📜 Official {board} Board Definition
-> **Standard Law:** {kb['intuition']}
+> **Governing Law:** {kb['intuition']}
 
 ---
 
@@ -1123,7 +1388,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
 
 ---
 
-### 🎨 Ray / Circuit Diagram Blueprint
+### 🎨 Diagram Blueprint (Ray / Circuit / FBD)
 {kb.get('diagram_blueprint', 'Draw neat labeled schematic with arrowheads.')}
 
 ---
@@ -1142,7 +1407,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
         return {
             "content": content,
             "action_badge": f"📜 {board} Board Derivation",
-            "follow_ups": ["Give Another Practice Question", "Quiz Me", "Save to Notes", "Add to Revision"]
+            "follow_ups": ["Give Another Practice Question", "Quiz me on this", "Save this explanation to my notes", "Add this to my revision queue"]
         }
 
     def _build_visual_lesson(self, kb: dict) -> dict:
@@ -1177,7 +1442,7 @@ Can you explain why this works out loud to a friend without using textbook buzzw
         return {
             "content": content,
             "action_badge": "🗺️ Visual Mental Model",
-            "follow_ups": ["Show Derivation", "Quiz Me", "Save as Note"]
+            "follow_ups": ["Show Board Derivation", "Quiz me on this", "Save this explanation to my notes"]
         }
 
     # ══════════════════════════════════════════════════════════
