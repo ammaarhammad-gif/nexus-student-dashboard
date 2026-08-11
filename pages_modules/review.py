@@ -76,16 +76,40 @@ def render_review_page(user_id: int):
         _render_review_queue_fragment(user_id, due_today)
 
     with tab3:
-        render_queue_items(due_this_week)
+        _render_review_queue_fragment(user_id, due_this_week)
 
     with tab4:
-        render_queue_items(upcoming)
+        _render_review_queue_fragment(user_id, upcoming)
 
     with tab5:
         _render_review_queue_fragment(user_id, recent, is_history=True)
 
     # Manual Quick Revision Scheduler
     st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+    with st.expander("➕ Manually Schedule an Adaptive Spaced Revision"):
+        subjects = get_all_subjects(user_id)
+        if subjects:
+            s_map = {s["name"]: s["id"] for s in subjects}
+            c_s1, c_s2, c_s3 = st.columns(3)
+            with c_s1:
+                sel_subj_name = st.selectbox("Subject", list(s_map.keys()), key="rev_man_subj")
+            sel_subj_id = s_map[sel_subj_name]
+
+            chapters = get_chapters_for_subject(user_id, sel_subj_id)
+            c_map = {c["name"]: c["id"] for c in chapters} if chapters else {}
+            with c_s2:
+                sel_chap_name = st.selectbox("Chapter", list(c_map.keys()) if c_map else ["None"], key="rev_man_chap")
+
+            topics = get_topics_for_chapter(user_id, c_map[sel_chap_name]) if (c_map and sel_chap_name in c_map) else []
+            t_map = {t["name"]: t["id"] for t in topics} if topics else {}
+            with c_s3:
+                sel_top_name = st.selectbox("Topic", list(t_map.keys()) if t_map else ["None"], key="rev_man_top")
+
+            if t_map and sel_top_name in t_map:
+                if st.button("🚀 Schedule Spaced Revisions", type="primary", use_container_width=True, key="rev_man_sched_btn"):
+                    schedule_adaptive_revisions(user_id, "topic", t_map[sel_top_name], understanding=3)
+                    st.success(f"Scheduled 4 spaced revisions (1d, 3d, 7d, 14d) for '{sel_top_name}'!")
+                    st.rerun()
 
 
 @st.fragment
@@ -146,31 +170,7 @@ def _render_review_queue_fragment(user_id: int, items: list, is_overdue: bool = 
                             except Exception:
                                 pass
                             render_floating_xp_toast(50, f"Mastered {item.get('topic_name', 'Topic')}! (+50 XP)")
-                            st.rerun(scope="fragment")
+                            st.rerun()
                 else:
                     st.markdown(f"<span style='color: #22C55E; font-size: 0.85rem; font-weight: 600;'>✅ Mastered ({item.get('completed_at', 'Today')})</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin: 8px 0; opacity: 0.15;'/>", unsafe_allow_html=True)
-    with st.expander("➕ Manually Schedule an Adaptive Spaced Revision"):
-        subjects = get_all_subjects(user_id)
-        if subjects:
-            s_map = {s["name"]: s["id"] for s in subjects}
-            c_s1, c_s2, c_s3 = st.columns(3)
-            with c_s1:
-                sel_subj_name = st.selectbox("Subject", list(s_map.keys()), key="rev_man_subj")
-            sel_subj_id = s_map[sel_subj_name]
-
-            chapters = get_chapters_for_subject(user_id, sel_subj_id)
-            c_map = {c["name"]: c["id"] for c in chapters} if chapters else {}
-            with c_s2:
-                sel_chap_name = st.selectbox("Chapter", list(c_map.keys()) if c_map else ["None"], key="rev_man_chap")
-
-            topics = get_topics_for_chapter(user_id, c_map[sel_chap_name]) if (c_map and sel_chap_name in c_map) else []
-            t_map = {t["name"]: t["id"] for t in topics} if topics else {}
-            with c_s3:
-                sel_top_name = st.selectbox("Topic", list(t_map.keys()) if t_map else ["None"], key="rev_man_top")
-
-            if t_map and sel_top_name in t_map:
-                if st.button("🚀 Schedule Spaced Revisions", type="primary", use_container_width=True, key="rev_man_sched_btn"):
-                    schedule_adaptive_revisions(user_id, "topic", t_map[sel_top_name], understanding=3)
-                    st.success(f"Scheduled 4 spaced revisions (1d, 3d, 7d, 14d) for '{sel_top_name}'!")
-                    st.rerun()
