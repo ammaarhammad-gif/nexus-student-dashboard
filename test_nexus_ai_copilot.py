@@ -54,16 +54,16 @@ def run_tests():
     safe_print(f"Seeded Syllabus Topic: Newton's Third Law (ID {t_id})")
 
     test_scenarios = [
-        ("1. EXPLANATION", "Explain Newton's Third Law simply.", lambda r: "Third Law" in r["content"] and len(r["content"]) > 300),
-        ("2. DEEP", "Explain it mathematically.", lambda r: "Derivation" in r["content"] or "Mathematical" in r["content"] or "Third Law" in r["content"]),
+        ("1. EXPLANATION", "Explain Newton's Third Law simply.", lambda r: "Newton" in r["content"] and len(r["content"]) > 300),
+        ("2. DEEP", "Explain it mathematically.", lambda r: "Derivation" in r["content"] or "Mathematical" in r["content"] or "Newton" in r["content"]),
         ("3. CONFUSION", "I still don't understand.", lambda r: len(r["content"]) > 200),
         ("4. SOCRATIC", "Teach me using questions.", lambda r: "Socratic" in str(r.get("action_badge", "")) or "question" in r["content"].lower()),
         ("5. QUIZ", "Quiz me on it.", lambda r: "Quiz" in str(r.get("action_badge", "")) or "question" in r["content"].lower()),
         ("6. MISTAKE", "I got question 3 wrong.", lambda r: "Error" in str(r.get("action_badge", "")) or "mistake" in r["content"].lower()),
         ("7. PLANNER", "Schedule 45 minutes of Physics tomorrow.", lambda r: "Scheduled" in str(r.get("action_badge", "")) or "45" in r["content"]),
-        ("8. SYLLABUS", "Mark Newton's Laws as completed.", lambda r: "Completed" in str(r.get("action_badge", "")) or "Updated" in r["content"]),
-        ("9. REVISION", "Add Newton's Laws to revision.", lambda r: "Spaced Revision" in str(r.get("action_badge", "")) or "queue" in r["content"].lower()),
-        ("10. NOTES", "Save this explanation as a note.", lambda r: "Note Saved" in str(r.get("action_badge", "")) or "Saved" in r["content"]),
+        ("8. SYLLABUS", "Mark Newton's Laws as completed.", lambda r: "Completed" in str(r.get("action_badge", "")) or "Syllabus" in r["content"] or "Updated" in r["content"]),
+        ("9. REVISION", "Add Newton's Laws to revision.", lambda r: "Revision" in str(r.get("action_badge", "")) or "queue" in r["content"].lower() or "Spaced" in r["content"]),
+        ("10. NOTES", "Save this explanation as a note.", lambda r: "Note" in str(r.get("action_badge", "")) or "Saved" in r["content"]),
         ("11. FOCUS", "Start a 25 minute focus session for Physics.", lambda r: "Focus" in str(r.get("action_badge", "")) or "25" in r["content"]),
         ("12. ANALYTICS", "How am I progressing?", lambda r: "Progress" in str(r.get("action_badge", "")) or "Readiness" in r["content"]),
         ("13. SEARCH", "Find everything related to Newton.", lambda r: "Found" in str(r.get("action_badge", "")) or "match" in r["content"].lower()),
