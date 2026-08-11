@@ -131,56 +131,33 @@ def render_ai_command_center_page(user_id: int):
                 st.session_state["queued_ai_prompt"] = "How am I progressing towards my exams?"
                 st.rerun()
 
-    else:
         # Render Chat Thread
         for idx, msg in enumerate(history):
             if msg["role"] == "user":
-                st.markdown(f"""
-                    <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
-                        <div style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 14px 14px 2px 14px; padding: 12px 18px; max-width: 80%;">
-                            <div style="font-size: 0.75rem; color: #38BDF8; font-weight: 700; margin-bottom: 4px; text-align: right;">👤 YOU • {msg.get('timestamp', '')}</div>
-                            <div style="font-size: 0.95rem; color: var(--nexus-text-title); font-weight: 500;">{msg['content']}</div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+                with st.chat_message("user", avatar="👤"):
+                    st.markdown(f"**{msg['content']}**")
+                    if msg.get("timestamp"):
+                        st.caption(f"Sent at {msg['timestamp']}")
             else:
-                badge_html = ""
-                if msg.get("action_badge"):
-                    badge_html = f"""
-                        <div style="margin-bottom: 10px;">
-                            <span style="background: rgba(34, 197, 94, 0.15); color: #22C55E; font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 12px; border: 1px solid rgba(34, 197, 94, 0.35); display: inline-flex; align-items: center; gap: 6px;">
-                                {msg['action_badge']}
-                            </span>
-                        </div>
-                    """
+                with st.chat_message("assistant", avatar="🤖"):
+                    if msg.get("action_badge"):
+                        st.markdown(
+                            f'<div style="margin-bottom: 10px;"><span style="background: rgba(34, 197, 94, 0.18); color: #22C55E; font-size: 0.82rem; font-weight: 700; padding: 5px 14px; border-radius: 12px; border: 1px solid rgba(34, 197, 94, 0.35); display: inline-flex; align-items: center; gap: 6px;">{msg["action_badge"]}</span></div>',
+                            unsafe_allow_html=True
+                        )
 
-                st.markdown(f"""
-                    <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 22px 24px; margin-bottom: 16px; border-left: 4px solid #38BDF8;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="font-size: 1.1rem;">🤖</span>
-                                <strong style="color: #38BDF8; font-family: 'Outfit', sans-serif; font-size: 1.05rem;">NEXUS AI</strong>
-                            </div>
-                            <span style="font-size: 0.75rem; color: var(--nexus-text-sub);">{msg.get('timestamp', '')}</span>
-                        </div>
-                        {badge_html}
-                    </div>
-                """, unsafe_allow_html=True)
+                    # Render Markdown/LaTeX content cleanly in Streamlit container
+                    st.markdown(msg["content"])
 
-                # Render Markdown/LaTeX content cleanly in Streamlit container
-                st.markdown(msg["content"])
-
-                # Render Interactive Follow-up Action Chips
-                if msg.get("follow_ups"):
-                    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-                    f_cols = st.columns(len(msg["follow_ups"]))
-                    for f_idx, chip_text in enumerate(msg["follow_ups"]):
-                        with f_cols[f_idx]:
-                            if st.button(f"👉 {chip_text}", key=f"chip_{idx}_{f_idx}", use_container_width=True):
-                                st.session_state["queued_ai_prompt"] = chip_text
-                                st.rerun()
-
-                st.markdown("<hr style='margin: 16px 0; opacity: 0.15;'/>", unsafe_allow_html=True)
+                    # Render Interactive Follow-up Action Chips
+                    if msg.get("follow_ups"):
+                        st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
+                        f_cols = st.columns(len(msg["follow_ups"]))
+                        for f_idx, chip_text in enumerate(msg["follow_ups"]):
+                            with f_cols[f_idx]:
+                                if st.button(f"👉 {chip_text}", key=f"chip_{idx}_{f_idx}", use_container_width=True):
+                                    st.session_state["queued_ai_prompt"] = chip_text
+                                    st.rerun()
 
     # ══════════════════════════════════════════════════════════
     # CHAT INPUT BAR & PROMPT DISPATCHER
