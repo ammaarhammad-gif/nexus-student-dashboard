@@ -28,8 +28,6 @@ def render_review_page(user_id: int):
         ["NEXUS", "Review"]
     )
 
-    _render_revision_queue_view(user_id)
-
     queue_data = get_revision_queue(user_id)
     overdue = queue_data.get("overdue", [])
     due_today = queue_data.get("due_today", [])
