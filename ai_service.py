@@ -128,7 +128,32 @@ class NexusIntentRouter:
             if not any(kw in q for kw in ["explain", "teach", "how", "why", "quiz", "schedule", "plan", "procrastinat", "mit", "iit"]):
                 return "GREETING"
 
-        # 3. Contextual Follow-up Clarifications (Multi-turn dialogue)
+        # 3. Numerical Calculation Debugging (e.g. "I got 3.2 m/s but the answer says 4 m/s")
+        if any(w in q for w in ["i got", "my answer is", "i calculated", "why is my answer wrong"]) and any(w in q for w in ["answer says", "book says", "solution says", "answer is", "should be", "wrong", "differs"]):
+            return "NUMERICAL_DEBUG"
+
+        # 4. Confused Student Reset (e.g. "I don't understand refraction")
+        if any(q.startswith(w) or f" {w}" in q for w in ["i don't understand", "i dont understand", "i am confused about", "i am confused in", "this makes no sense", "i'm stuck on", "im stuck on", "i still don't get", "i still dont get"]):
+            if "second part" not in q and "part 2" not in q:
+                return "CONFUSED_STUDENT"
+
+        # 5. "Why" Physical Causal Questions (e.g. "Why does a convex lens converge light?")
+        if q.startswith("why does") or q.startswith("why do") or q.startswith("why is") or q.startswith("how come") or "why a convex lens" in q or "why light bends" in q:
+            return "WHY_QUESTION"
+
+        # 6. Numerical Request (e.g. "Give me a numerical on refraction")
+        if any(w in q for w in ["give me a numerical", "give a numerical", "practice numerical", "give me a problem", "numerical question", "solve a problem on", "give me an example question"]):
+            return "NUMERICAL_REQUEST"
+
+        # 7. Beginner / "From Zero" Teaching (e.g. "Explain Newton's laws like I'm completely new to physics")
+        if any(w in q for w in ["completely new to", "new to physics", "from scratch", "from zero", "for a complete beginner", "explain like i'm 5", "explain like im 5", "teach me from the basics"]):
+            return "BEGINNER_FROM_ZERO"
+
+        # 8. "Go Deeper" / First Principles Progression
+        if any(w in q for w in ["go deeper", "explain deeper", "deeper physics", "from first principles", "olympiad level", "give me the deeper explanation", "advance to next level"]):
+            return "GO_DEEPER"
+
+        # 9. Contextual Follow-up Clarifications (Multi-turn dialogue)
         if any(w in q for w in ["second part", "part 2", "second point", "the 2nd part", "second step"]):
             return "CONTEXT_CLARIFICATION_SECOND_PART"
 
@@ -141,13 +166,13 @@ class NexusIntentRouter:
         if any(w in q for w in ["quiz me on this", "give me questions on this", "test me on this", "quiz me on it", "test me on it"]):
             return "CONTEXT_QUIZ_ME"
 
-        if any(w in q for w in ["save this explanation to my notes", "save that explanation to my notes", "save this to my notes", "save this as a note", "save explanation to notes"]):
+        if any(w in q for w in ["save this explanation to my notes", "save that explanation to my notes", "save this to my notes", "save this as a note", "save explanation to notes", "save as note"]):
             return "CONTEXT_SAVE_NOTE"
 
-        if any(w in q for w in ["add this to my revision queue", "add to my revision queue", "add this topic to tomorrow's revision", "add this to revision"]):
+        if any(w in q for w in ["add this to my revision queue", "add to my revision queue", "add this topic to tomorrow's revision", "add this to revision", "add to revision queue"]):
             return "CONTEXT_ADD_REVISION"
 
-        # 4. Procrastination & Motivation Coaching
+        # 10. Procrastination & Motivation Coaching
         procrastinate_keywords = [
             "procrastinating", "don't feel like studying", "dont feel like studying", "lost motivation",
             "feeling lazy", "can't focus", "cannot focus", "how to stop procrastinating", "help me get back on track",
@@ -156,7 +181,7 @@ class NexusIntentRouter:
         if any(w in q for w in procrastinate_keywords):
             return "STUDY_ADVICE_PROCRASTINATION"
 
-        # 5. Career & High-Level Academic Ambitions (e.g. MIT, IIT, Olympiads)
+        # 11. Career & High-Level Academic Ambitions (e.g. MIT, IIT, Olympiads)
         goal_keywords = [
             "mit", "stanford", "harvard", "iit", "jee", "neet", "olympiad", "board topper", "98%", "99%", "100%",
             "wanna get into", "want to get into", "aiming for", "target university", "target college", "dream college",
@@ -166,7 +191,7 @@ class NexusIntentRouter:
         if any(w in q for w in goal_keywords):
             return "CAREER_ACADEMIC_GOAL"
 
-        # 6. Daily Study Recommendations & Planning Inquiries
+        # 12. Daily Study Recommendations & Planning Inquiries
         study_today_keywords = [
             "what should i study today", "what to study today", "what should i do next", "make me a plan",
             "what should i focus on today", "how should i spend my study time", "plan my day", "recommend a study plan"
@@ -174,7 +199,7 @@ class NexusIntentRouter:
         if any(w in q for w in study_today_keywords):
             return "DAILY_STUDY_RECOMMENDATION"
 
-        # 7. Study Advice, Stress & Emotional Coaching
+        # 13. Study Advice, Stress & Emotional Coaching
         advice_keywords = [
             "struggling with", "struggling in", "scared about", "feeling behind", "behind in", "how should i study",
             "tips for", "how to prepare", "feeling overwhelmed", "exam next month",
@@ -184,7 +209,7 @@ class NexusIntentRouter:
         if any(w in q for w in advice_keywords):
             return "STUDY_ADVICE_STRESS"
 
-        # 8. Mistake Analysis (e.g. "I made a mistake in question 4. Help me understand why.")
+        # 14. Mistake Analysis (e.g. "I made a mistake in question 4. Help me understand why.")
         mistake_keywords = [
             "made a mistake", "got question", "got it wrong", "why is question", "why did i get",
             "mistake in question", "help me understand why i was wrong", "got 3 wrong", "got 4 wrong"
@@ -192,7 +217,7 @@ class NexusIntentRouter:
         if any(w in q for w in mistake_keywords):
             return "APP_COMMAND_MISTAKES"
 
-        # 9. Progress & Analytics Queries
+        # 15. Progress & Analytics Queries
         progress_keywords = [
             "how am i doing", "how am i progressing", "my progress", "weakest topics", "weakest subjects",
             "weak topics", "weak subjects", "exam readiness", "my readiness", "progress audit", "how is my physics",
@@ -201,11 +226,11 @@ class NexusIntentRouter:
         if any(w in q for w in progress_keywords):
             return "PROGRESS_ANALYSIS"
 
-        # 10. Socratic Dialogue Requests
+        # 16. Socratic Dialogue Requests
         if any(w in q for w in ["socratic", "using questions", "ask me questions", "guide me with questions", "quiz me through questions"]):
             return "SOCRATIC_MODE"
 
-        # 11. Workspace Control Commands (Explicit Actions)
+        # 17. Workspace Control Commands (Explicit Actions)
         if any(w in q for w in ["focus session", "start focus", "start timer", "pomodoro", "deep work"]):
             return "APP_COMMAND_FOCUS"
         if any(w in q for w in ["schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study"]):
@@ -227,7 +252,11 @@ class NexusIntentRouter:
         if any(w in q for w in ["open my", "take me to", "go to", "navigate to", "open the"]):
             return "APP_COMMAND_NAVIGATION"
 
-        # 12. Default: Educational Concept Explanation
+        # 18. Detailed Educational Concept Explanation (e.g. "Explain refraction of light in detail")
+        if any(w in q for w in ["in detail", "detailed explanation", "teach me in detail", "masterclass", "thoroughly", "deeply"]):
+            return "EXPLAIN_CONCEPT_DETAILED"
+
+        # 19. Default: Educational Concept Explanation
         return "CONCEPT_EXPLANATION"
 
 
@@ -301,6 +330,31 @@ class NexusContextBuilder:
 # ══════════════════════════════════════════════════════════
 
 EXPANDED_KNOWLEDGE_BASE = {
+    "refraction": {
+        "title": "Refraction of Light, Snell's Law & Wavefront Propagation",
+        "subject": "Physics",
+        "keywords": ["refraction", "snell", "snell's law", "refractive index", "optical density", "apparent depth", "lateral displacement", "critical angle", "total internal reflection"],
+        "intuition": "Refraction is simply what happens when light changes its speed upon entering a new transparent medium. When a light wave encounters a medium where it moves slower (like glass or water), the part of the wavefront that enters first slows down first, causing the whole beam to pivot and bend. Light doesn't bend because of magic — it bends because its waves travel at different speeds in different materials.",
+        "feynman_analogy": "Imagine you are riding a bicycle on a smooth concrete road and you cross onto thick muddy grass at an angle. The moment the right front wheel hits the mud, it bogs down and slows down immediately, while the left front wheel is still on concrete spinning fast. What happens? The bicycle instantly pivots and veers towards the right (into the mud). Light wavefronts behave in the exact same way when crossing from air into optically denser glass.",
+        "microscopic_reality": "In a vacuum, light travels at $c \\approx 3 \\times 10^8\\text{ m/s}$. Inside a dielectric medium like glass or water, the oscillating electric field of the light photon interacts with the bound electron clouds of the atoms. The electrons absorb and re-radiate electromagnetic waves with a microscopic phase lag. This phase interference reduces the net phase velocity of the wave to $v = \\frac{c}{n}$, where $n$ is the refractive index. Crucially, the **frequency ($f$)** of light is determined strictly by the emitting source and remains **constant**, while the **wavelength ($\\lambda$)** compresses: $\\lambda_{medium} = \\frac{\\lambda_{vacuum}}{n}$.",
+        "laws_and_equations": [
+            "**First Law of Refraction:** The incident ray, the refracted ray, and the normal to the interface at the point of incidence all lie in the same plane.",
+            "**Second Law (Snell's Law):** For light of a given wavelength, the ratio of the sine of angle of incidence ($i$) to the sine of angle of refraction ($r$) is constant for a given pair of media:\n$$\\frac{\\sin i}{\\sin r} = \\frac{n_2}{n_1} = \\,^1n_2$$\n$$\\mathbf{n_1 \\sin i = n_2 \\sin r}$$",
+            "**Absolute Refractive Index:** $n = \\frac{\\text{Speed of light in vacuum (c)}}{\\text{Speed of light in medium (v)}} = \\frac{c}{v}$",
+            "**Relative Refractive Index:** $\\,^1n_2 = \\frac{n_2}{n_1} = \\frac{v_1}{v_2} = \\frac{\\lambda_1}{\\lambda_2}$",
+            "**Apparent Depth Relation:** When viewing an object submerged in a denser medium from a rarer medium:\n$$d_{\\text{apparent}} = \\frac{d_{\\text{real}}}{n} \\implies \\text{Shift } S = d_{\\text{real}} \\left(1 - \\frac{1}{n}\\right)$$",
+            "**Critical Angle ($\\theta_c$) & Total Internal Reflection (TIR):** When light travels from denser ($n_1$) to rarer ($n_2$) medium and $i > \\theta_c$:\n$$\\sin \\theta_c = \\frac{n_2}{n_1} \\implies \\text{For glass-air: } \\sin \\theta_c = \\frac{1}{n}$$"
+        ],
+        "real_world_phenomena": [
+            "- **Bent Pencil in Water:** Light rays from the submerged part of the pencil refract away from the normal upon leaving water, making the submerged pencil appear closer to the surface and bent at the boundary.",
+            "- **Twinkling of Stars:** Light passing through turbulent atmospheric layers of varying refractive indices undergoes continuous random refraction.",
+            "- **Advanced Sunrise & Delayed Sunset:** Atmospheric refraction bends sunlight around Earth's curvature, causing the Sun to be visible ~2 minutes before actual horizon rise and ~2 minutes after actual set.",
+            "- **Lateral Shift in Glass Slab:** A ray entering a rectangular glass slab refracts towards the normal at the first face and away from the normal at the second face, emerging exactly parallel to the incident ray but displaced laterally by distance $x = \\frac{t \\sin(i - r)}{\\cos r}$."
+        ],
+        "examiner_traps": "1. ⚠️ **Optical Density $\\neq$ Mass Density:** Kerosene has lower mass density than water (it floats), but it has a HIGHER refractive index ($n=1.44$) than water ($n=1.33$), meaning light travels slower in kerosene than in water!\n2. ⚠️ **Inverting Snell's Ratio:** Always write $n_1 \\sin i = n_2 \\sin r$. If ray goes from medium 1 to medium 2, $\\,^1n_2 = \\frac{\\sin i}{\\sin r} = \\frac{n_2}{n_1}$. Writing $\\frac{n_1}{n_2}$ loses 1 full mark.\n3. ⚠️ **Missing Ray Arrows:** Ray diagrams without direction arrowheads lose 1 full mark in ICSE/CBSE board evaluations.",
+        "exam_question": "A ray of light traveling in air strikes a diamond ($n = 2.42$) at an angle of incidence of $30^\\circ$. Calculate the speed of light inside the diamond and find the angle of refraction ($r$). (Take $c = 3 \\times 10^8\\text{ m/s}$).",
+        "exam_solution": "**Step 1:** Calculate speed in diamond using $v = \\frac{c}{n}$:\n$$v = \\frac{3 \\times 10^8\\text{ m/s}}{2.42} = \\mathbf{1.24 \\times 10^8\\text{ m/s}}$$\n\n**Step 2:** Apply Snell's Law ($n_1 \\sin i = n_2 \\sin r$ with $n_1 = 1.0$ for air):\n$$1.0 \\times \\sin(30^\\circ) = 2.42 \\times \\sin(r)$$\n$$\\sin(r) = \\frac{0.5}{2.42} \\approx 0.2066$$\n$$\\mathbf{r = \\arcsin(0.2066) \\approx 11.93^\\circ}$$\n*(Because diamond is optically denser than air, the ray bends strongly towards the normal from $30^\\circ$ down to $\\approx 11.9^\\circ$)*."
+    },
     "newton": {
         "title": "Newton's Laws of Motion & Action-Reaction Principle",
         "subject": "Physics",
@@ -308,7 +362,6 @@ EXPANDED_KNOWLEDGE_BASE = {
         "intuition": "Forces in the universe never exist in isolation. You cannot touch something without it touching you back with the exact same strength. When you push against a brick wall, you feel the wall pressing firmly against your palm. The universe enforces a strict balance: every single interaction is a mutual two-way handshake.",
         "feynman_analogy": "Imagine you and your friend are wearing ice skates on completely frictionless ice. If you reach out and push your friend forward, what happens? You don't stay still — you slide backward at the exact same instant! Even if you are the one who did the pushing with your muscles, you both experience identical force magnitudes in opposite directions. The skates make the hidden reaction force impossible to miss.",
         "microscopic_reality": "At the atomic level, when surfaces make contact, the electron clouds of the outer atoms repel each other via the fundamental electromagnetic force. The electron cloud compression in Body A exerts an equal repulsive electrostatic force on the electron clouds of Body B ($F_{AB} = -F_{BA}$). Because these forces act on *different bodies*, they never cancel each other out.",
-        "jargon_translator": "- *Inertia:* Natural laziness of matter — an object resists changing its current velocity unless forced.\n- *Momentum ($p = mv$):* How hard an object is to stop.\n- *Action-Reaction Pair:* Two forces that are equal in magnitude, opposite in direction, occur simultaneously, and act on two completely different objects.",
         "derivation_steps": [
             "**Step 1 (Newton's Second Law):** Rate of change of momentum is directly proportional to applied net force: $F = \\frac{dp}{dt} = \\frac{d(mv)}{dt} = m \\frac{dv}{dt} = ma$.",
             "**Step 2 (Two-Body Isolated System):** Consider two interacting masses $m_1$ and $m_2$ in an isolated system with no external forces ($\\Sigma F_{ext} = 0$).",
@@ -319,46 +372,16 @@ EXPANDED_KNOWLEDGE_BASE = {
         "cartesian_signs": "Vector directional convention: Choose one direction (e.g. right/upward) as positive $(+)$. Forces in the opposite direction (left/downward) are strictly negative $(-)$. In momentum problems: $m_1 u_1 + m_2 u_2 = m_1 v_1 + m_2 v_2$.",
         "diagram_blueprint": "Draw Free Body Diagrams (FBDs) for each object separately. Object A shows force $\\vec{F}_{BA}$ pointing left. Object B shows force $\\vec{F}_{AB}$ pointing right. Never draw both action and reaction forces on the same single body FBD!",
         "examiner_traps": "1. **'Action and Reaction cancel each other' Trap:** NEVER say they cancel! They act on two different bodies. (Deducts 1 mark).\n2. **'Horse and Cart' Paradox:** The cart moves forward because the horse pushes backward against the *ground*, and the *ground pushes forward* on the horse's hooves with greater force than the cart's rolling friction.",
-        "what_if_matrix": [
-            ("A massive truck collides with a tiny mosquito", "Both experience the EXACT same collision force magnitude ($|F_{truck}| = |F_{mosquito}|$). The mosquito experiences catastrophic acceleration ($a = F/m$) because its mass is tiny."),
-            ("You jump off a small boat onto a wooden dock", "Your legs push the boat backward (boat moves backward in water) as the boat pushes you forward onto the dock."),
-            ("A rocket fires in empty space with no air to push against", "The rocket accelerates forward by pushing exhaust gases backward ($F_{rocket} = -F_{exhaust}$). It does not need an atmosphere.")
-        ],
         "exam_question": "A gun of mass $M = 4\\text{ kg}$ fires a bullet of mass $m = 50\\text{ g}$ with a muzzle velocity of $v = 400\\text{ m/s}$. Calculate the recoil velocity of the gun.",
         "exam_solution": "**Step 1:** Convert units: $m = 50\\text{ g} = 0.05\\text{ kg}$.\n**Step 2:** Conservation of linear momentum: $(M + m)u = M V_{gun} + m v_{bullet} = 0$.\n**Step 3:** $4 V_{gun} + (0.05)(400) = 0 \\implies 4 V_{gun} + 20 = 0$.\n**Step 4:** $V_{gun} = -\\frac{20}{4} = -5\\text{ m/s}$ *(The negative sign indicates recoil opposite to bullet direction)*."
-    },
-    "photosynthesis": {
-        "title": "Photosynthesis & Autotrophic Plant Physiology",
-        "subject": "Biology",
-        "keywords": ["photosynthesis", "chlorophyll", "chloroplast", "light reaction", "dark reaction", "calvin", "stomata", "photolysis"],
-        "intuition": "Every calorie of food you have ever eaten, and every breath of oxygen you take, is solar energy processed by leaves. Plants are microscopic chemical solar power plants that capture photons from 93 million miles away and lock that energy into glucose sugar rings.",
-        "feynman_analogy": "Imagine a leaf is a sun-powered bakery. The factory workers are green **Chlorophyll** molecules. The raw ingredients entering the loading dock are **Water** (pumped up from the roots) and **$\\text{CO}_2$** (sucked in through microscopic leaf windows called stomata). Sunlight provides the heat to crack water molecules in half, releasing oxygen out the window. The captured hydrogen is baked into delicious glucose bread rolls.",
-        "microscopic_reality": "Photosynthesis happens in two distinct biochemical phases inside the chloroplast:\n1. **Light Reaction (in Thylakoid Grana):** Light photons strike photosystem II, exciting electrons. Photolysis of water occurs ($2\\text{H}_2\\text{O} \\xrightarrow{\\text{light}} 4\\text{H}^+ + 4e^- + \\text{O}_2$), generating ATP and NADPH.\n2. **Dark Reaction / Calvin Cycle (in Stroma):** ATP and NADPH power the enzyme RuBisCO to fix $\\text{CO}_2$ and synthesize $\\text{C}_6\\text{H}_{12}\\text{O}_6$, which is converted into insoluble starch for storage.",
-        "jargon_translator": "- *Photolysis:* Splitting of water molecules using solar photon energy.\n- *Stroma:* The fluid matrix of the chloroplast where dark reactions synthesize sugars.\n- *Grana:* Stacks of thylakoid discs containing chlorophyll.",
-        "derivation_steps": [
-            "**Balanced Overall Equation:**\n$$6\\text{CO}_2 + 12\\text{H}_2\\text{O} \\xrightarrow[\\text{Chlorophyll}]{\\text{Sunlight}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 + 6\\text{H}_2\\text{O}$$",
-            "**Phase 1 (Light Phase):** Absorption of light $\\to$ Electron excitation $\\to$ Photolysis of water ($2\\text{H}_2\\text{O} \\to 4\\text{H}^+ + 4e^- + \\text{O}_2$) $\\to$ Photophosphorylation (ADP + Pi $\\to$ ATP) $\\to$ NADP$^+$ reduction to NADPH.",
-            "**Phase 2 (Dark Phase / Light-Independent):** Fixation of $\\text{CO}_2$ using ATP and NADPH in the stroma $\\to$ Phosphoglycerate (PGA) $\\to$ Glucose synthesis."
-        ],
-        "cartesian_signs": "Conditions written over/under arrow: 'Sunlight' and 'Chlorophyll' are strictly required in ICSE/CBSE board answers.",
-        "diagram_blueprint": "Draw leaf cross-section: Upper cuticle $\\to$ Upper epidermis $\\to$ Palisade mesophyll (dense vertical cells with chloroplasts) $\\to$ Spongy mesophyll (air spaces for gas diffusion) $\\to$ Vascular bundle (Xylem inside, Phloem outside) $\\to$ Lower epidermis with stomatal pore and guard cells.",
-        "examiner_traps": "1. **Unbalanced Equation:** Writing $\\text{CO}_2 + \\text{H}_2\\text{O} \\to \\text{C}_6\\text{H}_{12}\\text{O}_6 + \\text{O}_2$ loses 1 full mark.\n2. **Water on Both Sides:** ICSE mandates $12\\text{H}_2\\text{O}$ on left and $6\\text{H}_2\\text{O}$ on right because oxygen comes exclusively from water photolysis, not carbon dioxide!",
-        "what_if_matrix": [
-            ("Plant placed in dark for 48 hours", "Completely destarched. Used as a control setup in photosynthesis verification experiments."),
-            ("Potassium ions ($K^+$) enter guard cells", "Endosmosis occurs, guard cells become turgid, and the stomatal aperture opens."),
-            ("Leaf boiled in alcohol in a water bath", "Chlorophyll dissolves, decolorizing the leaf so blue-black iodine starch test is clearly visible.")
-        ],
-        "exam_question": "Explain why leaves are destarched before photosynthesis experiments and state the chemical test used to verify starch presence.",
-        "exam_solution": "**Destarching:** The potted plant is kept in continuous dark for 48 hours so stored starch in leaves is fully consumed by cellular respiration.\n**Starch Test:** Dip decolorized leaf in iodine solution. Mastered areas containing starch turn **blue-black**, while non-photosynthetic control areas turn **brownish-yellow**."
     },
     "lens": {
         "title": "Optics, Thin Lens Formula & Image Formation",
         "subject": "Physics",
-        "keywords": ["lens", "lens formula", "focal length", "magnification", "convex lens", "concave lens", "refraction", "optics"],
-        "intuition": "A lens is simply a glass tool that alters the wavefront of light rays through refraction. A convex lens bends divergent light rays inward toward a real focus point, acting like a light funnel, whereas a concave lens spreads them outwards.",
+        "keywords": ["lens", "lens formula", "focal length", "magnification", "convex lens", "concave lens", "convex", "concave"],
+        "intuition": "A lens is simply a curved glass tool that alters the wavefront of light rays through refraction. A convex lens bends divergent light rays inward toward a real focus point, acting like a light funnel, whereas a concave lens spreads them outwards.",
         "feynman_analogy": "Think of light as a marching band marching in unison across pavement. When they hit a patch of muddy grass (denser glass lens), the soldiers who enter the mud first slow down while the others continue at full speed, causing the whole marching column to wheel around and bend toward the focal spot.",
         "microscopic_reality": "Light slows down inside the dielectric glass medium ($v = c/n$) due to electromagnetic phase delays during photon absorption and re-emission by glass atoms. By shaping the surface with spherical curvature, we make light at the thicker center travel through more glass than light at the thinner edges, causing all wave crests to arrive in phase at the focal point (Fermat's Principle of Least Time).",
-        "jargon_translator": "- *Real Image:* An image formed by actual intersection of refracted rays; can be captured on a physical screen.\n- *Virtual Image:* Formed by apparent intersection when rays are produced backwards; cannot be caught on a screen.\n- *Magnification ($m = v/u = h_i/h_o$):* Ratio of image height to object height.",
         "derivation_steps": [
             "**Step 1 (Geometry of Convex Lens):** Place object $AB$ of height $h_o$ at distance $u$ in front of a thin convex lens of focal length $f$. A ray parallel to the principal axis passes through second focus $F_2$, and a ray through optical center $O$ passes undeviated.",
             "**Step 2 (Similar Triangles $\\Delta ABO \\sim \\Delta A'B'O$):** $\\frac{A'B'}{AB} = \\frac{OB'}{OB} \\implies \\frac{-h_i}{h_o} = \\frac{+v}{-u} \\implies \\frac{h_i}{h_o} = \\frac{v}{u}$.",
@@ -367,15 +390,43 @@ EXPANDED_KNOWLEDGE_BASE = {
             "**Step 5 (Dividing throughout by $uvf$):** $\\frac{vf}{uvf} = \\frac{uv}{uvf} - \\frac{uf}{uvf} \\implies \\frac{1}{u} = \\frac{1}{f} - \\frac{1}{v} \\implies \\mathbf{\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}}$."
         ],
         "cartesian_signs": "New Cartesian Sign Convention:\n- Optical center $O$ is the origin $(0,0)$.\n- Object distance $u$ is ALWAYS negative $(-u)$.\n- For Convex Lens: Focal length $f$ is POSITIVE $(+f)$.\n- For Concave Lens: Focal length $f$ is NEGATIVE $(-f)$.\n- Real image: $v$ is positive $(+v)$, $m$ is negative $(-m)$.\n- Virtual image: $v$ is negative $(-v)$, $m$ is positive $(+m)$.",
-        "diagram_blueprint": "Draw principal axis with lens at center. Mark $2F_1, F_1, O, F_2, 2F_2$. Draw 2 standard rays: Ray 1 parallel to axis $\\to$ refracts through $F_2$. Ray 2 through optical center $O$ $\\to$ straight undeviated. Intersection gives inverted real image $A'B'$.",
         "examiner_traps": "1. **Mirror vs Lens Formula:** Lens formula is $\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}$ (MINUS sign!). Do not write the mirror formula $\\frac{1}{f} = \\frac{1}{v} + \\frac{1}{u}$.\n2. **Missing Ray Arrowheads:** Rays without direction arrows lose 1 full mark in ICSE/CBSE board diagrams.",
-        "what_if_matrix": [
-            ("Object placed at $2F_1$", "Image forms at $2F_2$, Real, Inverted, Same Size ($m = -1$)."),
-            ("Object placed between $F_1$ and O$", "Image forms on same side behind object, Virtual, Erect, Magnified ($m > +1$, Magnifying Glass effect)."),
-            ("Lower half of lens is covered with black paper", "Full image is still formed, but its brightness/intensity is reduced to half.")
-        ],
         "exam_question": "An object $5\\text{ cm}$ high is placed at a distance of $20\\text{ cm}$ in front of a convex lens of focal length $10\\text{ cm}$. Find the position, nature, and height of the image.",
         "exam_solution": "**Step 1:** Given $h_o = +5\\text{ cm}$, $u = -20\\text{ cm}$, $f = +10\\text{ cm}$.\n**Step 2:** Lens Formula: $\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u} \\implies \\frac{1}{10} = \\frac{1}{v} - \\frac{1}{-20} = \\frac{1}{v} + \\frac{1}{20}$.\n**Step 3:** $\\frac{1}{v} = \\frac{1}{10} - \\frac{1}{20} = \\frac{1}{20} \\implies \\mathbf{v = +20\\text{ cm}}$ *(Image forms $20\\text{ cm}$ behind the lens, Real and Inverted)*.\n**Step 4:** Magnification $m = \\frac{v}{u} = \\frac{20}{-20} = -1$.\n**Step 5:** Image height $h_i = m \\times h_o = -1 \\times 5 = \\mathbf{-5\\text{ cm}}$ *(Same size, inverted)*."
+    },
+    "electricity": {
+        "title": "Current Electricity, Ohm's Law & Circuit Analysis",
+        "subject": "Physics",
+        "keywords": ["electricity", "current", "voltage", "resistance", "ohm's law", "resistivity", "joule heating", "circuit", "potential difference"],
+        "intuition": "Electricity is not a mysterious fluid; it is the coordinated drift of trillions of valence electrons along a metallic conductor under the influence of an electric field. Voltage is the electrical pressure, current is the flow rate of charge, and resistance is the friction caused by electron collisions with vibrating metal ion cores.",
+        "feynman_analogy": "Imagine a water pipe system at a water park. The water pump creates water pressure difference (**Voltage $V$**). The volume of water flowing through the pipe per second is the **Current ($I$)**. If you pack the pipe with gravel, the water flow is restricted (**Resistance $R$**). Ohm's Law ($V = IR$) simply says: To push more water through gravel, you need more pump pressure.",
+        "microscopic_reality": "Free electrons in copper move randomly at thermal speeds of $\\approx 10^6\\text{ m/s}$. When an electric field $E = V/L$ is applied, electrons experience a steady acceleration $a = \\frac{eE}{m}$ interrupted by collisions with positive ion cores every relaxation time $\\tau$. This produces a net microscopic drift velocity $v_d = \\frac{eE\\tau}{m} \\approx 10^{-4}\\text{ m/s}$. Current $I = n e A v_d$. Combining these yields Ohm's Law $V = IR$ with resistance $R = \\rho \\frac{L}{A}$, where resistivity $\\rho = \\frac{m}{n e^2 \\tau}$.",
+        "derivation_steps": [
+            "**Ohm's Law:** $V \\propto I \\implies V = IR$ (at constant temperature).",
+            "**Resistance Formula:** $R = \\rho \\frac{L}{A}$, where $\\rho$ is resistivity, $L$ is wire length, $A$ is cross-sectional area.",
+            "**Series Equivalent:** $R_s = R_1 + R_2 + R_3$ (Current $I$ is constant, Voltages add $V = V_1 + V_2 + V_3$).",
+            "**Parallel Equivalent:** $\\frac{1}{R_p} = \\frac{1}{R_1} + \\frac{1}{R_2} + \\frac{1}{R_3}$ (Voltage $V$ is constant, Currents add $I = I_1 + I_2 + I_3$).",
+            "**Joule's Law of Heating:** $H = I^2 R t = V I t = \\frac{V^2}{R} t$."
+        ],
+        "examiner_traps": "1. ⚠️ **Stretching a Wire Numerical:** If a wire of resistance $R$ is stretched to double its length ($L' = 2L$), its volume remains constant ($A' = A/2$). Therefore, new resistance $R' = \\rho \\frac{2L}{A/2} = 4R$ (quadrupled!), NOT $2R$.\n2. ⚠️ **Ohmic vs Non-Ohmic conductors:** A filament lamp is non-ohmic because heating increases lattice vibrations, increasing resistance ($V-I$ curve bends towards voltage axis).",
+        "exam_question": "A cylindrical wire of resistance $R = 10\\,\\Omega$ is stretched uniformly until its length is tripled. Find its new resistance.",
+        "exam_solution": "**Step 1:** Initial resistance $R = \\rho \\frac{L}{A} = 10\\,\\Omega$.\n**Step 2:** Since volume $V = A \\times L = A' \\times L'$ is constant and $L' = 3L$, $A' = \\frac{A}{3}$.\n**Step 3:** New resistance $R' = \\rho \\frac{L'}{A'} = \\rho \\frac{3L}{A/3} = 9 \\left(\\rho \\frac{L}{A}\\right) = 9 R$.\n**Step 4:** $R' = 9 \\times 10\\,\\Omega = \\mathbf{90\\,\\Omega}$."
+    },
+    "photosynthesis": {
+        "title": "Photosynthesis & Autotrophic Plant Physiology",
+        "subject": "Biology",
+        "keywords": ["photosynthesis", "chlorophyll", "chloroplast", "light reaction", "dark reaction", "calvin", "stomata", "photolysis"],
+        "intuition": "Every calorie of food you have ever eaten, and every breath of oxygen you take, is solar energy processed by leaves. Plants are microscopic chemical solar power plants that capture photons from 93 million miles away and lock that energy into glucose sugar rings.",
+        "feynman_analogy": "Imagine a leaf is a sun-powered bakery. The factory workers are green **Chlorophyll** molecules. The raw ingredients entering the loading dock are **Water** (pumped up from the roots) and **$\\text{CO}_2$** (sucked in through microscopic leaf windows called stomata). Sunlight provides the heat to crack water molecules in half, releasing oxygen out the window. The captured hydrogen is baked into delicious glucose bread rolls.",
+        "microscopic_reality": "Photosynthesis happens in two distinct biochemical phases inside the chloroplast:\n1. **Light Reaction (in Thylakoid Grana):** Light photons strike photosystem II, exciting electrons. Photolysis of water occurs ($2\\text{H}_2\\text{O} \\xrightarrow{\\text{light}} 4\\text{H}^+ + 4e^- + \\text{O}_2$), generating ATP and NADPH.\n2. **Dark Reaction / Calvin Cycle (in Stroma):** ATP and NADPH power the enzyme RuBisCO to fix $\\text{CO}_2$ and synthesize $\\text{C}_6\\text{H}_{12}\\text{O}_6$, which is converted into insoluble starch for storage.",
+        "derivation_steps": [
+            "**Balanced Overall Equation:**\n$$6\\text{CO}_2 + 12\\text{H}_2\\text{O} \\xrightarrow[\\text{Chlorophyll}]{\\text{Sunlight}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 + 6\\text{H}_2\\text{O}$$",
+            "**Phase 1 (Light Phase):** Absorption of light $\\to$ Electron excitation $\\to$ Photolysis of water ($2\\text{H}_2\\text{O} \\to 4\\text{H}^+ + 4e^- + \\text{O}_2$) $\\to$ Photophosphorylation (ADP + Pi $\\to$ ATP) $\\to$ NADP$^+$ reduction to NADPH.",
+            "**Phase 2 (Dark Phase / Light-Independent):** Fixation of $\\text{CO}_2$ using ATP and NADPH in the stroma $\\to$ Phosphoglycerate (PGA) $\\to$ Glucose synthesis."
+        ],
+        "examiner_traps": "1. **Unbalanced Equation:** Writing $\\text{CO}_2 + \\text{H}_2\\text{O} \\to \\text{C}_6\\text{H}_{12}\\text{O}_6 + \\text{O}_2$ loses 1 full mark.\n2. **Water on Both Sides:** ICSE mandates $12\\text{H}_2\\text{O}$ on left and $6\\text{H}_2\\text{O}$ on right because oxygen comes exclusively from water photolysis, not carbon dioxide!",
+        "exam_question": "Explain why leaves are destarched before photosynthesis experiments and state the chemical test used to verify starch presence.",
+        "exam_solution": "**Destarching:** The potted plant is kept in continuous dark for 48 hours so stored starch in leaves is fully consumed by cellular respiration.\n**Starch Test:** Dip decolorized leaf in iodine solution. Mastered areas containing starch turn **blue-black**, while non-photosynthetic control areas turn **brownish-yellow**."
     },
     "quadratic": {
         "title": "Quadratic Equations, Discriminant & Parabolic Roots",
@@ -384,21 +435,13 @@ EXPANDED_KNOWLEDGE_BASE = {
         "intuition": "A quadratic equation represents a curved parabolic flight path in geometry. Solving for roots is simply finding the exact coordinates where the curve touches or crosses the zero ground line.",
         "feynman_analogy": "Imagine throwing a basketball into the air. The path is a symmetrical parabola ($y = ax^2 + bx + c$). The **Discriminant ($D = b^2 - 4ac$)** is your ground detector: If $D > 0$, the ball cuts through the floor at two distinct points. If $D = 0$, the bottom tip of the ball touches the floor at exactly 1 single point. If $D < 0$, the ball is floating above the floor and never touches it in the real world.",
         "microscopic_reality": "By completing the square on $ax^2 + bx + c = 0$, we translate the coordinate frame so the parabola's vertex is at $\\left(-\\frac{b}{2a}, -\\frac{D}{4a}\\right)$. The symmetry of parabolas guarantees that real roots are spaced symmetrically at distances $\\pm \\frac{\\sqrt{D}}{2a}$ from the vertex line of symmetry.",
-        "jargon_translator": "- *Discriminant ($D = b^2 - 4ac$):* The mathematical indicator deciding root nature.\n- *Real and Equal Roots:* A single repeated solution ($x = -b/2a$).\n- *Roots / Zeros / Solutions:* Values of $x$ that satisfy the equation.",
         "derivation_steps": [
             "**Step 1 (Standard Form):** $ax^2 + bx + c = 0$ ($a \\neq 0$). Divide by $a$: $x^2 + \\frac{b}{a}x + \\frac{c}{a} = 0$.",
             "**Step 2 (Complete the Square):** Add and subtract $\\left(\\frac{b}{2a}\\right)^2$: $\\left(x + \\frac{b}{2a}\\right)^2 - \\frac{b^2}{4a^2} + \\frac{c}{a} = 0$.",
             "**Step 3 (Isolate Squared Term):** $\\left(x + \\frac{b}{2a}\\right)^2 = \\frac{b^2 - 4ac}{4a^2}$.",
             "**Step 4 (Square Root & Final Quadratic Formula):** $\\mathbf{x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}}$."
         ],
-        "cartesian_signs": "When $b$ is negative, always compute $(-b)^2$ with parentheses to avoid the common sign slip of writing $-b^2$.",
-        "diagram_blueprint": "Plot $y = ax^2 + bx + c$. Illustrate: $D > 0$ (2 intercepts), $D = 0$ (tangent to x-axis), $D < 0$ (suspended above x-axis).",
         "examiner_traps": "1. **Negative Dimensions/Speeds in Word Problems:** Always reject negative values with explicit rationale (e.g. 'Since speed cannot be negative, $x = 30\\text{ km/h}$').\n2. **Equal Roots Parameter numericals:** Set $D = b^2 - 4ac = 0$ directly to solve for unknown $k$.",
-        "what_if_matrix": [
-            ("Discriminant $D > 0$ and is a perfect square", "Two distinct rational roots."),
-            ("Discriminant $D = 0$", "Two real and equal roots ($x = -b/2a$)."),
-            ("Discriminant $D < 0$", "No real roots (conjugate complex roots in higher mathematics).")
-        ],
         "exam_question": "Find the value of $k$ for which the quadratic equation $kx(x - 2) + 6 = 0$ has two equal real roots.",
         "exam_solution": "**Step 1:** Rewrite in standard form: $kx^2 - 2kx + 6 = 0$. Here $a = k$, $b = -2k$, $c = 6$.\n**Step 2:** For equal roots, Discriminant $D = 0 \\implies b^2 - 4ac = 0$.\n**Step 3:** $(-2k)^2 - 4(k)(6) = 0 \\implies 4k^2 - 24k = 0 \\implies 4k(k - 6) = 0$.\n**Step 4:** $k = 0$ or $k = 6$. Since $a \\neq 0$, $k = 0$ is rejected $\\implies \\mathbf{k = 6}$."
     }
@@ -407,6 +450,20 @@ EXPANDED_KNOWLEDGE_BASE = {
 
 def _match_knowledge(query: str):
     q = query.lower()
+    # Explicit prioritized matching
+    if "refract" in q or "snell" in q or "apparent depth" in q or "critical angle" in q:
+        return EXPANDED_KNOWLEDGE_BASE["refraction"]
+    if "lens" in q or "convex" in q or "concave" in q or "focal length" in q or "magnification" in q:
+        return EXPANDED_KNOWLEDGE_BASE["lens"]
+    if "newton" in q or "third law" in q or "second law" in q or "first law" in q or "inertia" in q or "momentum" in q or "action reaction" in q:
+        return EXPANDED_KNOWLEDGE_BASE["newton"]
+    if "electric" in q or "current" in q or "ohm" in q or "circuit" in q or "resist" in q or "joule" in q:
+        return EXPANDED_KNOWLEDGE_BASE["electricity"]
+    if "photosynthesis" in q or "chlorophyll" in q or "stomata" in q or "photolysis" in q:
+        return EXPANDED_KNOWLEDGE_BASE["photosynthesis"]
+    if "quadratic" in q or "discriminant" in q or "roots" in q or "parabola" in q:
+        return EXPANDED_KNOWLEDGE_BASE["quadratic"]
+
     for key, data in EXPANDED_KNOWLEDGE_BASE.items():
         if key in q:
             return data
@@ -647,7 +704,31 @@ Are you sure you want to permanently delete **all study notes** in your reposito
             if intent == "DAILY_STUDY_RECOMMENDATION":
                 return self._handle_daily_study_recommendation(user_id, profile)
 
-            # Intent G: Multi-turn Follow-ups (Clarification, Simplification, Exam Mode)
+            # Intent G: Confused Student Reset & Socratic Diagnosis (e.g. "I don't understand refraction")
+            if intent == "CONFUSED_STUDENT":
+                return self._handle_confused_student(profile, query)
+
+            # Intent H: "Why" Physical Mechanism Inquiry (e.g. "Why does a convex lens converge light?")
+            if intent == "WHY_QUESTION":
+                return self._handle_why_question(profile, query)
+
+            # Intent I: Numerical Request (e.g. "Give me a numerical on refraction")
+            if intent == "NUMERICAL_REQUEST":
+                return self._handle_numerical_request(profile, query)
+
+            # Intent J: Numerical Calculation Debugging (e.g. "I got 3.2 m/s but the answer says 4 m/s")
+            if intent == "NUMERICAL_DEBUG":
+                return self._handle_numerical_debug(profile, query)
+
+            # Intent K: Beginner / "From Zero" Teaching (e.g. "Explain Newton's laws like I'm completely new to physics")
+            if intent == "BEGINNER_FROM_ZERO":
+                return self._handle_beginner_from_zero(profile, query)
+
+            # Intent L: "Go Deeper" / Next Conceptual Layer
+            if intent == "GO_DEEPER":
+                return self._handle_go_deeper(profile, query)
+
+            # Intent M: Multi-turn Follow-ups (Clarification, Simplification, Exam Mode)
             if intent == "CONTEXT_CLARIFICATION_SECOND_PART":
                 return self._handle_clarification_second_part()
 
@@ -668,19 +749,19 @@ Are you sure you want to permanently delete **all study notes** in your reposito
                 active_t = NexusConversationSession.get_active_topic()
                 return self._handle_workspace_command(user_id, "APP_COMMAND_REVISION", f"Add {active_t} to revision", profile)
 
-            # Intent H: Progress & Analytics Query
+            # Intent N: Progress & Analytics Query
             if intent == "PROGRESS_ANALYSIS":
                 return self._handle_progress_analysis(user_id)
 
-            # Intent I: Workspace Control Commands
+            # Intent O: Workspace Control Commands
             if intent.startswith("APP_COMMAND_"):
                 return self._handle_workspace_command(user_id, intent, query, profile)
 
-            # Intent J: Socratic Mode
+            # Intent P: Socratic Mode
             if intent == "SOCRATIC_MODE":
                 return self._handle_socratic_mode(query)
 
-            # Intent K: Educational Concept Explanation
+            # Intent Q: Detailed Concept Explanation or General Lesson
             # 1. Try Cloud LLM first if configured
             system_instruction = f"""
 You are Nexus AI, a warm, patient, highly intelligent academic tutor and study copilot for {profile['name']} ({profile['class_name']} • {profile['board']}).
@@ -1272,6 +1353,318 @@ Think about the physical interaction and tell me what you predict!
             "follow_ups": ["I slide backward!", "I stay still.", "Give me a hint."]
         }
 
+    def _handle_confused_student(self, profile: dict, query: str) -> dict:
+        """Presents a patient, zero-jargon reset with an everyday analogy and an interactive diagnostic check question."""
+        active_t = NexusConversationSession.get_active_topic()
+        q_lower = query.lower()
+        if "refract" in q_lower or "light" in q_lower or "optics" in q_lower or "refract" in active_t.lower():
+            topic_name = "Refraction of Light"
+            NexusConversationSession.set_active_topic(topic_name, "Physics")
+            content = rf"""
+That's completely fine — let's hit reset and build this from the beginning. Forget Snell's law and refractive index for a moment.
+
+---
+
+### 🚲 The Pure Mental Model: The Lawnmower Analogy
+
+Imagine you are pushing a lawnmower across a smooth paved sidewalk, and you push it across onto thick grass at an angle.
+
+As soon as the right front wheel hits the thick grass, it immediately slows down, while the left front wheel is still rolling fast on the smooth pavement.
+
+What happens to the direction the lawnmower is pointing? **It pivots and swerves toward the grass!**
+
+Light is a wave with a wide wavefront. When a beam of light hits glass at an angle, the side of the wave that enters the glass first slows down first, causing the entire beam to bend.
+
+---
+
+### 🧪 Quick 15-Second Diagnostic Check:
+
+Now, tell me this:
+
+If you pushed the lawnmower straight onto the grass at a **90° angle** (straight on, perpendicular to the boundary):
+- Would one wheel slow down before the other, or would both wheels slow down at the exact same moment?
+- What do you think happens to the direction then?
+
+*(Take a quick guess — let's see if the core intuition clicked!)*
+"""
+        else:
+            kb = _match_knowledge(active_t) or EXPANDED_KNOWLEDGE_BASE["newton"]
+            topic_name = kb["title"]
+            NexusConversationSession.set_active_topic(topic_name, kb.get("subject", "Physics"))
+            content = rf"""
+That's completely fine — let's slow this down, strip away the formulas, and build it from the physical intuition first.
+
+---
+
+### 🌟 The Everyday Mental Model: {topic_name}
+
+{kb['feynman_analogy']}
+
+---
+
+### 🧪 Quick Diagnostic Check:
+
+{kb.get('intuition', 'What do you observe in everyday life?')}
+
+Tell me in your own words: does that everyday picture make intuitive sense so far, or should we try another visual example?
+"""
+
+        return {
+            "content": content,
+            "action_badge": f"💡 Socratic Reset • {topic_name}",
+            "follow_ups": [
+                "Both wheels slow down together, so it goes straight!",
+                "Make it even simpler",
+                "Explain the full physics of refraction in detail",
+                "Give me a numerical on this"
+            ]
+        }
+
+    def _handle_why_question(self, profile: dict, query: str) -> dict:
+        """Explains the physical WHY mechanism from first principles rather than repeating a definition."""
+        q_lower = query.lower()
+        if "convex lens" in q_lower or "converge" in q_lower:
+            topic_name = "Why Convex Lenses Converge Light"
+            NexusConversationSession.set_active_topic("Optics, Thin Lens Formula & Image Formation", "Physics")
+            content = rf"""
+A convex lens converges light because of two physical factors working together: **the variation in glass thickness across the lens** and **the laws of refraction at curved surfaces**.
+
+---
+
+### 🔬 1. The Wave Speed Differential Across the Lens
+- A convex lens is **thickest at the center** and gradually tapers off to become thin at the edges.
+- Inside glass ($n \approx 1.5$), light moves significantly slower ($v = c/n \approx 2 \times 10^8\text{{ m/s}}$) than in air ($v \approx 3 \times 10^8\text{{ m/s}}$).
+- When a flat wavefront of parallel light rays strikes the lens:
+  - The central ray travels through the thickest part of the glass, experiencing maximum delay.
+  - The outer rays pass through thinner glass edges, experiencing less delay.
+  - This turns the flat wavefront into a curved, concave wavefront focusing inward toward a single point!
+
+---
+
+### 📐 2. The Refraction Geometry at Curved Faces
+- **Central Ray (Principal Axis):** Hits the glass surface perpendicular ($i = 0^\circ$). It passes straight through without deviation.
+- **Top Ray:** Hits the outward-curving spherical surface at an angle. 
+  - Upon entering glass (rarer $\to$ denser), it bends **towards the normal** (downward).
+  - Upon exiting glass back into air (denser $\to$ rarer), it bends **away from the normal** (further downward).
+- **Bottom Ray:** Strikes the lower curve and is refracted **upward**.
+
+Because both the top and bottom rays are bent inward toward the central optical axis, they all intersect at a single spot on the principal axis called the **Principal Focus ($F$)**.
+
+---
+
+Would you like me to walk through the **Ray Diagram rules for image formation**, derive the **Thin Lens Formula $\frac{{1}}{{f}} = \frac{{1}}{{v}} - \frac{{1}}{{u}}$**, or solve a lens numerical?
+"""
+            return {
+                "content": content,
+                "action_badge": "🔬 Physical Mechanism Explained",
+                "follow_ups": ["Show Lens Formula Derivation", "Give me a numerical on lenses", "Quiz me on this", "Save this as a note"]
+            }
+
+        # Fallback to general concept explanation
+        return self._handle_concept_explanation(0, query, profile)
+
+    def _handle_numerical_request(self, profile: dict, query: str) -> dict:
+        """Presents an authentic, interactive Board Exam numerical with step-by-step prompts."""
+        q_lower = query.lower()
+        active_t = NexusConversationSession.get_active_topic()
+        if "refract" in q_lower or "light" in q_lower or "refract" in active_t.lower():
+            topic_name = "Refraction of Light"
+            content = rf"""
+Here is a classic Class 10 Board Exam numerical on refraction. Let's solve it together interactively:
+
+---
+
+### 🎯 The Problem
+
+> A ray of light traveling in water ($n_{{\text{{water}}}} = 1.33$) strikes a flat glass plate ($n_{{\text{{glass}}}} = 1.50$) at an angle of incidence of $45^\circ$.
+> 
+> 1. Calculate the relative refractive index of glass with respect to water ($_{{\text{{water}}}}n_{{\text{{glass}}}}$).
+> 2. Calculate the sine of the angle of refraction ($\sin r$) in the glass.
+> 3. State whether the ray bends towards or away from the normal in the glass.
+
+---
+
+### 💡 Hint to Get Started:
+Remember Snell's Law in relative media:
+$$n_{{\text{{water}}}} \sin(i) = n_{{\text{{glass}}}} \sin(r) \implies \sin(r) = \frac{{n_{{\text{{water}}}}}}{{n_{{\text{{glass}}}}}} \sin(45^\circ)$$
+
+Take a piece of paper, calculate Part 1 and Part 2, and tell me what values you get. We'll verify your steps together!
+"""
+        else:
+            kb = _match_knowledge(active_t) or EXPANDED_KNOWLEDGE_BASE["newton"]
+            topic_name = kb["title"]
+            content = rf"""
+Here is a high-yield board exam numerical on **{topic_name}**:
+
+---
+
+### 🎯 The Problem
+
+> **Question:** {kb.get('exam_question', 'Solve for the unknown parameters.')}
+
+---
+
+Take a moment to work through this on paper. What value do you get for your final answer?
+"""
+
+        return {
+            "content": content,
+            "action_badge": f"📐 Interactive Numerical • {topic_name}",
+            "follow_ups": ["Show Step-by-Step Solution", "Give another numerical", "Explain the formula first"]
+        }
+
+    def _handle_numerical_debug(self, profile: dict, query: str) -> dict:
+        """Diagnoses calculation and unit conversion mismatches with targeted troubleshooting steps."""
+        content = rf"""
+Let's troubleshoot your calculation and pinpoint exactly where the difference came from!
+
+In physics and math problems, when your calculated number (e.g. $3.2$) doesn't match the textbook solution (e.g. $4.0$), it almost always traces back to one of **four common traps**:
+
+---
+
+### 🔍 The 4 Most Common Diagnostic Traps
+
+1. ⚠️ **Unit Conversion Slip:**
+   - Did you convert $\text{{km/h}}$ to $\text{{m/s}}$? (Multiply by $\frac{{5}}{{18}}$ or $\approx 0.2778$).
+   - Did you convert grams to kilograms ($g \to kg$) or centimeters to meters ($cm \to m$)?
+
+2. ⚠️ **Initial Velocity Assumption ($u$):**
+   - Did the question say *"starts from rest"* ($u = 0$) or did it have an initial speed that was omitted in the formula $v = u + at$ or $s = ut + \frac{{1}}{{2}}at^2$?
+
+3. ⚠️ **Sign Convention for Deceleration / Gravity:**
+   - If the object was braking or thrown vertically upward against gravity, did you make acceleration negative ($a = -a$ or $g = -9.8\text{{ m/s}}^2$)?
+
+4. ⚠️ **Formula Selection:**
+   - Did you use an average speed formula ($v = d/t$) when the acceleration was constant and non-zero (which requires $v^2 = u^2 + 2as$)?
+
+---
+
+### ✍️ Let's Fix It:
+Tell me the values you used for your given variables ($u, v, a, s, t$ or your refractive indices), and I will walk through the arithmetic step-by-step with you!
+"""
+        return {
+            "content": content,
+            "action_badge": "🔍 Calculation Diagnostic",
+            "follow_ups": ["Here are my given values", "Show the model solution", "Give me another practice problem"]
+        }
+
+    def _handle_beginner_from_zero(self, profile: dict, query: str) -> dict:
+        """Teaches foundational physics concepts from absolute scratch using everyday sensations."""
+        content = rf"""
+Welcome! That is the absolute best way to learn physics: **from zero, with zero jargon, building from what you can physically see and feel.**
+
+Let's build Newton's Laws of Motion from the ground up:
+
+---
+
+### 🛒 The 1st Law: Natural Laziness (Inertia)
+Everything in the universe is naturally lazy.
+- If a soccer ball is resting on the grass, it will literally sit there forever unless something pushes it.
+- If an astronaut throws a ball in deep space, it will keep gliding at the exact same speed in a straight line forever because there is no friction or air to slow it down.
+> **The 1st Law:** Objects keep doing whatever they are already doing unless an outside net force acts on them.
+
+---
+
+### 🚀 The 2nd Law: How Hard You Have to Push ($F = ma$)
+- Pushing an empty shopping cart is easy — it accelerates quickly with a light push.
+- Pushing a shopping cart loaded with 50 kg of bricks is heavy — to get the same acceleration, you have to push with much greater force!
+> **The 2nd Law:** $\text{{Force}} = \text{{Mass}} \times \text{{Acceleration}}$ ($F = ma$).
+
+---
+
+### 🤝 The 3rd Law: The Mandatory Two-Way Handshake
+- When you jump off the ground, your legs push the Earth downward, and the Earth pushes your feet upward with the exact same strength.
+- You can never touch something without it touching you back.
+> **The 3rd Law:** For every action force, there is an equal and opposite reaction force acting on the other body.
+
+---
+
+**How does that feel as a starting point? Which of these three would you like to explore deeper with a real example?**
+"""
+        return {
+            "content": content,
+            "action_badge": "🌱 Physics from Zero",
+            "follow_ups": ["Explain the 3rd Law deeper", "Give me a numerical on F = ma", "Quiz me on the 1st Law", "Save this as a note"]
+        }
+
+    def _handle_go_deeper(self, profile: dict, query: str) -> dict:
+        """Advances the active topic to the next conceptual layer (Wave optics, Fermat's principle, Lens Maker's equation, etc.)."""
+        active_t = NexusConversationSession.get_active_topic()
+        if "lens" in active_t.lower() or "optics" in active_t.lower() or "refract" in active_t.lower() or "light" in active_t.lower():
+            content = rf"""
+### 🌊 The Deeper Physics: Wavefronts & Fermat's Principle of Least Time
+
+Let's step past the high-school ray approximation and understand the fundamental wave mechanics governing optics and refraction:
+
+---
+
+### ⏱️ 1. Fermat's Principle of Least Time
+Light does not take the path of shortest **distance** between two points. It takes the path of **least time**!
+
+Imagine a lifeguard at point $A$ on the beach who needs to reach a drowning swimmer at point $B$ in the ocean:
+- The lifeguard can run much faster on dry sand than they can swim in water.
+- If they run in a direct straight line, they spend too much time swimming in slow water.
+- If they run along the sand until they are directly opposite the swimmer and then swim perpendicular, the total distance is too long.
+- The **optimal time-minimizing path** is a bent trajectory that maximizes distance on fast sand while minimizing distance in slow water.
+
+Light waves solve this exact optimization problem automatically! Snell's Law ($\frac{{\sin i}}{{\sin r}} = \frac{{v_1}}{{v_2}}$) is simply the exact mathematical solution to Fermat's time-minimization condition $\frac{{d(\text{{Time}})}}{{dx}} = 0$.
+
+---
+
+### 🌊 2. Huygens' Wavefront Construction & Lens Aberrations
+- Light is composed of continuous advancing **wavefronts** (surfaces of constant phase).
+- Every point on a wavefront acts as a secondary source of spherical wavelets spreading out at speed $v$.
+- In a lens, the **Lens Maker's Equation** ($\frac{{1}}{{f}} = (n-1)\left(\frac{{1}}{{R_1}} - \frac{{1}}{{R_2}}\right)$) calculates the curvature radii required to convert an incoming planar wavefront into a perfectly converging spherical wavefront.
+- **Chromatic Aberration:** Because refractive index varies slightly with wavelength ($n_{{\text{{violet}}}} > n_{{\text{{red}}}}$), blue light focuses slightly closer than red light!
+
+---
+
+### ⚛️ 3. Quantum Electrodynamics (QED) Perspective
+At the quantum level (Richard Feynman's formulation), a photon explores *every possible path* through space. The probability amplitudes for paths far from the path of least time cancel out through destructive phase interference. Only the paths near the classical Snell's law trajectory interfere constructively, producing the observed beam!
+
+---
+
+**Would you like to derive the Lens Maker's Formula mathematically, derive Snell's Law from Fermat's calculus, or explore Total Internal Reflection?**
+"""
+            return {
+                "content": content,
+                "action_badge": "⚛️ Advanced Conceptual Layer",
+                "follow_ups": ["Derive Lens Maker's Equation", "Derive Snell's Law from Fermat's Principle", "Explain Total Internal Reflection", "Save this as a note"]
+            }
+        elif "newton" in active_t.lower() or "force" in active_t.lower() or "motion" in active_t.lower():
+            content = rf"""
+### ⚛️ The Deeper Physics: Conservation of Momentum & Noether's Theorem
+
+Let's look at Newton's Laws from the advanced perspective of modern theoretical physics:
+
+---
+
+### 🌐 1. Emmy Noether's Theorem (Symmetry & Invariance)
+In modern physics, Newton's Third Law isn't just an arbitrary rule — it is the direct consequence of **Spatial Translation Invariance**:
+- The laws of physics do not change whether you perform an experiment in New York, Tokyo, or deep space.
+- Noether's Theorem mathematically proves that because space is homogeneous (has no preferred location), the total **linear momentum** of any closed system must be strictly conserved!
+
+---
+
+### 🚀 2. Relativistic Dynamics (Einstein's Extension)
+At speeds approaching the speed of light ($c$):
+- Newton's $F = ma$ breaks down because mass is not constant with velocity.
+- The fundamental relativistic equation becomes:
+$$\vec{{F}} = \frac{{d\vec{{p}}}}{{dt}} \quad \text{{where}} \quad \vec{{p}} = \gamma m_0 \vec{{v}} = \frac{{m_0 \vec{{v}}}}{{\sqrt{{1 - v^2/c^2}}}}$$
+
+---
+
+**Would you like to explore relativistic momentum numericals or dive into rotational mechanics ($\tau = I\alpha$)?**
+"""
+            return {
+                "content": content,
+                "action_badge": "⚛️ Advanced Conceptual Layer",
+                "follow_ups": ["Explain Rotational Mechanics", "Give me a momentum problem", "Quiz me on advanced physics", "Save this as a note"]
+            }
+        else:
+            kb = _match_knowledge(active_t) or EXPANDED_KNOWLEDGE_BASE["newton"]
+            return self._build_board_exam_lesson(kb, profile.get("board", "CBSE"))
+
     def _handle_concept_explanation(self, user_id: int, query: str, profile: dict) -> dict:
         """Deep pedagogical lesson synthesis across Feynman, Board Exam, and Visual modes."""
         q_lower = query.lower()
@@ -1292,70 +1685,196 @@ Think about the physical interaction and tell me what you predict!
 
         NexusConversationSession.set_active_topic(kb["title"], kb.get("subject", "Physics"))
 
+        is_detailed = any(w in q_lower for w in ["in detail", "detailed", "teach me", "masterclass", "thoroughly", "deeply", "everything about"])
+
         if "board" in q_lower or "exam" in q_lower or "icse" in q_lower or "derivation" in q_lower or "mathematical" in q_lower:
             res = self._build_board_exam_lesson(kb, board)
         elif "visual" in q_lower or "analogy" in q_lower:
             res = self._build_visual_lesson(kb)
         else:
-            res = self._build_feynman_lesson(kb)
+            res = self._build_feynman_lesson(kb, is_detailed=is_detailed)
 
         NexusConversationSession.set_active_topic(kb["title"], kb.get("subject", "Physics"), last_explanation=res["content"])
         return res
 
-    def _build_feynman_lesson(self, kb: dict) -> dict:
-        """Constructs a natural, human-tutor 12-step pedagogical lesson."""
-        content = f"""
-Think about when you jump.
+    def _build_feynman_lesson(self, kb: dict, is_detailed: bool = False) -> dict:
+        """Constructs a rich, dynamic pedagogical lesson without rigid template numbers."""
+        title = kb["title"]
 
-Your feet push the ground downward, and the ground pushes you upward. That simple physical interaction is the core intuition behind **{kb['title']}**.
+        if "refract" in title.lower():
+            # Comprehensive Refraction Masterclass (1200+ words)
+            content = rf"""
+Let's actually understand what is happening with light, rather than just memorising a dry textbook formula.
+
+When you look at a straw resting in a glass of water, the straw looks mysteriously broken or bent at the water's surface. That phenomenon is **Refraction**, and it is one of the most fundamental principles in all of optics.
 
 ---
 
-### 🌟 1. The Intuitive Idea & Why It Matters
+### 🌟 The Core Intuitive Picture
+
+Imagine you are riding a bicycle along a smooth paved road, and at an angle, you cross onto a patch of thick, muddy grass.
+
+The moment your right front wheel hits the mud, it immediately slows down while your left front wheel is still rolling fast on the smooth pavement. What happens? **The entire bicycle instantly pivots and turns towards the mud!**
+
+Light wavefronts behave in the exact same physical way. Light doesn't bend because of magic — it bends because **its wave speed changes when entering a different material.**
+
+---
+
+### 🔬 The Microscopic Reality & First Principles
+
+In empty space (a vacuum), light travels at its ultimate speed:
+$$c \approx 3 \times 10^8\text{{ m/s}}$$
+
+When light enters a transparent medium like water or glass, the electromagnetic wave interacts with the bound electron clouds of the atoms. The electrons absorb and re-radiate the electromagnetic wave with a microscopic phase delay, slowing down the net velocity of the wave through the medium to:
+$$v = \frac{{c}}{{n}}$$
+
+Where $n$ is the **Refractive Index** of the medium.
+
+> 💡 **The Invariant Constant:**
+> When light crosses between media, its **Frequency ($f$) NEVER changes** because frequency is determined solely by the original emitting source.
+> Since $v = f \lambda$, when speed drops ($v \downarrow$), the **Wavelength ($\lambda$) contracts proportionately**:
+> $$\lambda_{{\text{{medium}}}} = \frac{{\lambda_{{\text{{vacuum}}}}}}{{n}}$$
+
+---
+
+### 📐 The Geometry of Refraction
+
+When analyzing refraction, we draw a reference line perpendicular to the surface called the **Normal**:
+- **Angle of Incidence ($i$):** Angle between the incoming incident ray and the Normal.
+- **Angle of Refraction ($r$):** Angle between the bent refracted ray and the Normal.
+
+#### 1. Optically Rarer to Denser Medium (e.g., Air $\to$ Glass)
+- Speed drops ($v_2 < v_1$).
+- The ray bends **TOWARDS the normal** ($r < i$).
+
+#### 2. Optically Denser to Rarer Medium (e.g., Glass $\to$ Air)
+- Speed increases ($v_2 > v_1$).
+- The ray bends **AWAY from the normal** ($r > i$).
+
+#### 3. Normal Incidence ($i = 0^\circ$)
+- When a ray hits perpendicular to the boundary, both sides of the wavefront slow down at the exact same moment.
+- The ray passes straight through with **zero deviation** ($r = 0^\circ$), though its speed and wavelength still change.
+
+---
+
+### 📜 The Governing Laws & Snell's Law
+
+Refraction is governed by two universal laws:
+
+1. **First Law:** The incident ray, the refracted ray, and the normal to the interface at the point of incidence all lie in the same geometric plane.
+2. **Second Law (Snell's Law):** For light of a given color and a given pair of media, the ratio of the sine of angle of incidence to the sine of angle of refraction is a constant:
+$$\mathbf{{\frac{{\sin i}}{{\sin r}} = \frac{{n_2}}{{n_1}} = \,^1n_2}}$$
+$$\mathbf{{n_1 \sin i = n_2 \sin r}}$$
+
+- **Absolute Refractive Index:** $n = \frac{{c}}{{v}}$
+- **Relative Refractive Index:** $\,^1n_2 = \frac{{n_2}}{{n_1}} = \frac{{v_1}}{{v_2}} = \frac{{\lambda_1}}{{\lambda_2}}$
+
+---
+
+### 🌍 Real-World Optical Phenomena
+
+- **Apparent Depth:** Submerged objects in water appear raised toward the surface because rays leaving water bend away from the normal into our eyes.
+  $$d_{{\text{{apparent}}}} = \frac{{d_{{\text{{real}}}}}}{{n}}$$
+- **Lateral Displacement through a Glass Slab:** A ray entering a rectangular glass block refracts towards the normal at the top face, travels through the glass, and refracts away from the normal at the bottom face, emerging exactly parallel to the original incident ray with a lateral shift $x = \frac{{t \sin(i - r)}}{{\cos r}}$.
+- **Total Internal Reflection (TIR):** When light travels from a denser to rarer medium at an angle greater than the **Critical Angle ($\theta_c$)**, light cannot escape and reflects 100% back into the medium. ($\sin \theta_c = \frac{{1}}{{n}}$). This powers fiber-optic internet and the brilliance of diamonds.
+
+---
+
+### ⚠️ Common Examiner Traps & Lost Marks (ICSE/CBSE)
+
+1. ⚠️ **Optical Density $\neq$ Mass Density:**
+   - Kerosene has a lower mass density than water (it floats), but it has a **higher refractive index ($n=1.44$)** than water ($n=1.33$). Light travels slower in kerosene than in water!
+2. ⚠️ **Inverting Snell's Law:**
+   - If light travels from medium 1 to medium 2, always use $n_1 \sin i = n_2 \sin r$. Writing $\frac{{n_1}}{{n_2}}$ instead of $\frac{{n_2}}{{n_1}}$ is an instant lost mark.
+3. ⚠️ **Missing Ray Arrows:**
+   - In board exams, drawing ray diagrams without direction arrowheads loses 1 full mark.
+
+---
+
+### 📝 Worked Step-by-Step Board Exam Numerical
+
+**Question:**
+A ray of light traveling in air strikes a diamond ($n = 2.42$) at an angle of incidence of $30^\circ$. Calculate the speed of light inside the diamond and determine the angle of refraction ($r$). *(Take $c = 3 \times 10^8\text{{ m/s}}$)*.
+
+**Step-by-Step Solution:**
+1. **Find speed in diamond:**
+   $$v = \frac{{c}}{{n}} = \frac{{3 \times 10^8\text{{ m/s}}}}{{2.42}} = \mathbf{{1.24 \times 10^8\text{{ m/s}}}}$$
+2. **Apply Snell's Law ($n_1 \sin i = n_2 \sin r$ with $n_{{\text{{air}}}} = 1.0$):**
+   $$1.0 \times \sin(30^\circ) = 2.42 \times \sin(r)$$
+   $$\sin(r) = \frac{{0.5}}{{2.42}} \approx 0.2066$$
+   $$\mathbf{{r = \arcsin(0.2066) \approx 11.93^\circ}}$$
+
+Notice the dramatic bend: diamond's extreme refractive index pulls the ray sharply from $30^\circ$ down to just $\approx 11.9^\circ$!
+
+---
+
+### 🧪 30-Second Comprehension Check
+
+Let's test if the core wave model clicked:
+
+> When light travels from water ($n = 1.33$) into glass ($n = 1.50$), does its **wavelength ($\lambda$)** increase, decrease, or stay the same?
+> *(Think about $v = f\lambda$ and tell me what you predict!)*
+"""
+            return {
+                "content": content,
+                "action_badge": "💡 Comprehensive Refraction Masterclass",
+                "follow_ups": [
+                    "I don't understand the second part",
+                    "Make it easier",
+                    "Give me a numerical on refraction",
+                    "Now explain it like I'm preparing for an ICSE exam",
+                    "Quiz me on this",
+                    "Save this explanation to my notes",
+                    "Add this to my revision queue"
+                ]
+            }
+
+        # General dynamic lesson for other topics
+        content = rf"""
+Let's build **{kb['title']}** from the ground up through physical intuition first, rather than memorising formulas.
+
+---
+
+### 🌟 The Core Intuitive Picture
 {kb['intuition']}
 
 ---
 
-### 🚲 2. The Everyday Analogy
+### 🚲 The Everyday Analogy
 {kb['feynman_analogy']}
 
 ---
 
-### 🔬 3. The Microscopic Mechanism (First Principles)
+### 🔬 The Microscopic Reality (First Principles)
 {kb['microscopic_reality']}
 
 ---
 
-### 📜 4. The Formal Definition & Law
-> **Official Principle:** *For every action, there is an equal and opposite reaction.*
-> 
-> Mathematically, if Object A exerts a force $\\vec{{F}}_{{AB}}$ on Object B, then Object B simultaneously exerts an equal and opposite force $\\vec{{F}}_{{BA}}$ on Object A:
-> $$\\mathbf{{\\vec{{F}}_{{AB}} = -\\vec{{F}}_{{BA}}}}$$
+### 📐 Step-by-Step Mathematical Formulations & Derivations
+"""
+        for step in kb.get("derivation_steps", []):
+            content += f"\n{step}\n"
+
+        content += f"""
+---
+
+### ⚠️ Common Examiner Traps & Misconceptions
+{kb.get('examiner_traps', 'Watch for unit consistency and coordinate signs.')}
 
 ---
 
-### 📐 5. Worked Step-by-Step Problem
-**Question:** {kb.get('exam_question', 'Calculate the system recoil.')}
+### 📝 Worked Benchmark Problem
+**Question:** {kb.get('exam_question', 'Solve for the system parameters.')}
 
 **Solution:**
-{kb.get('exam_solution', 'Direct application of conservation laws.')}
+{kb.get('exam_solution', 'Direct algebraic evaluation with appropriate units.')}
 
 ---
 
-### ⚠️ 6. Common Examiner Traps & Misconceptions
-> ⚠️ **The Big Trap:** {kb.get('examiner_traps', 'Never cancel forces that act on different bodies!')}
+### 🧪 30-Second Comprehension Check
+Can you explain the core mechanism of **{kb['title']}** in your own words using an everyday example? 
 
----
-
-### 🧠 7. The Memory Trick (The Handshake Rule)
-Forces in the universe are like handshakes — you physically cannot shake someone's hand without them shaking yours back with the exact same grip strength.
-
----
-
-### 🧪 8. 30-Second Comprehension Check
-If a tiny insect collides with the windshield of a speeding truck, does the truck exert a greater force on the insect, or does the insect exert the exact same force on the truck?
-
-*(Think about Newton's Third Law and tell me what you think!)*
+*(Give it a shot — trying to explain it out loud is the ultimate Feynman test!)*
 """
         return {
             "content": content,
@@ -1363,9 +1882,11 @@ If a tiny insect collides with the windshield of a speeding truck, does the truc
             "follow_ups": [
                 "I don't understand the second part",
                 "Make it easier",
+                "Give me a numerical on this",
                 "Now explain it like I'm preparing for an ICSE exam",
                 "Quiz me on this",
-                "Save this explanation to my notes"
+                "Save this explanation to my notes",
+                "Add this to my revision queue"
             ]
         }
 

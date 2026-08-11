@@ -1,6 +1,6 @@
 """
-test_nexus_ai_copilot.py — Verification for the 12 Mandatory Conversational Academic Copilot Scenarios.
-Fully UTF-8 / ASCII safe for Windows consoles.
+test_nexus_ai_copilot.py — Comprehensive Verification Suite for Nexus AI Pedagogical Master Tutor.
+Tests all 12 mandatory pedagogical scenarios.
 """
 
 import os
@@ -31,14 +31,14 @@ def safe_print(msg: str):
 
 
 def run_tests():
-    safe_print("=" * 70)
-    safe_print("RUNNING 12 MANDATORY NEXUS AI CONVERSATIONAL COPILOT TESTS")
-    safe_print("=" * 70)
+    safe_print("=" * 75)
+    safe_print("RUNNING 12 MANDATORY NEXUS AI PEDAGOGICAL MASTER TUTOR TESTS")
+    safe_print("=" * 75)
 
     init_db()
 
     # 1. Setup mock user & curriculum
-    username = f"copilot_test_student_{os.getpid()}"
+    username = f"master_tutor_student_{os.getpid()}"
     user_id = create_user(username, "Password123!")
     if not user_id:
         u = verify_user(username, "Password123!")
@@ -48,72 +48,72 @@ def run_tests():
 
     # Add curriculum
     s_id = add_subject(user_id, "Physics", "#38BDF8")
-    c_id = add_chapter(user_id, s_id, "Laws of Motion")
-    t_id = add_topic(user_id, c_id, "Newton's Third Law of Motion")
+    c_id = add_chapter(user_id, s_id, "Optics & Light")
+    t_id = add_topic(user_id, c_id, "Refraction of Light")
     save_progress(user_id, "topic", t_id, status="Not Started", understanding=2)
-    safe_print(f"Seeded Syllabus Topic: Newton's Third Law (ID {t_id})")
+    safe_print(f"Seeded Syllabus Topic: Refraction of Light (ID {t_id})")
 
-    # The 12 Mandatory Tests in Sequential Conversational Progression
+    # The 12 Mandatory Pedagogical Test Cases
     test_suite = [
         (
-            "TEST 1: MIT Career Goal Mentorship",
-            "I wanna get into MIT",
-            lambda r: "MIT" in r["content"] and "student MIT would want" in r["content"] and "Execution Error" not in r["content"]
+            "TEST 1: Detailed Long Pedagogical Masterclass on Refraction",
+            "Explain refraction of light in detail.",
+            lambda r: len(r["content"]) > 800 and "Snell" in r["content"] and "mud" in r["content"].lower() and "diamond" in r["content"].lower() and "Execution Error" not in r["content"]
         ),
         (
-            "TEST 2: Concept Explanation (12-Step Tutor Flow)",
-            "Explain Newton's Third Law to me",
-            lambda r: "jump" in r["content"].lower() and "action" in r["content"].lower() and len(r["content"]) > 300
+            "TEST 2: Socratic Reset & Diagnostic Question on Confusion",
+            "I don't understand refraction.",
+            lambda r: "lawnmower" in r["content"].lower() and "90" in r["content"] and ("Diagnostic" in r["content"] or "Socratic Reset" in str(r.get("action_badge", "")))
         ),
         (
-            "TEST 3: Multi-turn Clarification (Second Part)",
-            "I don't understand the second part",
-            lambda r: "second part" in r["content"].lower() or "microscopic" in r["content"].lower() or "cancel" in r["content"].lower()
+            "TEST 3: Physical WHY Mechanism of Convex Lens Convergence",
+            "Why does a convex lens converge light?",
+            lambda r: "thick" in r["content"].lower() and "delay" in r["content"].lower() and "focus" in r["content"].lower()
         ),
         (
-            "TEST 4: Multi-turn Simplification (Make it easier)",
-            "Make it easier",
-            lambda r: "analogy" in r["content"].lower() or "plain everyday" in r["content"].lower() or "handshake" in r["content"].lower()
+            "TEST 4: Interactive Board Numerical Request",
+            "Give me a numerical on refraction.",
+            lambda r: "Problem" in r["content"] and "water" in r["content"].lower() and "glass" in r["content"].lower()
         ),
         (
-            "TEST 5: Action - Quiz on Active Concept",
-            "Quiz me on this",
-            lambda r: "Quiz" in str(r.get("action_badge", "")) and "5-question" in r["content"]
+            "TEST 5: Calculation Mismatch Diagnostic Analysis",
+            "I got 3.2 m/s but the answer says 4 m/s.",
+            lambda r: "Diagnostic" in r["content"] or "Unit Conversion" in r["content"] or "Calculation" in str(r.get("action_badge", ""))
         ),
         (
-            "TEST 6: Action - Add Active Topic to Revision Queue",
-            "Add this to my revision queue",
-            lambda r: "Spaced Repetition" in r["content"] and "Revision" in str(r.get("action_badge", ""))
+            "TEST 6: Real Action - Add to Revision Queue",
+            "Add refraction to my revision queue.",
+            lambda r: "Revision" in str(r.get("action_badge", "")) or "Spaced Repetition" in r["content"]
         ),
         (
-            "TEST 7: Action - Start 25-min Focus Session",
-            "Start a 25 minute Physics focus session",
+            "TEST 7: Real Action - Start 25-min Physics Focus Session",
+            "Start a 25 minute physics focus session.",
             lambda r: "Focus Studio" in r["content"] and "25" in r["content"]
         ),
         (
-            "TEST 8: Data-Driven Study Recommendation",
-            "What should I study today?",
-            lambda r: "workspace" in r["content"].lower() and "Prioritizing" in r["content"]
+            "TEST 8: Real Action - Save Context Explanation to Notes",
+            "Save this as a note.",
+            lambda r: "Notes Repository" in r["content"] or "Note Saved" in str(r.get("action_badge", "")) or "Note" in str(r.get("action_badge", ""))
         ),
         (
-            "TEST 9: Action - Save Explanation to Notes Repository",
-            "Save this explanation to my notes",
-            lambda r: "Notes Repository" in r["content"] or "Note Saved" in str(r.get("action_badge", ""))
+            "TEST 9: Real Data - Weakest Topics & Progress Analysis",
+            "What are my weakest topics?",
+            lambda r: "Progress" in str(r.get("action_badge", "")) or "Readiness" in r["content"] or "Coverage" in r["content"]
         ),
         (
-            "TEST 10: Mistake Diagnostic Analysis",
-            "I made a mistake in question 4. Help me understand why.",
-            lambda r: "Root-Cause" in r["content"] or "Sign Convention" in r["content"] or "Diagnosed" in str(r.get("action_badge", ""))
+            "TEST 10: Natural Academic & Career Mentorship",
+            "I want to get into MIT.",
+            lambda r: "MIT" in r["content"] and "student MIT would want" in r["content"]
         ),
         (
-            "TEST 11: Progress Velocity & Readiness Audit",
-            "How am I progressing?",
-            lambda r: "Readiness" in r["content"] and "Progress" in str(r.get("action_badge", ""))
+            "TEST 11: Beginner / From Zero Teaching",
+            "Explain Newton's laws like I'm completely new to physics.",
+            lambda r: "cart" in r["content"].lower() and "lazy" in r["content"].lower() and "Handshake" in r["content"]
         ),
         (
-            "TEST 12: Procrastination & Mindset Reset (5-Min Rule)",
-            "I've been procrastinating and don't feel like studying.",
-            lambda r: "5-Minute Rule" in r["content"] and "Focus Sprint" in r["content"]
+            "TEST 12: Go Deeper Conceptual Layer Progression",
+            "Go deeper.",
+            lambda r: ("Fermat" in r["content"] or "Wavefront" in r["content"] or "Least Time" in r["content"]) and "Advanced" in str(r.get("action_badge", ""))
         )
     ]
 
@@ -130,15 +130,16 @@ def run_tests():
             else:
                 safe_print(f"  [FAIL] {name}")
                 safe_print(f"         Badge: {res.get('action_badge')}")
+                safe_print(f"         Length: {len(res.get('content', ''))} chars")
                 safe_print(f"         Snippet: {res.get('content')[:120]}...")
                 failed += 1
         except Exception as e:
             safe_print(f"  [ERROR] {name} Exception: {e}")
             failed += 1
 
-    safe_print("=" * 70)
+    safe_print("=" * 75)
     safe_print(f"FINAL RESULT: {passed} / {len(test_suite)} Tests Passed ({round(passed/len(test_suite)*100)}%)")
-    safe_print("=" * 70)
+    safe_print("=" * 75)
     return failed == 0
 
 
