@@ -171,7 +171,6 @@ def _render_review_queue_fragment(user_id: int, items: list, is_overdue: bool = 
                                 pass
                             top_title = item.get("topic_name", "Topic") if isinstance(item, dict) else "Topic"
                             render_floating_xp_toast(50, f"Mastered {top_title}!")
-                            st.rerun()
                 else:
                     st.markdown(f"<span style='color: #22C55E; font-size: 0.85rem; font-weight: 600;'>✅ Mastered ({item.get('completed_at', 'Today')})</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin: 8px 0; opacity: 0.15;'/>", unsafe_allow_html=True)
