@@ -28,12 +28,12 @@ def render_review_page(user_id: int):
         ["NEXUS", "Review"]
     )
 
-    queue_data = get_revision_queue(user_id)
+    queue_data = get_revision_queue(user_id) or {}
     overdue = queue_data.get("overdue", [])
     due_today = queue_data.get("due_today", [])
     due_this_week = queue_data.get("due_this_week", [])
     upcoming = queue_data.get("upcoming", [])
-    recent = queue_data.get("recent", [])
+    recent = queue_data.get("recent", queue_data.get("recent_completed", []))
 
     # Hero KPI Banner
     c1, c2, c3 = st.columns(3)
@@ -169,7 +169,8 @@ def _render_review_queue_fragment(user_id: int, items: list, is_overdue: bool = 
                                 complete_adaptive_revision(user_id, item_id)
                             except Exception:
                                 pass
-                            render_floating_xp_toast(50, f"Mastered {item.get('topic_name', 'Topic')}! (+50 XP)")
+                            top_title = item.get("topic_name", "Topic") if isinstance(item, dict) else "Topic"
+                            render_floating_xp_toast(50, f"Mastered {top_title}!")
                             st.rerun()
                 else:
                     st.markdown(f"<span style='color: #22C55E; font-size: 0.85rem; font-weight: 600;'>✅ Mastered ({item.get('completed_at', 'Today')})</span>", unsafe_allow_html=True)
