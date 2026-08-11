@@ -1,372 +1,229 @@
 """
-ai_command_center.py — Nexus AI Command Center UI & Cognitive Workspace.
+ai_command_center.py — Nexus AI Autonomous Academic Workspace & Intelligent Copilot.
 
 Features:
-- 100% Autonomous Academic Cognitive AI Engine (Zero setup friction, instant results)
-- Integrated Context Bridge with Syllabus, Exams, Mistakes & Spaced Repetitions
-- 7 Interactive Command Tabs:
-  1. 🌟 Daily Intelligence Blueprint (Pre-computed on load)
-  2. 💡 Concept Mentor & Feynman Explainer
-  3. 🎯 AI Quiz Crafter (with 1-click Quiz Engine Export)
-  4. 🗓️ Smart Study Planner (with 1-click Daily Planner Sync)
-  5. 📊 Deep Progress Diagnostic
-  6. 🔄 Spaced Revision Retention Strategist
-  7. ❌ Mistake Vault Root-Cause Diagnostic
+1. Unified Conversational Intelligence Interface (Tutor, Mentor, Planner, Diagnostic, Controller)
+2. Interactive Follow-up Action Chips (1-click deep derivations, quizzes, revisions, notes)
+3. Live Workspace Action Badges (Shows executed database & navigation actions)
+4. Context & Status Pill (Online engine status, Class & Board context)
+5. Guarded Destructive Action Confirmations
 """
 
 import streamlit as st
-import json
-import datetime
-from ai_service import nexus_ai, NexusContextBuilder
-from models import (
-    get_all_subjects,
-    get_chapters_for_subject,
-    get_topics_for_chapter,
-    create_quiz,
-    add_daily_plan
-)
-from styles import render_top_header_bar, render_breadcrumbs
+from ai_service import nexus_ai, NexusConversationSession, NexusContextBuilder
+from styles import render_top_header_bar, render_html
 
 
 def render_ai_command_center_page(user_id: int):
+    context = NexusContextBuilder.assemble_full_context(user_id)
+    profile = context["profile"]
+    status_info = nexus_ai.get_status()
+
     render_top_header_bar(
         user_id,
         "🤖 Nexus AI",
-        "Autonomous academic intelligence tools powered by multi-factor curriculum analytics and Feynman pedagogy.",
+        "Your intelligent academic copilot & command center.",
         ["NEXUS", "Nexus AI"]
     )
 
-    # 7 Core Command Tabs
-    tab_daily, tab_mentor, tab_quiz, tab_plan, tab_diag, tab_rev, tab_mistakes = st.tabs([
-        "🌟 Daily Blueprint",
-        "💡 Concept Mentor",
-        "🎯 Quiz Crafter",
-        "🗓️ Study Planner",
-        "📊 Diagnostic",
-        "🔄 Revisions",
-        "❌ Error Analysis"
-    ])
-
-
     # ══════════════════════════════════════════════════════════
-    # TAB 1: DAILY INTELLIGENCE BLUEPRINT
+    # STATUS & CONTEXT BAR
     # ══════════════════════════════════════════════════════════
-    with tab_daily:
-        st.subheader("🌟 Daily Academic Intelligence Blueprint")
-        st.caption("AI analyzes today's exam proximity, weak understanding topics, and overdue revisions to build your personalized study strategy.")
-
-        c_d1, c_d2 = st.columns([3, 1])
-        with c_d2:
-            if st.button("🔄 Refresh Blueprint", type="primary", use_container_width=True, key="ai_regen_daily_btn"):
-                with st.spinner("Analyzing curriculum analytics..."):
-                    res = nexus_ai.generate_daily_recommendations(user_id)
-                    st.session_state["ai_daily_blueprint"] = res["content"]
-                    st.rerun()
-
-        if "ai_daily_blueprint" not in st.session_state:
-            with st.spinner("Generating today's AI study blueprint..."):
-                res = nexus_ai.generate_daily_recommendations(user_id)
-                st.session_state["ai_daily_blueprint"] = res["content"]
-
+    c_st1, c_st2, c_st3 = st.columns([2, 1.5, 1])
+    with c_st1:
         st.markdown(f"""
-            <div class="readiness-container" style="padding: 24px; margin-top: 10px;">
-                {st.session_state['ai_daily_blueprint']}
+            <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+                <span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 8px #22C55E;"></span>
+                <span style="font-size: 0.85rem; font-weight: 700; color: #38BDF8; letter-spacing: 0.04em;">NEXUS COGNITIVE ENGINE ACTIVE</span>
+                <span style="font-size: 0.8rem; color: var(--nexus-text-sub);">• {status_info['engine_mode']}</span>
+            </div>
+        """, unsafe_allow_html=True)
+    with c_st2:
+        st.markdown(f"""
+            <div style="text-align: center; padding: 4px 0;">
+                <span style="background: rgba(56, 189, 248, 0.12); color: #38BDF8; font-size: 0.8rem; font-weight: 700; padding: 3px 12px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.25);">
+                    🎓 {profile.get('class_name', 'Class 10')} • {profile.get('board', 'CBSE')}
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
+    with c_st3:
+        if st.button("🗑️ Clear Chat", key="ai_clear_chat_btn", use_container_width=True):
+            NexusConversationSession.clear_history()
+            st.rerun()
+
+    st.markdown("<hr style='margin: 10px 0 16px 0; opacity: 0.15;'/>", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════
+    # QUICK ACTION SHORTCUT CHIPS
+    # ══════════════════════════════════════════════════════════
+    st.caption("⚡ Quick Academic Actions:")
+    qa1, qa2, qa3, qa4, qa5, qa6 = st.columns(6)
+    
+    with qa1:
+        if st.button("💡 Explain Concept", use_container_width=True, key="qa_exp"):
+            st.session_state["queued_ai_prompt"] = "Explain Newton's Third Law from first principles"
+            st.rerun()
+    with qa2:
+        if st.button("🎯 Quiz Me", use_container_width=True, key="qa_quiz"):
+            st.session_state["queued_ai_prompt"] = "Quiz me on my current topics"
+            st.rerun()
+    with qa3:
+        if st.button("🗓️ Plan My Day", use_container_width=True, key="qa_plan"):
+            st.session_state["queued_ai_prompt"] = "Plan my study schedule for today"
+            st.rerun()
+    with qa4:
+        if st.button("📊 Progress Audit", use_container_width=True, key="qa_diag"):
+            st.session_state["queued_ai_prompt"] = "How am I progressing towards my exams?"
+            st.rerun()
+    with qa5:
+        if st.button("❌ Review Mistakes", use_container_width=True, key="qa_mist"):
+            st.session_state["queued_ai_prompt"] = "Show me everything I got wrong in practice"
+            st.rerun()
+    with qa6:
+        if st.button("⏱️ Start Focus", use_container_width=True, key="qa_foc"):
+            st.session_state["queued_ai_prompt"] = "Start a 25 minute focus session"
+            st.rerun()
+
+    st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════
+    # MESSAGE STREAM & CHAT HISTORY
+    # ══════════════════════════════════════════════════════════
+    history = NexusConversationSession.get_history()
+
+    if not history:
+        # Welcoming Empty State Guide
+        st.markdown(f"""
+            <div class="readiness-container" style="padding: 32px 24px; text-align: center; margin: 18px 0; border: 1px dashed rgba(56, 189, 248, 0.35);">
+                <div style="font-size: 2.5rem; margin-bottom: 8px;">🤖</div>
+                <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--nexus-text-title); margin: 0 0 6px 0;">
+                    Nexus Academic Intelligence Copilot
+                </h2>
+                <p style="color: var(--nexus-text-sub); font-size: 0.95rem; max-width: 600px; margin: 0 auto 20px auto; line-height: 1.5;">
+                    I teach concepts conversationally from first principles, generate high-rigor board exam quizzes, schedule study sprints, and control your Nexus workspace through natural language.
+                </p>
+                <div style="font-size: 0.8rem; font-weight: 700; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">
+                    TRY ASKING:
+                </div>
             </div>
         """, unsafe_allow_html=True)
 
+        e_col1, e_col2, e_col3 = st.columns(3)
+        with e_col1:
+            if st.button("🗣️ \"Teach me Newton's Third Law simply\"", use_container_width=True, key="emp_p1"):
+                st.session_state["queued_ai_prompt"] = "Explain Newton's Third Law simply"
+                st.rerun()
+            if st.button("📐 \"Explain it mathematically\"", use_container_width=True, key="emp_p2"):
+                st.session_state["queued_ai_prompt"] = "Explain Newton's Third Law mathematically with derivations"
+                st.rerun()
+        with e_col2:
+            if st.button("🗓️ \"Schedule 45 min Physics tomorrow\"", use_container_width=True, key="emp_p3"):
+                st.session_state["queued_ai_prompt"] = "Schedule 45 minutes of Physics tomorrow"
+                st.rerun()
+            if st.button("🎯 \"Quiz me on Chemical Bonding\"", use_container_width=True, key="emp_p4"):
+                st.session_state["queued_ai_prompt"] = "Quiz me on Chemical Bonding"
+                st.rerun()
+        with e_col3:
+            if st.button("🧠 \"Teach me using questions (Socratic)\"", use_container_width=True, key="emp_p5"):
+                st.session_state["queued_ai_prompt"] = "Teach me Newton's Third Law using questions"
+                st.rerun()
+            if st.button("📊 \"How am I progressing?\"", use_container_width=True, key="emp_p6"):
+                st.session_state["queued_ai_prompt"] = "How am I progressing towards my exams?"
+                st.rerun()
+
+    else:
+        # Render Chat Thread
+        for idx, msg in enumerate(history):
+            if msg["role"] == "user":
+                st.markdown(f"""
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
+                        <div style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 14px 14px 2px 14px; padding: 12px 18px; max-width: 80%;">
+                            <div style="font-size: 0.75rem; color: #38BDF8; font-weight: 700; margin-bottom: 4px; text-align: right;">👤 YOU • {msg.get('timestamp', '')}</div>
+                            <div style="font-size: 0.95rem; color: var(--nexus-text-title); font-weight: 500;">{msg['content']}</div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                badge_html = ""
+                if msg.get("action_badge"):
+                    badge_html = f"""
+                        <div style="margin-bottom: 10px;">
+                            <span style="background: rgba(34, 197, 94, 0.15); color: #22C55E; font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 12px; border: 1px solid rgba(34, 197, 94, 0.35); display: inline-flex; align-items: center; gap: 6px;">
+                                {msg['action_badge']}
+                            </span>
+                        </div>
+                    """
+
+                st.markdown(f"""
+                    <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 22px 24px; margin-bottom: 16px; border-left: 4px solid #38BDF8;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 1.1rem;">🤖</span>
+                                <strong style="color: #38BDF8; font-family: 'Outfit', sans-serif; font-size: 1.05rem;">NEXUS AI</strong>
+                            </div>
+                            <span style="font-size: 0.75rem; color: var(--nexus-text-sub);">{msg.get('timestamp', '')}</span>
+                        </div>
+                        {badge_html}
+                    </div>
+                """, unsafe_allow_html=True)
+
+                # Render Markdown/LaTeX content cleanly in Streamlit container
+                st.markdown(msg["content"])
+
+                # Render Interactive Follow-up Action Chips
+                if msg.get("follow_ups"):
+                    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                    f_cols = st.columns(len(msg["follow_ups"]))
+                    for f_idx, chip_text in enumerate(msg["follow_ups"]):
+                        with f_cols[f_idx]:
+                            if st.button(f"👉 {chip_text}", key=f"chip_{idx}_{f_idx}", use_container_width=True):
+                                st.session_state["queued_ai_prompt"] = chip_text
+                                st.rerun()
+
+                st.markdown("<hr style='margin: 16px 0; opacity: 0.15;'/>", unsafe_allow_html=True)
+
     # ══════════════════════════════════════════════════════════
-    # TAB 2: CONCEPT MENTOR & FEYNMAN EXPLAINER
+    # CHAT INPUT BAR & PROMPT DISPATCHER
     # ══════════════════════════════════════════════════════════
-    with tab_mentor:
-        st.subheader("💡 AI Concept Mentor (Feynman Technique)")
-        st.caption("Select any topic in your syllabus for a crystal-clear pedagogical explanation.")
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
 
-        subjects = get_all_subjects(user_id)
-        if not subjects:
-            st.warning("Please configure subjects in Syllabus Manager first.")
-        else:
-            s_map = {s["name"]: s["id"] for s in subjects}
-            col_m1, col_m2, col_m3 = st.columns(3)
-            with col_m1:
-                sel_s_name = st.selectbox("Subject", list(s_map.keys()), key="ai_ment_subj")
-            sel_s_id = s_map[sel_s_name]
+    # Check queued prompt from quick chips
+    initial_val = st.session_state.pop("queued_ai_prompt", None)
 
-            chapters = get_chapters_for_subject(user_id, sel_s_id)
-            c_map = {c["name"]: c["id"] for c in chapters} if chapters else {}
-            with col_m2:
-                sel_c_name = st.selectbox("Chapter", list(c_map.keys()) if c_map else ["None"], key="ai_ment_chap")
-            sel_c_id = c_map.get(sel_c_name)
+    with st.form("nexus_chat_input_form", clear_on_submit=True):
+        col_inp, col_snd = st.columns([5, 1])
+        with col_inp:
+            chat_input = st.text_input(
+                "Chat with Nexus",
+                value=initial_val or "",
+                placeholder="Ask Nexus anything about your studies, or give an action command (e.g. 'Schedule 45 min Physics tomorrow', 'Quiz me', 'Explain photosynthesis')...",
+                label_visibility="collapsed",
+                key="nexus_chat_text_box"
+            )
+        with col_snd:
+            send_btn = st.form_submit_button("⚡ Send", type="primary", use_container_width=True)
 
-            topics = get_topics_for_chapter(user_id, sel_c_id) if sel_c_id else []
-            t_map = {t["name"]: t["id"] for t in topics} if topics else {}
-            with col_m3:
-                sel_t_name = st.selectbox("Target Topic", list(t_map.keys()) if t_map else ["None"], key="ai_ment_top")
-            sel_t_id = t_map.get(sel_t_name)
+    # Dispatch Query
+    prompt_to_process = initial_val if (initial_val and not send_btn) else (chat_input if send_btn else None)
 
-            c_st1, c_st2 = st.columns([1, 2])
-            with c_st1:
-                style_choice = st.selectbox(
-                    "Explanation Pedagogical Style",
-                    ["Feynman Technique (Plain English & Analogies)", "Board Exam Derivation (Step-by-Step & Formal)", "Visual Analogy (Mental Models)", "Socratic Derivation (Guided Questions)"],
-                    key="ai_ment_style"
+    if prompt_to_process and prompt_to_process.strip():
+        user_query = prompt_to_process.strip()
+        NexusConversationSession.add_message("user", user_query)
+
+        with st.spinner("Nexus is thinking & orchestrating academic workspace..."):
+            try:
+                ai_response = nexus_ai.process_chat_message(user_id, user_query)
+                NexusConversationSession.add_message(
+                    role="nexus",
+                    content=ai_response.get("content", "I am ready to help with your academic goals."),
+                    action_badge=ai_response.get("action_badge"),
+                    follow_ups=ai_response.get("follow_ups", [])
                 )
-            with c_st2:
-                student_query = st.text_input("Specific Doubt / Question (Optional)", placeholder="e.g. Why is the focal length of a concave mirror considered negative?", key="ai_ment_query")
+            except Exception as e:
+                NexusConversationSession.add_message(
+                    role="nexus",
+                    content=f"⚠️ **Error encountered:** {str(e)}\n\nPlease try rephrasing your request or ask another study question.",
+                    action_badge="⚠️ Execution Error"
+                )
 
-            if st.button("🧠 Explain Topic", type="primary", use_container_width=True, key="ai_ment_btn"):
-                if not sel_t_id:
-                    st.error("Please select a topic to explain.")
-                else:
-                    with st.spinner(f"Nexus AI is preparing your {style_choice} explanation for '{sel_t_name}'..."):
-                        try:
-                            res = nexus_ai.generate_explanation(user_id, sel_t_id, style_choice, student_query)
-                            st.session_state["ai_explanation_result"] = res
-                        except Exception as e:
-                            st.error(f"AI Generation Failed: {e}")
-
-            if "ai_explanation_result" in st.session_state:
-                exp_res = st.session_state["ai_explanation_result"]
-                st.markdown(f"""
-                    <div class="readiness-container" style="padding: 24px; margin-top: 16px; border-left: 4px solid #A855F7;">
-                        <div style="font-size: 0.8rem; font-weight: 700; color: #A855F7; text-transform: uppercase;">
-                            {exp_res['subject_name']} • {exp_res['chapter_name']} • {exp_res['style']}
-                        </div>
-                        <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--nexus-text-title); margin: 4px 0 14px 0;">
-                            {exp_res['topic_name']}
-                        </h2>
-                        {exp_res['content']}
-                    </div>
-                """, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════
-    # TAB 3: AI QUIZ CRAFTER (WITH 1-CLICK QUIZ ENGINE EXPORT)
-    # ══════════════════════════════════════════════════════════
-    with tab_quiz:
-        st.subheader("🎯 AI Custom Quiz Crafter")
-        st.caption("Generate tailored, board-exam caliber MCQs targeting specific topics or weak spots, with 1-click export directly into the interactive Quiz Engine.")
-
-        subjects = get_all_subjects(user_id)
-        if not subjects:
-            st.warning("Please configure subjects in Syllabus Manager first.")
-        else:
-            s_map = {s["name"]: s["id"] for s in subjects}
-            c_qz1, c_qz2, c_qz3 = st.columns(3)
-            with c_qz1:
-                sel_qz_s_name = st.selectbox("Subject", list(s_map.keys()), key="ai_qz_subj")
-            sel_qz_s_id = s_map[sel_qz_s_name]
-
-            chapters = get_chapters_for_subject(user_id, sel_qz_s_id)
-            c_map = {c["name"]: c["id"] for c in chapters} if chapters else {}
-            with c_qz2:
-                sel_qz_c_name = st.selectbox("Chapter", list(c_map.keys()) if c_map else ["All Chapters"], key="ai_qz_chap")
-            sel_qz_c_id = c_map.get(sel_qz_c_name) if sel_qz_c_name != "All Chapters" else None
-
-            topics = get_topics_for_chapter(user_id, sel_qz_c_id) if sel_qz_c_id else []
-            t_map = {t["name"]: t["id"] for t in topics} if topics else {}
-            with c_qz3:
-                sel_qz_t_name = st.selectbox("Topic (Optional)", ["All Topics"] + list(t_map.keys()), key="ai_qz_top")
-            sel_qz_t_id = t_map.get(sel_qz_t_name) if sel_qz_t_name != "All Topics" else None
-
-            c_qzo1, c_qzo2, c_qzo3 = st.columns(3)
-            with c_qzo1:
-                qz_diff = st.selectbox("Difficulty", ["Adaptive", "Foundational", "Board Exam Hard", "Tricky & Trap-Heavy"], key="ai_qz_diff")
-            with c_qzo2:
-                qz_cnt = st.selectbox("Question Count", [5, 8, 10], index=0, key="ai_qz_cnt")
-            with c_qzo3:
-                qz_focus = st.text_input("Custom Focus Prompt", placeholder="e.g. Focus on numerical problem traps", key="ai_qz_focus")
-
-            if st.button("⚡ Craft AI Quiz", type="primary", use_container_width=True, key="ai_craft_qz_btn"):
-                with st.spinner(f"Nexus AI is crafting {qz_cnt} high-rigor questions..."):
-                    try:
-                        qz_payload = nexus_ai.generate_ai_quiz(
-                            user_id=user_id,
-                            subject_id=sel_qz_s_id,
-                            chapter_id=sel_qz_c_id,
-                            topic_id=sel_qz_t_id,
-                            difficulty=qz_diff,
-                            count=qz_cnt,
-                            focus_prompt=qz_focus
-                        )
-                        st.session_state["ai_crafted_quiz"] = qz_payload
-                        st.success("AI Quiz crafted successfully!")
-                    except Exception as e:
-                        st.error(f"Quiz Generation Error: {e}")
-
-            if "ai_crafted_quiz" in st.session_state:
-                quiz_data = st.session_state["ai_crafted_quiz"]
-                questions = quiz_data["questions"]
-                
-                st.markdown(f"""
-                    <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 16px; margin: 16px 0;">
-                        <h3 style="margin: 0; color: #38BDF8; font-family: 'Outfit', sans-serif;">{quiz_data['title']}</h3>
-                        <p style="margin: 4px 0 0 0; color: var(--nexus-text-sub); font-size: 0.9rem;">{len(questions)} Questions Ready for Testing</p>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                if st.button("🚀 Export & Play Now in Quiz Engine ➔", type="primary", use_container_width=True, key="ai_export_quiz_btn"):
-                    new_quiz_id = create_quiz(
-                        user_id=user_id,
-                        title=quiz_data["title"],
-                        subject_id=quiz_data["subject_id"],
-                        chapter_id=quiz_data["chapter_id"],
-                        topic_id=quiz_data["topic_id"],
-                        difficulty=quiz_data["difficulty"],
-                        questions_json=json.dumps(questions)
-                    )
-                    st.session_state["active_quiz_id"] = new_quiz_id
-                    st.session_state["quiz_submitted"] = False
-                    st.session_state["quiz_results"] = None
-                    st.session_state["current_page"] = "🎯 Quiz Engine"
-                    st.session_state["nav_epoch"] = st.session_state.get("nav_epoch", 0) + 1
-                    st.toast("Quiz transferred to Quiz Engine!", icon="🚀")
-                    st.rerun()
-
-                for idx, q in enumerate(questions, 1):
-                    st.markdown(f"""
-                        <div class="priority-item-card" style="border-left-color: #38BDF8; margin-bottom: 10px;">
-                            <strong>Q{idx}. {q['question']}</strong>
-                            <div style="font-size: 0.85rem; color: var(--nexus-text-sub); margin: 6px 0;">
-                                Options: {', '.join(q['options'])}
-                            </div>
-                            <div style="font-size: 0.85rem; color: #22C55E;">
-                                <strong>Answer:</strong> {q['correct_answer']}
-                            </div>
-                            <div style="font-size: 0.8rem; color: var(--nexus-text-sub); margin-top: 4px;">
-                                💡 <em>{q['explanation']}</em>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════
-    # TAB 4: SMART STUDY PLANNER
-    # ══════════════════════════════════════════════════════════
-    with tab_plan:
-        st.subheader("🗓️ AI Smart Study Schedule Generator")
-        st.caption("AI allocates your pending syllabus topics, revision milestones, and problem sets into an optimal multi-day timetable.")
-
-        c_pl1, c_pl2 = st.columns(2)
-        with c_pl1:
-            plan_days = st.selectbox("Schedule Duration", [3, 7, 14], index=1, key="ai_plan_days")
-        with c_pl2:
-            plan_hours = st.slider("Daily Available Study Hours", min_value=1.0, max_value=8.0, value=3.5, step=0.5, key="ai_plan_hrs")
-
-        if st.button("📅 Generate Intelligent Study Plan", type="primary", use_container_width=True, key="ai_gen_plan_btn"):
-            with st.spinner(f"Nexus AI is scheduling your {plan_days}-day curriculum roadmap..."):
-                try:
-                    res = nexus_ai.generate_ai_study_plan(user_id, daily_hours=plan_hours, target_days=plan_days)
-                    st.session_state["ai_generated_plan"] = res["plan_data"]
-                    st.success("Study schedule created!")
-                except Exception as e:
-                    st.error(f"Plan Generation Error: {e}")
-
-        if "ai_generated_plan" in st.session_state:
-            p_data = st.session_state["ai_generated_plan"]
-            st.markdown(f"""
-                <div class="readiness-container" style="padding: 18px; margin: 16px 0;">
-                    <div style="font-size: 0.8rem; font-weight: 700; color: #38BDF8; text-transform: uppercase;">EXECUTIVE STRATEGY</div>
-                    <p style="font-size: 1.0rem; color: var(--nexus-text-title); margin: 6px 0 0 0;">{p_data.get('strategy_summary', '')}</p>
-                </div>
-            """, unsafe_allow_html=True)
-
-            if st.button("📥 Sync All Tasks to Study Planner", type="primary", use_container_width=True, key="ai_sync_planner_btn"):
-                today = datetime.date.today()
-                synced_count = 0
-                for d_idx, day in enumerate(p_data.get("daily_plans", [])):
-                    target_date_str = (today + datetime.timedelta(days=d_idx)).strftime("%Y-%m-%d")
-                    for t in day.get("tasks", []):
-                        add_daily_plan(
-                            user_id=user_id,
-                            plan_date=target_date_str,
-                            description=t.get("task", "Study Task"),
-                            duration_minutes=t.get("duration_minutes", 30),
-                            subject_id=None
-                        )
-                        synced_count += 1
-                st.balloons()
-                st.success(f"Successfully synced {synced_count} AI-scheduled tasks directly into your Study Planner!")
-
-            for day in p_data.get("daily_plans", []):
-                tasks_html = "".join([
-                    f"<div style='margin-bottom: 4px; font-size: 0.9rem;'>• <strong>{t.get('subject_name', 'General')}:</strong> {t.get('task')} <em>({t.get('duration_minutes', 30)} min — {t.get('task_type', 'Study')})</em></div>"
-                    for t in day.get("tasks", [])
-                ])
-                st.markdown(f"""
-                    <div class="priority-item-card" style="border-left-color: #F97316; margin-bottom: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <strong style="color: var(--nexus-text-title); font-size: 1.05rem;">{day.get('date_label', f'Day {day.get("day_number")}')}</strong>
-                            <span style="font-size: 0.8rem; font-weight: 700; color: #F97316;">⏱️ {day.get('target_focus_hours')} hrs</span>
-                        </div>
-                        <div style="font-size: 0.85rem; color: #38BDF8; margin-bottom: 8px;">
-                            🎯 <strong>Daily Milestone:</strong> {day.get('daily_goal')}
-                        </div>
-                        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06);">
-                            {tasks_html}
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════
-    # TAB 5: DEEP PROGRESS DIAGNOSTIC
-    # ══════════════════════════════════════════════════════════
-    with tab_diag:
-        st.subheader("📊 Deep Academic Progress Diagnostic")
-        st.caption("AI-powered diagnostic of syllabus coverage velocity, bottleneck chapters, and exam preparedness projection.")
-
-        if st.button("📈 Run Deep Progress Audit", type="primary", use_container_width=True, key="ai_run_diag_btn"):
-            with st.spinner("Nexus AI is analyzing your academic data and running predictive diagnostics..."):
-                try:
-                    res = nexus_ai.generate_progress_diagnostic(user_id)
-                    st.session_state["ai_progress_diagnostic"] = res["content"]
-                except Exception as e:
-                    st.error(f"Diagnostic Error: {e}")
-
-        if "ai_progress_diagnostic" in st.session_state:
-            st.markdown(f"""
-                <div class="readiness-container" style="padding: 24px; margin-top: 16px;">
-                    {st.session_state['ai_progress_diagnostic']}
-                </div>
-            """, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════
-    # TAB 6: SPACED REVISION STRATEGIST
-    # ══════════════════════════════════════════════════════════
-    with tab_rev:
-        st.subheader("🔄 Spaced Revision Retention Strategist")
-        st.caption("AI optimizes your spaced repetition queue using forgetting curve intervals and cognitive priority weights.")
-
-        if st.button("🧠 Generate Revision Advisory", type="primary", use_container_width=True, key="ai_gen_rev_btn"):
-            with st.spinner("Nexus AI is calculating optimal retention intervals..."):
-                try:
-                    res = nexus_ai.generate_revision_recommendations(user_id)
-                    st.session_state["ai_revision_advisory"] = res["content"]
-                except Exception as e:
-                    st.error(f"Revision Advisory Error: {e}")
-
-        if "ai_revision_advisory" in st.session_state:
-            st.markdown(f"""
-                <div class="readiness-container" style="padding: 24px; margin-top: 16px;">
-                    {st.session_state['ai_revision_advisory']}
-                </div>
-            """, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════
-    # TAB 7: MISTAKE VAULT ROOT-CAUSE DIAGNOSTIC
-    # ══════════════════════════════════════════════════════════
-    with tab_mistakes:
-        st.subheader("❌ Mistake Vault Root-Cause Diagnostic")
-        st.caption("AI analyzes your recorded quiz errors and common misconceptions to build your customized anti-mistake checklist.")
-
-        if st.button("🔍 Diagnose Cognitive Error Traps", type="primary", use_container_width=True, key="ai_diag_mistakes_btn"):
-            with st.spinner("Nexus AI is diagnosing error root causes across your Mistake Vault..."):
-                try:
-                    res = nexus_ai.generate_mistake_root_cause_analysis(user_id)
-                    st.session_state["ai_mistake_diagnosis"] = res["content"]
-                except Exception as e:
-                    st.error(f"Mistake Diagnostic Error: {e}")
-
-        if "ai_mistake_diagnosis" in st.session_state:
-            st.markdown(f"""
-                <div class="readiness-container" style="padding: 24px; margin-top: 16px;">
-                    {st.session_state['ai_mistake_diagnosis']}
-                </div>
-            """, unsafe_allow_html=True)
+        st.rerun()

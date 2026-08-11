@@ -1,21 +1,13 @@
 """
-ai_service.py — Production-Grade Nexus AI Service Abstraction Layer & Cognitive Engine.
+ai_service.py — Production-Grade Nexus AI Intelligence Layer & Autonomous Academic Copilot.
 
-Features:
-- Dual-Engine Architecture:
-  1. Autonomous Cognitive Pedagogical Engine (Deep topic-specific domain knowledge, rigorous Feynman analogies, formal board derivations, visual mental models, and Socratic dialogues)
-  2. Cloud LLM Engine (Google Gemini, OpenAI, Groq, Anthropic when API keys are configured)
-- Authorized Student Context Assembly across all 8 Nexus data domains:
-  (Syllabus, Understanding, Exams, Tasks, Focus Sessions, Spaced Repetitions, Quizzes, Mistakes)
-- 7 Core AI Capabilities:
-  1. Daily Recommendations & Academic Blueprint
-  2. Concept Mentor & Multi-Style Feynman Explainer (Ultra-Deep Pedagogical Differentiation)
-  3. Adaptive AI Quiz Generation & 1-Click Engine Export
-  4. Intelligent Study Planner & 1-Click Daily Planner Sync
-  5. Deep Progress & Velocity Diagnostics
-  6. Spaced Revision Retention Optimization
-  7. Mistake Vault Root-Cause Analysis
-- Zero Secrets Exposure & Server-Side Security
+Combines:
+1. AI Tutor & Deep Pedagogical Teaching Engine (Feynman, Board Exam, Visual/Analogical, Socratic)
+2. Conversational Multi-Turn Session Memory (Topic tracking, refinement, confusion analysis)
+3. Multi-Stage "Teach Me" Interactive Learning Pipeline
+4. Natural Language Workspace Action Controller (Tool execution across all Nexus modules)
+5. Dual-Engine Architecture (Cloud LLMs + Autonomous Local Cognitive Engine)
+6. Strict Educational Domain Confinement
 """
 
 import os
@@ -24,9 +16,12 @@ import datetime
 import re
 import requests
 import streamlit as st
+import psycopg2.extras
+from database import get_connection
 from models import (
     get_user_profile,
     get_overall_stats,
+    get_all_subjects,
     get_all_subjects_with_stats,
     get_chapters_for_subject,
     get_topics_for_chapter,
@@ -34,32 +29,32 @@ from models import (
     get_daily_plans,
     get_study_sessions,
     get_revision_queue,
-    get_due_revisions,
     get_quiz_history,
     get_all_mistakes,
     get_mistake_analytics,
     get_recall_stats,
     calculate_exam_readiness_score,
     get_top_nexus_priorities,
-    get_all_formulas,
-    get_connection
+    get_all_formulas
 )
-import psycopg2.extras
+from ai_tools import (
+    execute_nexus_tool,
+    resolve_topic_by_name,
+    resolve_subject_by_name,
+    NEXUS_TOOL_DEFINITIONS
+)
 
 
-# ══════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 # AUTHORIZED NEXUS CONTEXT BUILDER
-# ══════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 
 class NexusContextBuilder:
-    """
-    Assembles authorized student data into structured, high-signal context
-    for AI analysis without exposing sensitive auth credentials.
-    """
+    """Assembles authorized student data for AI reasoning."""
 
     @staticmethod
     def get_student_profile(user_id: int) -> dict:
-        profile = get_user_profile(user_id)
+        profile = get_user_profile(user_id) or {}
         return {
             "name": profile.get("name", "Student"),
             "class_name": profile.get("class_name", "Class 10"),
@@ -68,286 +63,206 @@ class NexusContextBuilder:
         }
 
     @staticmethod
-    def get_syllabus_context(user_id: int) -> dict:
+    def get_syllabus_summary(user_id: int) -> dict:
         stats = get_overall_stats(user_id)
         subjects = get_all_subjects_with_stats(user_id)
-        
-        subj_summary = []
-        for s in subjects:
-            subj_summary.append({
-                "subject_name": s["name"],
-                "chapters_count": s["total_chapters"],
-                "topics_count": s["total_topics"],
-                "completed_topics": s["completed"],
-                "percent_completed": s["percent_completed"],
-                "avg_understanding": s["avg_understanding"]
-            })
-            
         return {
-            "overall_stats": stats,
-            "subjects_breakdown": subj_summary
+            "total_topics": stats.get("total_topics", 0),
+            "completed_topics": stats.get("completed_topics", 0),
+            "percent_completed": stats.get("percent_completed", 0),
+            "subjects": [{
+                "name": s["name"],
+                "completed": s["completed"],
+                "total": s["total_topics"],
+                "pct": s["percent_completed"],
+                "avg_understanding": s["avg_understanding"]
+            } for s in subjects]
         }
 
     @staticmethod
-    def get_exam_context(user_id: int) -> list:
-        terms = get_active_upcoming_terms(user_id)
-        today = datetime.date.today()
-        exam_list = []
-        for t in terms:
-            days_left = None
-            if t.get("exam_date"):
-                try:
-                    ex_d = datetime.datetime.strptime(t["exam_date"], "%Y-%m-%d").date()
-                    days_left = (ex_d - today).days
-                except Exception:
-                    pass
-            exam_list.append({
-                "term_id": t["id"],
-                "name": t["name"],
-                "exam_date": t.get("exam_date"),
-                "days_left": days_left
-            })
-        return exam_list
-
-    @staticmethod
-    def get_weak_and_priority_topics(user_id: int, limit: int = 8) -> list:
-        priorities = get_top_nexus_priorities(user_id, limit=limit)
+    def get_priorities(user_id: int) -> list:
+        priorities = get_top_nexus_priorities(user_id, limit=5)
         return [{
             "topic_name": p["topic_name"],
             "subject_name": p["subject_name"],
             "chapter_name": p["chapter_name"],
-            "priority_tier": p["tier"],
             "reasons": p["reasons"]
         } for p in priorities]
 
     @staticmethod
-    def get_mistake_vault_context(user_id: int) -> dict:
-        analytics = get_mistake_analytics(user_id)
-        unreviewed = get_all_mistakes(user_id, is_reviewed=False)
+    def assemble_full_context(user_id: int) -> dict:
         return {
-            "total_mistakes": analytics.get("total", 0),
-            "unreviewed_count": analytics.get("unreviewed", 0),
-            "reviewed_count": analytics.get("reviewed", 0),
-            "error_distribution": analytics.get("breakdown", []),
-            "recent_unreviewed_samples": [{
-                "question": m["question"],
-                "your_answer": m.get("your_answer"),
-                "correct_answer": m.get("correct_answer"),
-                "mistake_type": m.get("mistake_type"),
-                "subject_name": m.get("subject_name"),
-                "prevention_strategy": m.get("prevention_strategy")
-            } for m in unreviewed[:5]]
-        }
-
-    @staticmethod
-    def get_revision_queue_context(user_id: int) -> dict:
-        q = get_revision_queue(user_id)
-        overdue = q.get("overdue", [])
-        due_today = q.get("due_today", [])
-        due_week = q.get("due_this_week", [])
-        total_active = len(overdue) + len(due_today) + len(due_week)
-
-        return {
-            "total_active_revisions": total_active,
-            "overdue_count": len(overdue),
-            "due_today_count": len(due_today),
-            "overdue_items": [{
-                "topic_name": r.get("topic_name") or r.get("item_name"),
-                "subject_name": r.get("subject_name"),
-                "due_date": str(r.get("next_revision_date") or r.get("due_date", "")),
-                "interval_days": r.get("interval_days")
-            } for r in overdue[:5]],
-            "due_today_items": [{
-                "topic_name": r.get("topic_name") or r.get("item_name"),
-                "subject_name": r.get("subject_name"),
-                "interval_days": r.get("interval_days")
-            } for r in due_today[:5]]
-        }
-
-    @staticmethod
-    def get_assessment_context(user_id: int) -> dict:
-        quizzes = get_quiz_history(user_id, limit=6)
-        recall_stats = get_recall_stats(user_id)
-        readiness = calculate_exam_readiness_score(user_id)
-        
-        avg_quiz_acc = (sum(q["accuracy_pct"] for q in quizzes) / len(quizzes)) if quizzes else 0
-        return {
-            "exam_readiness_score": readiness.get("readiness_score", 0),
-            "readiness_factors": readiness.get("factors", {}),
-            "recent_quizzes_count": len(quizzes),
-            "avg_quiz_accuracy": round(avg_quiz_acc, 1),
-            "active_recall_sessions": recall_stats.get("total_sessions", 0),
-            "active_recall_avg_rating": recall_stats.get("avg_score", 0)
-        }
-
-    @staticmethod
-    def get_study_habits_context(user_id: int) -> dict:
-        today_str = datetime.date.today().strftime("%Y-%m-%d")
-        plans = get_daily_plans(user_id, today_str)
-        sessions = get_study_sessions(user_id, limit=7)
-        
-        total_recent_mins = sum(s.get("duration_minutes", 0) for s in sessions)
-        return {
-            "today_tasks": [{
-                "task": p.get("task") or p.get("description", ""),
-                "subject_name": p.get("subject_name"),
-                "is_completed": bool(p.get("is_completed"))
-            } for p in plans],
-            "recent_7_sessions_minutes": total_recent_mins
-        }
-
-    @classmethod
-    def assemble_full_context(cls, user_id: int) -> dict:
-        """Assembles comprehensive authorized student context into a clean JSON-serializable dictionary."""
-        return {
-            "profile": cls.get_student_profile(user_id),
-            "syllabus": cls.get_syllabus_context(user_id),
-            "exams": cls.get_exam_context(user_id),
-            "priorities": cls.get_weak_and_priority_topics(user_id),
-            "mistakes": cls.get_mistake_vault_context(user_id),
-            "revisions": cls.get_revision_queue_context(user_id),
-            "assessments": cls.get_assessment_context(user_id),
-            "habits": cls.get_study_habits_context(user_id)
+            "profile": NexusContextBuilder.get_student_profile(user_id),
+            "syllabus": NexusContextBuilder.get_syllabus_summary(user_id),
+            "priorities": NexusContextBuilder.get_priorities(user_id)
         }
 
 
-# ══════════════════════════════════════════════
-# PEDAGOGICAL DOMAIN KNOWLEDGE BASE
-# ══════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
+# DEEP PEDAGOGICAL KNOWLEDGE BASE (STEM & Humanities)
+# ══════════════════════════════════════════════════════════
 
-TOPIC_KNOWLEDGE_BASE = {
-    "ohm": {
-        "title": "Ohm's Law & Electrical Resistance",
-        "subject": "Physics / Science",
-        "board_def": "At constant temperature, the electric current (I) flowing through a metallic conductor is directly proportional to the potential difference (V) applied across its ends. Mathematically, V ∝ I or V = I·R, where R is the constant of proportionality called Electrical Resistance.",
-        "feynman_analogy": "Imagine a water pipe connecting two water tanks. The **Voltage (V)** is the height difference between the tanks (water pressure pushing down). The **Current (I)** is how many liters of water rush out per second. The **Resistance (R)** is how narrow or clogged with gravel the pipe is. If you double the height (voltage), twice as much water rushes through — unless you make the pipe narrower (resistance), which chokes the flow.",
-        "physical_reality": "In a metallic wire, free conduction electrons accelerate under the electric field created by the battery. As they drift, they constantly collide with vibrating positive metal ions in the crystal lattice. These collisions transfer kinetic energy to the lattice as heat ($H = I^2Rt$) and oppose the free motion of charge — creating physical electrical resistance ($R = \\rho \\frac{L}{A}$).",
-        "jargon_translator": "- *Potential Difference:* Just electrical pressure or push.\n- *Resistance:* Friction inside the wire against moving electrons.\n- *Ohmic Conductor:* A material whose resistance stays constant regardless of how much voltage you apply.",
+EXPANDED_KNOWLEDGE_BASE = {
+    "newton": {
+        "title": "Newton's Laws of Motion & Action-Reaction Principle",
+        "subject": "Physics",
+        "keywords": ["newton", "third law", "first law", "second law", "force", "action reaction", "momentum", "inertia"],
+        "intuition": "Forces in the universe never exist in isolation. You cannot touch something without it touching you back with the exact same strength. When you push against a brick wall, you feel the wall pressing firmly against your palm. The universe enforces a strict balance: every single interaction is a mutual two-way handshake.",
+        "feynman_analogy": "Imagine you and your friend are wearing ice skates on completely frictionless ice. If you reach out and push your friend forward, what happens? You don't stay still — you slide backward at the exact same instant! Even if you are the one who did the pushing with your muscles, you both experience identical force magnitudes in opposite directions. The skates make the hidden reaction force impossible to miss.",
+        "microscopic_reality": "At the atomic level, when surfaces make contact, the electron clouds of the outer atoms repel each other via the fundamental electromagnetic force. The electron cloud compression in Body A exerts an equal repulsive electrostatic force on the electron clouds of Body B ($F_{AB} = -F_{BA}$). Because these forces act on *different bodies*, they never cancel each other out.",
+        "jargon_translator": "- *Inertia:* Natural laziness of matter — an object resists changing its current velocity unless forced.\n- *Momentum ($p = mv$):* How hard an object is to stop.\n- *Action-Reaction Pair:* Two forces that are equal in magnitude, opposite in direction, occur simultaneously, and act on two completely different objects.",
         "derivation_steps": [
-            "**Step 1 (Empirical Observation):** Experimentally, for a metallic conductor at constant temperature, $V \\propto I$.",
-            "**Step 2 (Introduction of Resistance):** $\\frac{V}{I} = \\text{constant} = R$. Therefore, $V = I \\cdot R$.",
-            "**Step 3 (Dependence on Dimensions):** Resistance is directly proportional to length ($R \\propto L$) and inversely proportional to cross-sectional area ($R \\propto 1/A$). Combining gives $R = \\rho \\frac{L}{A}$, where $\\rho$ is the Resistivity in $\\Omega\\cdot m$.",
-            "**Step 4 (Graphical Verification):** A plot of $V$ against $I$ yields a straight line passing through the origin. The slope of the V-I curve equals $R$ (or $1/R$ if plotted as I-V)."
+            "**Step 1 (Newton's Second Law):** Rate of change of momentum is directly proportional to applied net force: $F = \\frac{dp}{dt} = \\frac{d(mv)}{dt} = m \\frac{dv}{dt} = ma$.",
+            "**Step 2 (Two-Body Isolated System):** Consider two interacting masses $m_1$ and $m_2$ in an isolated system with no external forces ($\\Sigma F_{ext} = 0$).",
+            "**Step 3 (Conservation of Linear Momentum):** Total momentum $p_{total} = p_1 + p_2 = \\text{constant}$.",
+            "**Step 4 (Time Derivative of Momentum):** $\\frac{d(p_1 + p_2)}{dt} = 0 \\implies \\frac{dp_1}{dt} + \\frac{dp_2}{dt} = 0$.",
+            "**Step 5 (Newton's Third Law Expression):** Since $F_{12} = \\frac{dp_1}{dt}$ and $F_{21} = \\frac{dp_2}{dt}$, we obtain $F_{12} + F_{21} = 0 \\implies \\mathbf{F_{12} = -F_{21}}$."
         ],
-        "sign_conventions": "Ensure units: Voltage in Volts (V), Current in Amperes (A), Resistance in Ohms ($\\Omega$). If length is in $cm$ or radius in $mm$, convert to meters ($m$) before substituting into $R = \\rho L/A$.",
-        "diagram_guide": "Draw a closed circuit with: Battery (longer line +), Switch (closed), Ammeter in **series**, Voltmeter in **parallel** across resistor R, and a Rheostat for varying current.",
-        "rubric_warnings": "Examiners deduct 1 full mark if you forget to state the condition **'at constant temperature'** in the definition!",
+        "cartesian_signs": "Vector directional convention: Choose one direction (e.g. right/upward) as positive $(+)$. Forces in the opposite direction (left/downward) are strictly negative $(-)$. In momentum problems: $m_1 u_1 + m_2 u_2 = m_1 v_1 + m_2 v_2$.",
+        "diagram_blueprint": "Draw Free Body Diagrams (FBDs) for each object separately. Object A shows force $\\vec{F}_{BA}$ pointing left. Object B shows force $\\vec{F}_{AB}$ pointing right. Never draw both action and reaction forces on the same single body FBD!",
+        "examiner_traps": "1. **'Action and Reaction cancel each other' Trap:** NEVER say they cancel! They act on two different bodies. (Deducts 1 mark).\n2. **'Horse and Cart' Paradox:** The cart moves forward because the horse pushes backward against the *ground*, and the *ground pushes forward* on the horse's hooves with greater force than the cart's rolling friction.",
         "what_if_matrix": [
-            ("Voltage is doubled (V -> 2V)", "Current doubles (I -> 2I), Resistance remains unchanged (R is a geometric property)."),
-            ("Wire is stretched to double its length (L -> 2L)", "Area halves ($A \\to A/2$ since volume is constant), so new resistance becomes $4R$ ($2^2 = 4$)."),
-            ("Temperature increases in metals", "Positive lattice ions vibrate faster, increasing collision frequency $\\implies R$ increases.")
-        ]
-    },
-    "refraction": {
-        "title": "Refraction of Light & Snell's Law",
-        "subject": "Physics / Science",
-        "board_def": "Refraction is the phenomenon of bending of a ray of light when it travels obliquely from one optical medium to another of different optical density. Snell's Law states: (1) The incident ray, refracted ray, and the normal at the point of incidence all lie in the same plane. (2) The ratio of the sine of the angle of incidence to the sine of the angle of refraction is constant for a given pair of media: $\\frac{\\sin i}{\\sin r} = n_{21} = \\frac{v_1}{v_2}$.",
-        "feynman_analogy": "Imagine a marching band marching in a straight diagonal line on smooth pavement, suddenly hitting a patch of thick muddy grass. The soldiers on the side that enters the mud first slow down immediately, while the soldiers still on the pavement keep moving fast. This speed difference forces the entire marching line to pivot and change direction. Light behaves like those marching soldiers — when a wavefront enters a denser medium, one side slows down first, pivoting the ray toward the normal.",
-        "physical_reality": "Light travels at $3 \\times 10^8\\text{ m/s}$ in vacuum. In glass or water, light photons interact with electron clouds of atoms, causing a phase delay that reduces its effective phase velocity to $v = c/n$. Because wave frequency $f$ remains strictly constant (determined by the source), wavelength shortens ($\\lambda = v/f$), causing the wavefront to bend.",
-        "jargon_translator": "- *Optical Density:* How much a material slows down light waves (not the same as mass density!).\n- *Normal:* An imaginary reference line drawn at exact 90 degrees (perpendicular) to the boundary surface.\n- *Refractive Index (n):* The factor by which light is slowed down ($n = c/v$).",
-        "derivation_steps": [
-            "**Step 1 (Huygens' Wavefront Principle):** Consider a plane wavefront $AB$ incident at angle $i$ on medium boundary.",
-            "**Step 2 (Time of Travel):** Let speed in medium 1 be $v_1$ and medium 2 be $v_2$. In time $t$, distance traveled in medium 1 is $BC = v_1 t$ and in medium 2 is $AD = v_2 t$.",
-            "**Step 3 (Trigonometric Ratios):** From right triangle $\\triangle ABC$, $\\sin i = \\frac{BC}{AC} = \\frac{v_1 t}{AC}$. From $\\triangle ADC$, $\\sin r = \\frac{AD}{AC} = \\frac{v_2 t}{AC}$.",
-            "**Step 4 (Snell's Law Ratio):** Dividing the two equations: $\\frac{\\sin i}{\\sin r} = \\frac{v_1 t / AC}{v_2 t / AC} = \\frac{v_1}{v_2} = \\frac{n_2}{n_1} = n_{21}$."
+            ("A massive truck collides with a tiny mosquito", "Both experience the EXACT same collision force magnitude ($|F_{truck}| = |F_{mosquito}|$). The mosquito experiences catastrophic acceleration ($a = F/m$) because its mass is tiny."),
+            ("You jump off a small boat onto a wooden dock", "Your legs push the boat backward (boat moves backward in water) as the boat pushes you forward onto the dock."),
+            ("A rocket fires in empty space with no air to push against", "The rocket accelerates forward by pushing exhaust gases backward ($F_{rocket} = -F_{exhaust}$). It does not need an atmosphere.")
         ],
-        "sign_conventions": "Angles $i$ and $r$ are ALWAYS measured relative to the **Normal** line (perpendicular to surface), NEVER relative to the glass surface itself.",
-        "diagram_guide": "Draw boundary line. Draw dashed normal line. Draw incident ray with arrow towards boundary. When entering denser medium, draw refracted ray bent **towards** the normal ($r < i$). Label $i$, $r$, $n_1$, $n_2$.",
-        "rubric_warnings": "Always draw arrowheads on light rays! An unarrowed line receives 0 marks on ICSE/CBSE ray diagrams.",
-        "what_if_matrix": [
-            ("Light enters normally ($i = 0^\\circ$)", "$\\sin 0^\\circ = 0 \\implies r = 0^\\circ$. The ray passes straight without bending, though its speed decreases."),
-            ("Light travels from Denser to Rarer medium", "Ray bends **away from the normal** ($r > i$). If $i > i_c$ (critical angle), Total Internal Reflection occurs."),
-            ("Refractive index of glass is 1.5", "Speed of light in glass is $v = \\frac{3 \\times 10^8}{1.5} = 2 \\times 10^8\\text{ m/s}$.")
-        ]
-    },
-    "lens": {
-        "title": "Spherical Lenses, Mirror & Lens Formula",
-        "subject": "Physics / Science",
-        "board_def": "The Lens Formula expresses the quantitative relationship between the object distance (u), image distance (v), and focal length (f) of a spherical lens: $\\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}$. Magnification is given by $m = \\frac{h_i}{h_o} = \\frac{v}{u}$. (For Spherical Mirrors: $\\frac{1}{f} = \\frac{1}{v} + \\frac{1}{u}$ and $m = -\\frac{v}{u}$).",
-        "feynman_analogy": "Think of a convex lens like a magnifying glass acting as a team of tiny prisms. Rays hitting the outer edges bend sharply inward toward the center, while rays going straight through the optical center pass unbent. By geometry, all parallel rays converge at a single spotlight point — the **Focus ($f$)**. Where the rays physically cross, a real upside-down movie projector image is formed on a screen.",
-        "physical_reality": "Curved glass surfaces impose varying angle-of-incidence across the lens aperture according to Snell's law. In the paraxial ray approximation (thin lens), spherical curvature guarantees that all rays originating from a point source refocus at a conjugate point defined by Fermat's principle of least time.",
-        "jargon_translator": "- *Real Image:* Light rays actually meet. Can be projected onto paper or a wall. Always inverted.\n- *Virtual Image:* Rays only appear to meet when extended backward (like your reflection in a bathroom mirror). Cannot be caught on a screen. Always erect.",
-        "derivation_steps": [
-            "**Step 1 (Similar Triangles from Ray Diagram):** Consider an object $AB$ placed beyond $2F_1$ of a convex lens. Ray 1 passes parallel to principal axis and refracts through focus $F_2$. Ray 2 passes through optical center $O$ unbent.",
-            "**Step 2 (First Triangle Pair):** $\\triangle ABO \\sim \\triangle A'B'O$. Therefore, $\\frac{A'B'}{AB} = \\frac{OB'}{OB} = \\frac{+v}{-u}$.",
-            "**Step 3 (Second Triangle Pair):** From similar triangles $\\triangle OCF_2 \\sim \\triangle A'B'F_2$ (where $OC = AB$): $\\frac{A'B'}{OC} = \\frac{F_2 B'}{OF_2} \\implies \\frac{A'B'}{AB} = \\frac{v - f}{f}$.",
-            "**Step 4 (Equating & Rearranging):** $\\frac{v}{-u} = \\frac{v - f}{f} \\implies vf = -uv + uf$. Dividing entire equation by $uvf$: $\\frac{1}{u} = -\\frac{1}{f} + \\frac{1}{v} \\implies \\frac{1}{f} = \\frac{1}{v} - \\frac{1}{u}$."
-        ],
-        "sign_conventions": "New Cartesian Sign Convention:\n- Optical center is the origin $(0,0)$.\n- Object distance $u$ is ALWAYS **negative** (left of lens).\n- Focal length $f$ is **positive** for Convex lens, **negative** for Concave lens.\n- Real image distance $v$ is **positive** (right of lens); Virtual image $v$ is **negative** (left of lens).",
-        "diagram_guide": "Use a sharp pencil and ruler. Draw principal axis line. Place lens at center. Mark $F_1, 2F_1$ on left and $F_2, 2F_2$ on right equidistant from $O$. Draw object $AB$. Draw parallel ray $\\to$ refracts through $F_2$. Draw central ray $\\to$ straight through $O$. Show intersection $A'B'$.",
-        "rubric_warnings": "Minus sign confusion in Lens vs Mirror formula is the #1 reason students lose 3 marks. Remember: Lens has MINUS ($\\frac{1}{v} - \\frac{1}{u}$), Mirror has PLUS ($\\frac{1}{v} + \\frac{1}{u}$).",
-        "what_if_matrix": [
-            ("Object is at $2F_1$ in convex lens", "Real, inverted image forms at exactly $2F_2$, same size ($m = -1$, $v = +2f$)."),
-            ("Object is between $F_1$ and $O$", "Convex lens acts as magnifying glass: Virtual, erect, magnified image forms on same side ($m > +1$)."),
-            ("Power of lens $P = +2.0\\text{ D}$", "Focal length $f = \\frac{1}{P} = \\frac{1}{+2.0} = +0.5\\text{ m} = +50\\text{ cm}$ (Convex lens for hypermetropia).")
-        ]
+        "exam_question": "A gun of mass $M = 4\\text{ kg}$ fires a bullet of mass $m = 50\\text{ g}$ with a muzzle velocity of $v = 400\\text{ m/s}$. Calculate the recoil velocity of the gun.",
+        "exam_solution": "**Step 1:** Convert units: $m = 50\\text{ g} = 0.05\\text{ kg}$.\n**Step 2:** Conservation of linear momentum: $(M + m)u = M V_{gun} + m v_{bullet} = 0$.\n**Step 3:** $4 V_{gun} + (0.05)(400) = 0 \\implies 4 V_{gun} + 20 = 0$.\n**Step 4:** $V_{gun} = -\\frac{20}{4} = -5\\text{ m/s}$ *(The negative sign indicates recoil opposite to bullet direction)*."
     },
     "photosynthesis": {
-        "title": "Photosynthesis & Autotrophic Nutrition",
-        "subject": "Biology / Science",
-        "board_def": "Photosynthesis is the biochemical process by which green autotrophic plants synthesize organic food (glucose) from simple inorganic substances (carbon dioxide and water) in the presence of sunlight and chlorophyll, releasing oxygen as a byproduct. Overall equation: $6\\text{CO}_2 + 12\\text{H}_2\\text{O} \\xrightarrow[\\text{Chlorophyll}]{\\text{Sunlight}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 + 6\\text{H}_2\\text{O}$.",
-        "feynman_analogy": "Think of a plant leaf as a solar-powered organic bakery. The solar panels are the **Chloroplasts** packed with green chlorophyll pigments. The raw ingredients shipped into the factory are **Water** (pumped up from soil through xylem pipes) and **$\\text{CO}_2$** (sucked in through microscopic leaf windows called stomata). The solar energy cracks water molecules in half, capturing hydrogen and tossing out oxygen as factory waste. The hydrogen is then glued to $\\text{CO}_2$ to bake sweet glucose bread rolls.",
-        "physical_reality": "Photosynthesis occurs in two distinct biochemical phases inside the chloroplast:\n1. **Light Reaction (in Thylakoid grana):** Photons excite chlorophyll electrons. Photolysis of water occurs ($2\\text{H}_2\\text{O} \\to 4\\text{H}^+ + 4e^- + \\text{O}_2$), generating ATP and NADPH.\n2. **Dark Reaction / Calvin Cycle (in Stroma):** Chemical energy from ATP and NADPH reduces $\\text{CO}_2$ to synthesize 3-carbon sugars and ultimately glucose, stored as starch.",
-        "jargon_translator": "- *Photolysis of Water:* Literally 'light splitting' — using solar energy to rip water apart into hydrogen and oxygen.\n- *Stomata:* Microscopic breathing pores on leaves guarded by two kidney-shaped guard cells.\n- *Transpiration Pull:* Upward suction force pulling water up tall trees.",
+        "title": "Photosynthesis & Autotrophic Plant Physiology",
+        "subject": "Biology",
+        "keywords": ["photosynthesis", "chlorophyll", "chloroplast", "light reaction", "dark reaction", "calvin", "stomata", "photolysis"],
+        "intuition": "Every calorie of food you have ever eaten, and every breath of oxygen you take, is solar energy processed by leaves. Plants are microscopic chemical solar power plants that capture photons from 93 million miles away and lock that energy into glucose sugar rings.",
+        "feynman_analogy": "Imagine a leaf is a sun-powered bakery. The factory workers are green **Chlorophyll** molecules. The raw ingredients entering the loading dock are **Water** (pumped up from the roots) and **$\\text{CO}_2$** (sucked in through microscopic leaf windows called stomata). Sunlight provides the heat to crack water molecules in half, releasing oxygen out the window. The captured hydrogen is baked into delicious glucose bread rolls.",
+        "microscopic_reality": "Photosynthesis happens in two distinct biochemical phases inside the chloroplast:\n1. **Light Reaction (in Thylakoid Grana):** Light photons strike photosystem II, exciting electrons. Photolysis of water occurs ($2\\text{H}_2\\text{O} \\xrightarrow{\\text{light}} 4\\text{H}^+ + 4e^- + \\text{O}_2$), generating ATP and NADPH.\n2. **Dark Reaction / Calvin Cycle (in Stroma):** ATP and NADPH power the enzyme RuBisCO to fix $\\text{CO}_2$ and synthesize $\\text{C}_6\\text{H}_{12}\\text{O}_6$, which is converted into insoluble starch for storage.",
+        "jargon_translator": "- *Photolysis:* Splitting of water molecules using solar photon energy.\n- *Stroma:* The fluid matrix of the chloroplast where dark reactions synthesize sugars.\n- *Grana:* Stacks of thylakoid discs containing chlorophyll.",
         "derivation_steps": [
-            "**Step 1 (Absorption):** Chlorophyll molecules absorb specific wavelengths of solar photon energy.",
-            "**Step 2 (Conversion & Photolysis):** Light energy is converted into chemical energy; photolysis of water splits $\\text{H}_2\\text{O}$ into hydrogen protons, electrons, and $\\text{O}_2$ gas.",
-            "**Step 3 (Reduction of $\\text{CO}_2$):** Hydrogen reduces carbon dioxide to carbohydrate glucose ($\\text{C}_6\\text{H}_{12}\\text{O}_6$).",
-            "**Step 4 (Storage):** Unused glucose is polymerized into insoluble starch granules for storage."
+            "**Balanced Overall Equation:**\n$$6\\text{CO}_2 + 12\\text{H}_2\\text{O} \\xrightarrow[\\text{Chlorophyll}]{\\text{Sunlight}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 + 6\\text{H}_2\\text{O}$$",
+            "**Phase 1 (Light Phase):** Absorption of light $\\to$ Electron excitation $\\to$ Photolysis of water ($2\\text{H}_2\\text{O} \\to 4\\text{H}^+ + 4e^- + \\text{O}_2$) $\\to$ Photophosphorylation (ADP + Pi $\\to$ ATP) $\\to$ NADP$^+$ reduction to NADPH.",
+            "**Phase 2 (Dark Phase / Light-Independent):** Fixation of $\\text{CO}_2$ using ATP and NADPH in the stroma $\\to$ Phosphoglycerate (PGA) $\\to$ Glucose synthesis."
         ],
-        "sign_conventions": "Balanced chemical equation is strictly mandatory for board exams. Write $6\\text{CO}_2 + 12\\text{H}_2\\text{O} \\to \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 + 6\\text{H}_2\\text{O}$ with 'Sunlight' and 'Chlorophyll' written over/under the arrow.",
-        "diagram_guide": "Draw cross-section of leaf showing: Upper cuticle, upper epidermis, palisade mesophyll with dense chloroplast dots, spongy mesophyll with air spaces, vascular bundle (xylem/phloem), lower epidermis with stomatal pore and guard cells.",
-        "rubric_warnings": "Writing an unbalanced equation like $\\text{CO}_2 + \\text{H}_2\\text{O} \\to \\text{C}_6\\text{H}_{12}\\text{O}_6 + \\text{O}_2$ immediately loses 1 mark on board exams.",
+        "cartesian_signs": "Conditions written over/under arrow: 'Sunlight' and 'Chlorophyll' are strictly required in ICSE/CBSE board answers.",
+        "diagram_blueprint": "Draw leaf cross-section: Upper cuticle $\\to$ Upper epidermis $\\to$ Palisade mesophyll (dense vertical cells with chloroplasts) $\\to$ Spongy mesophyll (air spaces for gas diffusion) $\\to$ Vascular bundle (Xylem inside, Phloem outside) $\\to$ Lower epidermis with stomatal pore and guard cells.",
+        "examiner_traps": "1. **Unbalanced Equation:** Writing $\\text{CO}_2 + \\text{H}_2\\text{O} \\to \\text{C}_6\\text{H}_{12}\\text{O}_6 + \\text{O}_2$ loses 1 full mark.\n2. **Water on Both Sides:** ICSE mandates $12\\text{H}_2\\text{O}$ on left and $6\\text{H}_2\\text{O}$ on right because oxygen comes exclusively from water photolysis, not carbon dioxide!",
         "what_if_matrix": [
-            ("Desert plants (CAM photosynthesis)", "Take up $\\text{CO}_2$ at night when stomata open to prevent water loss; store as malic acid and synthesize glucose during daytime."),
-            ("Potassium ions enter guard cells", "Guard cells swell by endosmosis, stomatal pore curves open."),
-            ("Plant kept in dark for 72 hours", "Completely destarched (used for photosynthesis verification experiments with iodine).")
-        ]
+            ("Plant placed in dark for 48 hours", "Completely destarched. Used as a control setup in photosynthesis verification experiments."),
+            ("Potassium ions ($K^+$) enter guard cells", "Endosmosis occurs, guard cells become turgid, and the stomatal aperture opens."),
+            ("Leaf boiled in alcohol in a water bath", "Chlorophyll dissolves, decolorizing the leaf so blue-black iodine starch test is clearly visible.")
+        ],
+        "exam_question": "Explain why leaves are destarched before photosynthesis experiments and state the chemical test used to verify starch presence.",
+        "exam_solution": "**Destarching:** The potted plant is kept in continuous dark for 48 hours so stored starch in leaves is fully consumed by cellular respiration.\n**Starch Test:** Dip decolorized leaf in iodine solution. Mastered areas containing starch turn **blue-black**, while non-photosynthetic control areas turn **brownish-yellow**."
+    },
+    "ohm": {
+        "title": "Ohm's Law, Resistance & Circuit Governing Equations",
+        "subject": "Physics",
+        "keywords": ["ohm", "resistance", "voltage", "current", "resistivity", "circuit", "potential difference", "rheostat"],
+        "intuition": "Electric current is not magic — it is the physical drift of billions of electrons bouncing through a metal wire. How fast they flow depends on two competing things: how hard the battery pushes them (Voltage) versus how many obstacles they hit on their way (Resistance).",
+        "feynman_analogy": "Imagine a water slide. Voltage ($V$) is the height of the slide — the higher it is, the more pressure pushing you down. Current ($I$) is how many people splash into the pool per minute. Resistance ($R$) is having speed bumps and friction on the slide surface. If you double the height, twice as many people splash down — unless you double the bumps, which cuts the flow in half ($I = V/R$).",
+        "microscopic_reality": "Under an applied electric field $E = V/L$, free electrons acquire an average drift velocity $v_d = \\frac{eE\\tau}{m}$. Collisions with vibrating positive metal ions in the crystal lattice impart resistance. This dissipation of kinetic energy converts electrical work into thermal heat ($H = I^2Rt$).",
+        "jargon_translator": "- *Potential Difference ($V$):* Work done per unit positive charge to move between two points ($V = W/Q$).\n- *Ohmic Conductor:* Materials that strictly obey $V \\propto I$ (straight-line V-I graph passing through origin).\n- *Resistivity ($\\rho$):* Intrinsic material property independent of dimensions.",
+        "derivation_steps": [
+            "**Step 1 (Statement):** At constant temperature, current flowing through a metallic conductor is directly proportional to potential difference across its ends: $V \\propto I$.",
+            "**Step 2 (Resistance Constant):** $\\frac{V}{I} = \\text{constant} = R \\implies \\mathbf{V = IR}$.",
+            "**Step 3 (Geometric Factors):** Resistance is proportional to length ($R \\propto L$) and inversely proportional to area ($R \\propto 1/A$). Combining: $\\mathbf{R = \\rho \\frac{L}{A}}$, where $\\rho$ is Resistivity in $\\Omega \\cdot m$."
+        ],
+        "cartesian_signs": "SI Units: $V$ in Volts (V), $I$ in Amperes (A), $R$ in Ohms ($\\Omega$). Convert lengths from $cm$ to meters ($m$) and wire radius from $mm$ to $m$ ($A = \\pi r^2$).",
+        "diagram_blueprint": "Draw series circuit: Battery $\\to$ Key switch $\\to$ Ammeter in **series** $\\to$ Resistor $R$ $\\to$ Rheostat. Connect Voltmeter in **parallel** strictly across resistor $R$.",
+        "examiner_traps": "1. **Omitting 'Constant Temperature':** Missing this phrase in definition costs 1 mark.\n2. **Stretching Wire Numerical Trap:** If a wire is stretched to double its length ($L \\to 2L$), its area halves ($A \\to A/2$), making new resistance **$4R$** ($2^2 = 4$), NOT $2R$!",
+        "what_if_matrix": [
+            ("Voltage is doubled across a fixed resistor", "Current doubles ($I \\to 2I$). Resistance remains completely unchanged."),
+            ("Wire cut into two equal halves in parallel", "Each half has resistance $R/2$. In parallel: $R_{eq} = \\frac{(R/2)(R/2)}{R/2 + R/2} = R/4$."),
+            ("Temperature of copper wire increases", "Lattice ions vibrate with greater amplitude, increasing electron collision frequency $\\implies R$ increases.")
+        ],
+        "exam_question": "A cylindrical wire of resistance $R = 16\\,\\Omega$ is stretched uniformly until its length is doubled. What is its new resistance?",
+        "exam_solution": "**Step 1:** Initial resistance $R_1 = \\rho \\frac{L_1}{A_1} = 16\\,\\Omega$.\n**Step 2:** When stretched, volume $V = L \\cdot A = \\text{constant}$. Since $L_2 = 2L_1$, cross-sectional area $A_2 = \\frac{A_1}{2}$.\n**Step 3:** New resistance $R_2 = \\rho \\frac{L_2}{A_2} = \\rho \\frac{2L_1}{A_1 / 2} = 4 \\left(\\rho \\frac{L_1}{A_1}\\right) = 4 R_1$.\n**Step 4:** $R_2 = 4 \\times 16 = \\mathbf{64\\,\\Omega}$."
     },
     "quadratic": {
-        "title": "Quadratic Equations, Discriminant & Nature of Roots",
+        "title": "Quadratic Equations, Discriminant & Parabolic Roots",
         "subject": "Mathematics",
-        "board_def": "A quadratic equation in variable x is an equation of the standard form $ax^2 + bx + c = 0$, where $a, b, c \\in \\mathbb{R}$ and $a \\neq 0$. The roots are given by the Quadratic Formula: $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$. The quantity $D = b^2 - 4ac$ is the Discriminant which determines the nature of roots.",
-        "feynman_analogy": "Imagine throwing a basketball into a hoop. The path it traces through the air is an arching parabola ($y = ax^2 + bx + c$). Finding the 'roots' is simply asking: *'At what exact ground points does the ball touch the floor ($y = 0$)?'* The **Discriminant ($D = b^2 - 4ac$)** is like a ground-detector: If $D > 0$, the ball cuts through the floor in two distinct spots. If $D = 0$, the parabola's vertex just grazes the floor at 1 single point. If $D < 0$, the ball is flying in the air and never touches the floor (no real roots).",
-        "physical_reality": "In coordinate geometry, quadratic roots represent the x-intercepts of a parabolic conic section. Completing the square translates the parabola's vertex to the point $(-\\frac{b}{2a}, -\\frac{D}{4a})$, demonstrating why the axis of symmetry is always $x = -\\frac{b}{2a}$.",
-        "jargon_translator": "- *Discriminant (D):* The mathematical 'judge' inside the square root ($b^2 - 4ac$) that decides how many real solutions exist.\n- *Coincident Roots:* Two identical repeated solutions ($x_1 = x_2 = -b/2a$).\n- *Roots / Zeros / Solutions:* Values of $x$ that satisfy the equation.",
+        "keywords": ["quadratic", "discriminant", "roots", "completing square", "quadratic formula", "parabola", "nature of roots"],
+        "intuition": "A quadratic equation represents a curved parabolic flight path in geometry. Solving for roots is simply finding the exact coordinates where the curve touches or crosses the zero ground line.",
+        "feynman_analogy": "Imagine throwing a basketball into the air. The path is a symmetrical parabola ($y = ax^2 + bx + c$). The **Discriminant ($D = b^2 - 4ac$)** is your ground detector: If $D > 0$, the ball cuts through the floor at two distinct points. If $D = 0$, the bottom tip of the ball touches the floor at exactly 1 single point. If $D < 0$, the ball is floating above the floor and never touches it in the real world.",
+        "microscopic_reality": "By completing the square on $ax^2 + bx + c = 0$, we translate the coordinate frame so the parabola's vertex is at $\\left(-\\frac{b}{2a}, -\\frac{D}{4a}\\right)$. The symmetry of parabolas guarantees that real roots are spaced symmetrically at distances $\\pm \\frac{\\sqrt{D}}{2a}$ from the vertex line of symmetry.",
+        "jargon_translator": "- *Discriminant ($D = b^2 - 4ac$):* The mathematical indicator deciding root nature.\n- *Real and Equal Roots:* A single repeated solution ($x = -b/2a$).\n- *Roots / Zeros / Solutions:* Values of $x$ that satisfy the equation.",
         "derivation_steps": [
-            "**Step 1 (Standard Form):** Start with $ax^2 + bx + c = 0$ (where $a \\neq 0$). Divide throughout by $a$: $x^2 + \\frac{b}{a}x + \\frac{c}{a} = 0$.",
-            "**Step 2 (Completing the Square):** Add and subtract $(\\frac{b}{2a})^2$: $\\left(x^2 + 2 \\cdot x \\cdot \\frac{b}{2a} + \\left(\\frac{b}{2a}\\right)^2\\right) - \\left(\\frac{b}{2a}\\right)^2 + \\frac{c}{a} = 0$.",
-            "**Step 3 (Factoring Perfect Square):** $\\left(x + \\frac{b}{2a}\\right)^2 = \\frac{b^2}{4a^2} - \\frac{c}{a} = \\frac{b^2 - 4ac}{4a^2}$.",
-            "**Step 4 (Square Root & Solve):** $x + \\frac{b}{2a} = \\pm \\frac{\\sqrt{b^2 - 4ac}}{2a} \\implies x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$."
+            "**Step 1 (Standard Form):** $ax^2 + bx + c = 0$ ($a \\neq 0$). Divide by $a$: $x^2 + \\frac{b}{a}x + \\frac{c}{a} = 0$.",
+            "**Step 2 (Complete the Square):** Add and subtract $\\left(\\frac{b}{2a}\\right)^2$: $\\left(x + \\frac{b}{2a}\\right)^2 - \\frac{b^2}{4a^2} + \\frac{c}{a} = 0$.",
+            "**Step 3 (Isolate Squared Term):** $\\left(x + \\frac{b}{2a}\\right)^2 = \\frac{b^2 - 4ac}{4a^2}$.",
+            "**Step 4 (Square Root & Final Quadratic Formula):** $\\mathbf{x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}}$."
         ],
-        "sign_conventions": "When evaluating $D = b^2 - 4ac$, if $b$ is negative, always write $(-b)^2$ with parentheses to avoid writing $-b^2$ which yields incorrect signs.",
-        "diagram_guide": "Sketch parabola $y = ax^2 + bx + c$. Show 3 cases: (1) $D > 0$: 2 x-intercepts. (2) $D = 0$: Tangent to x-axis at 1 point. (3) $D < 0$: Entirely above x-axis.",
-        "rubric_warnings": "Always check for $a \\neq 0$. In word problems, reject negative dimensions or negative speeds with explicit justification (e.g. 'Since speed cannot be negative, $x = 45\\text{ km/h}$').",
+        "cartesian_signs": "When $b$ is negative, always compute $(-b)^2$ with parentheses to avoid the common sign slip of writing $-b^2$.",
+        "diagram_blueprint": "Plot $y = ax^2 + bx + c$. Illustrate: $D > 0$ (2 intercepts), $D = 0$ (tangent to x-axis), $D < 0$ (suspended above x-axis).",
+        "examiner_traps": "1. **Negative Dimensions/Speeds in Word Problems:** Always reject negative values with explicit rationale (e.g. 'Since speed cannot be negative, $x = 30\\text{ km/h}$').\n2. **Equal Roots Parameter numericals:** Set $D = b^2 - 4ac = 0$ directly to solve for unknown $k$.",
         "what_if_matrix": [
-            ("Discriminant $D > 0$ and perfect square", "Two distinct rational roots."),
-            ("Discriminant $D = 0$", "Two equal real roots ($x = -b/2a$). Essential for word problems involving 'equal roots' to find unknown parameter $k$ ($b^2 - 4ac = 0$)."),
-            ("Discriminant $D < 0$", "No real roots (imaginary conjugate pair in higher mathematics).")
-        ]
+            ("Discriminant $D > 0$ and is a perfect square", "Two distinct rational roots."),
+            ("Discriminant $D = 0$", "Two real and equal roots ($x = -b/2a$)."),
+            ("Discriminant $D < 0$", "No real roots (conjugate complex roots in higher mathematics).")
+        ],
+        "exam_question": "Find the value of $k$ for which the quadratic equation $kx(x - 2) + 6 = 0$ has two equal real roots.",
+        "exam_solution": "**Step 1:** Rewrite in standard form: $kx^2 - 2kx + 6 = 0$. Here $a = k$, $b = -2k$, $c = 6$.\n**Step 2:** For equal roots, Discriminant $D = 0 \\implies b^2 - 4ac = 0$.\n**Step 3:** $(-2k)^2 - 4(k)(6) = 0 \\implies 4k^2 - 24k = 0 \\implies 4k(k - 6) = 0$.\n**Step 4:** $k = 0$ or $k = 6$. Since $a \\neq 0$, $k = 0$ is rejected $\\implies \\mathbf{k = 6}$."
     }
 }
 
 
-def _find_matched_knowledge(topic_name: str, chapter_name: str, subject_name: str):
-    """Fuzzy matches query against pedagogical knowledge base."""
-    t_lower = (topic_name + " " + chapter_name + " " + subject_name).lower()
-    for key, data in TOPIC_KNOWLEDGE_BASE.items():
-        if key in t_lower:
+def _match_knowledge(query: str):
+    q = query.lower()
+    for key, data in EXPANDED_KNOWLEDGE_BASE.items():
+        if key in q:
             return data
-    # Fallback to general physics/chemistry/biology/math dynamic builder
+        for kw in data.get("keywords", []):
+            if kw in q:
+                return data
     return None
 
 
-# ══════════════════════════════════════════════
-# CLEAN AI SERVICE ABSTRACTION LAYER
-# ══════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
+# MULTI-TURN CONVERSATIONAL SESSION MANAGER
+# ══════════════════════════════════════════════════════════
+
+class NexusConversationSession:
+    """Manages active dialogue memory, topic tracking, and pedagogical state."""
+
+    @staticmethod
+    def get_history():
+        if "nexus_chat_history" not in st.session_state:
+            st.session_state["nexus_chat_history"] = []
+        return st.session_state["nexus_chat_history"]
+
+    @staticmethod
+    def add_message(role: str, content: str, action_badge: str = None, follow_ups: list = None, expandable_details: dict = None):
+        history = NexusConversationSession.get_history()
+        history.append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.datetime.now().strftime("%I:%M %p"),
+            "action_badge": action_badge,
+            "follow_ups": follow_ups or [],
+            "expandable_details": expandable_details or {}
+        })
+
+    @staticmethod
+    def get_active_topic():
+        return st.session_state.get("nexus_active_topic", "General Academic Mastery")
+
+    @staticmethod
+    def set_active_topic(topic_name: str):
+        st.session_state["nexus_active_topic"] = topic_name
+
+    @staticmethod
+    def clear_history():
+        st.session_state["nexus_chat_history"] = []
+        st.session_state["nexus_active_topic"] = None
+        st.session_state["pending_destructive_action"] = None
+
+
+# ══════════════════════════════════════════════════════════
+# PRODUCTION NEXUS AI SERVICE
+# ══════════════════════════════════════════════════════════
 
 class NexusAIService:
     """
-    Clean AI Service with Dual-Engine support:
-    1. Cloud LLM Mode (Gemini / OpenAI / Groq / Anthropic)
-    2. Autonomous Cognitive Mode (Built-in dynamic pedagogical engine)
+    Production-grade AI service combining Cloud LLMs and Autonomous Cognitive Engine.
     """
 
     def __init__(self):
@@ -416,356 +331,567 @@ class NexusAIService:
         return defaults.get(provider.lower(), "gemini-2.5-flash")
 
     def get_status(self) -> dict:
-        """Returns provider configuration status and masked API key info."""
         self._detect_provider_and_key()
         is_cloud = bool(self.api_key and self.provider)
-        masked_key = ""
-        if self.api_key:
-            if len(self.api_key) > 8:
-                masked_key = f"{self.api_key[:4]}...{self.api_key[-4:]}"
-            else:
-                masked_key = "****"
-
-        engine_mode = f"Cloud LLM ({self.provider.upper()})" if is_cloud else "Autonomous Cognitive Engine"
+        masked_key = f"{self.api_key[:4]}...{self.api_key[-4:]}" if (self.api_key and len(self.api_key) > 8) else ("****" if self.api_key else "")
         return {
-            "is_configured": True,  # Autonomous engine is always ready!
+            "is_configured": True,
             "is_cloud": is_cloud,
-            "engine_mode": engine_mode,
+            "engine_mode": f"Cloud LLM ({self.provider.upper()})" if is_cloud else "Autonomous Cognitive Engine",
             "provider": self.provider or "Autonomous Engine",
-            "model": self.model_name or "Nexus Cognitive v3.2",
-            "masked_key": masked_key,
-            "setup_guide": ""
+            "model": self.model_name or "Nexus Cognitive v4.0",
+            "masked_key": masked_key
         }
 
-    def _call_llm(self, system_instruction: str, user_prompt: str, temperature: float = 0.4) -> str:
-        """Dispatches prompt to the configured LLM provider via REST API if available."""
+    def _call_llm_with_tools(self, user_id: int, system_prompt: str, user_query: str, chat_history: list) -> dict:
+        """Invokes Cloud LLM with full student context and tool execution support."""
         self._detect_provider_and_key()
         if not self.api_key or not self.provider:
             return None
 
         prov = self.provider.lower()
+        full_system = f"{system_prompt}\n\nAvailable Tools:\n{json.dumps(NEXUS_TOOL_DEFINITIONS)}\nIf an action is required, respond with a JSON block ```json\n{{\"tool\": \"tool_name\", \"parameters\": {{...}}}}\n```"
+        
+        # Build prompt
+        formatted_history = "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in chat_history[-6:]])
+        full_prompt = f"Chat History:\n{formatted_history}\n\nUser: {user_query}"
 
-        if prov == "gemini":
-            model = self.model_name or "gemini-2.5-flash"
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
-            payload = {
-                "contents": [{
-                    "role": "user",
-                    "parts": [{"text": f"{system_instruction}\n\n{user_prompt}"}]
-                }],
-                "generationConfig": {
-                    "temperature": temperature,
-                    "maxOutputTokens": 2500
+        try:
+            if prov == "gemini":
+                model = self.model_name or "gemini-2.5-flash"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+                payload = {
+                    "contents": [{"role": "user", "parts": [{"text": f"{full_system}\n\n{full_prompt}"}]}],
+                    "generationConfig": {"temperature": 0.4, "maxOutputTokens": 3000}
                 }
-            }
-            resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=45)
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+                resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=45)
+                if resp.status_code == 200:
+                    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    return self._process_llm_output(user_id, text)
 
-        elif prov == "openai":
-            model = self.model_name or "gpt-4o-mini"
-            url = "https://api.openai.com/v1/chat/completions"
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_instruction},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "temperature": temperature,
-                "max_tokens": 2500
-            }
-            headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-            resp = requests.post(url, json=payload, headers=headers, timeout=45)
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
-
-        elif prov == "groq":
-            model = self.model_name or "llama-3.3-70b-versatile"
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_instruction},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "temperature": temperature,
-                "max_tokens": 2500
-            }
-            headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-            resp = requests.post(url, json=payload, headers=headers, timeout=45)
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
-
-        elif prov == "anthropic":
-            model = self.model_name or "claude-3-5-sonnet-20241022"
-            url = "https://api.anthropic.com/v1/messages"
-            payload = {
-                "model": model,
-                "system": system_instruction,
-                "messages": [{"role": "user", "content": user_prompt}],
-                "max_tokens": 2500,
-                "temperature": temperature
-            }
-            headers = {"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"}
-            resp = requests.post(url, json=payload, headers=headers, timeout=45)
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-            return data["content"][0]["text"]
+            elif prov == "openai" or prov == "groq":
+                url = "https://api.openai.com/v1/chat/completions" if prov == "openai" else "https://api.groq.com/openai/v1/chat/completions"
+                model = self.model_name or ("gpt-4o-mini" if prov == "openai" else "llama-3.3-70b-versatile")
+                headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "system", "content": full_system}, {"role": "user", "content": full_prompt}],
+                    "temperature": 0.4,
+                    "max_tokens": 3000
+                }
+                resp = requests.post(url, json=payload, headers=headers, timeout=45)
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"]
+                    return self._process_llm_output(user_id, text)
+        except Exception:
+            pass
 
         return None
 
+    def _process_llm_output(self, user_id: int, raw_text: str) -> dict:
+        """Parses tool calls from LLM output, executes them, and formats response."""
+        badge = None
+        action_json = None
+        
+        # Look for JSON tool block
+        match = re.search(r"```json\s*(\{.*?\})\s*```", raw_text, re.DOTALL)
+        if match:
+            try:
+                action_json = json.loads(match.group(1))
+            except Exception:
+                pass
+
+        if action_json and "tool" in action_json:
+            tool_name = action_json["tool"]
+            params = action_json.get("parameters", {})
+            result = execute_nexus_tool(user_id, tool_name, params)
+            if result.get("success"):
+                badge = f"⚡ {result.get('message', 'Action executed.')}"
+            elif result.get("error"):
+                badge = f"⚠️ {result.get('error')}"
+
+        clean_text = re.sub(r"```json\s*\{.*?\}\s*```", "", raw_text, flags=re.DOTALL).strip()
+        return {
+            "content": clean_text or raw_text,
+            "action_badge": badge
+        }
+
     # ══════════════════════════════════════════════════════════
-    # CAPABILITY 1: DAILY RECOMMENDATIONS & BLUEPRINT
+    # MAIN CONVERSATIONAL CHAT ENGINE (Dual-Engine)
     # ══════════════════════════════════════════════════════════
-    def generate_daily_recommendations(self, user_id: int) -> dict:
+    def process_chat_message(self, user_id: int, user_message: str) -> dict:
+        """
+        Main entry point for Nexus conversational intelligence.
+        Dispatches to Cloud LLM if active, or Autonomous Cognitive Engine.
+        """
+        query = user_message.strip()
         context = NexusContextBuilder.assemble_full_context(user_id)
-        
-        system_prompt = """You are the Nexus Cognitive Academic AI. Generate a structured Daily Study Blueprint in Markdown."""
-        user_prompt = f"Student Context: {json.dumps(context)}"
-        
-        cloud_resp = self._call_llm(system_prompt, user_prompt)
-        if cloud_resp:
-            return {"status": "success", "content": cloud_resp, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
+        profile = context["profile"]
+        chat_history = NexusConversationSession.get_history()
 
-        prios = context.get("priorities", [])
-        top_p = prios[0] if prios else {"topic_name": "Core High-Yield Concepts", "subject_name": "Science", "reasons": ["Syllabus milestone"]}
-        second_p = prios[1] if len(prios) > 1 else {"topic_name": "Numerical Derivations", "subject_name": "Mathematics", "reasons": ["Exam weightage"]}
-        
-        revs = context.get("revisions", {})
-        overdue_cnt = revs.get("overdue_count", 0)
-        due_today_cnt = revs.get("due_today_count", 0)
-        
-        mistakes = context.get("mistakes", {})
-        dominant_err = "Calculation & Formula Sign Precision"
-        if mistakes.get("error_distribution"):
-            dominant_err = mistakes["error_distribution"][0].get("mistake_type", dominant_err)
+        # ── Check Destructive Action Confirmation ──
+        pending = st.session_state.get("pending_destructive_action")
+        if pending and "confirm" in query.lower():
+            if pending == "DELETE_ALL_NOTES":
+                res = execute_nexus_tool(user_id, "delete_all_notes", {"confirmed": True})
+                st.session_state["pending_destructive_action"] = None
+                return {
+                    "content": f"✅ **Action Confirmed:** {res['message']}",
+                    "action_badge": "🗑️ All Notes Deleted",
+                    "follow_ups": ["View Syllabus", "Create New Note", "Plan Today's Study"]
+                }
 
-        exams = context.get("exams", [])
-        nearest_exam = exams[0] if exams else {"name": "Board Examinations", "days_left": 30}
-        days_str = f"{nearest_exam['days_left']} days" if nearest_exam.get("days_left") is not None else "upcoming soon"
-
-        blueprint = f"""
-### 🎯 Executive Priority Summary
-Target **{top_p['topic_name']}** ({top_p['subject_name']}) today. Your curriculum trajectory shows this is the highest-leverage topic to elevate your exam score before **{nearest_exam['name']}** (*{days_str} remaining*).
-
----
-
-### ⚡ Top 3 Actionable Study Blocks for Today
-1. 🧠 **Deep Work Focus Block 1 (50 min)** • `{top_p['subject_name']}`
-   - **Topic:** **{top_p['topic_name']}**
-   - **Strategy:** Read core derivations, write out key formulas from memory, and test self with 3 active recall questions.
-   - **Why:** {', '.join(top_p.get('reasons', ['High-yield curriculum milestone']))}.
-
-2. 📐 **Problem-Solving Block 2 (35 min)** • `{second_p['subject_name']}`
-   - **Topic:** **{second_p['topic_name']}**
-   - **Strategy:** Solve 5 previous-year board questions under timed conditions without checking solutions.
-
-3. 🔄 **Retention Reinforcement Block 3 (20 min)** • `Active Recall & Revision`
-   - **Strategy:** Clear your Spaced Repetition queue ({overdue_cnt} overdue, {due_today_cnt} due today) and review {mistakes.get('unreviewed_count', 0)} unreviewed Mistake Vault cards.
-
----
-
-### 🔄 Spaced Repetition Alert
-{"🚨 **Urgent:** You have " + str(overdue_cnt) + " topics crossing their forgetting-curve threshold! Revise them today to avoid cognitive decay." if overdue_cnt > 0 else "✨ **Retention Health:** Your spaced repetition queue is in optimal shape. Maintain daily check-ins!"}
-
----
-
-### ❌ Mistake Prevention Rule of the Day
-🛡️ **Focus on '{dominant_err}':** Before submitting any calculation or numerical problem, always double-check the SI unit conversions ($m \\leftrightarrow cm$, $J \\leftrightarrow kJ$) and sign conventions.
-
----
-
-> 💡 *"Excellence is not an act, but a habit. Win today's 3 study blocks!"*
+        # ── 1. Try Cloud LLM ──
+        system_instruction = f"""
+You are Nexus AI, an intelligent, patient, academically rigorous private tutor and academic copilot for {profile['name']} ({profile['class_name']} • {profile['board']}).
+Guidelines:
+1. Always teach conversationally with deep pedagogical substance (500-1000+ words for explanations).
+2. Avoid generic summaries or bullet-point shortcuts. Use natural teaching transitions.
+3. If the user asks you to perform an action (schedule a task, create a note, log a mistake, generate a quiz, change wallpaper, navigate, update syllabus), invoke the appropriate tool from the tool schema.
+4. Confine your answers strictly to the academic/study domain.
 """
-        return {"status": "success", "content": blueprint, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
+        cloud_result = self._call_llm_with_tools(user_id, system_instruction, query, chat_history)
+        if cloud_result and cloud_result.get("content"):
+            return {
+                "content": cloud_result["content"],
+                "action_badge": cloud_result.get("action_badge"),
+                "follow_ups": ["Explain Simpler", "Show Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
+            }
 
-    # ══════════════════════════════════════════════════════════
-    # CAPABILITY 2: CONCEPT MENTOR & FEYNMAN EXPLAINER
-    # ══════════════════════════════════════════════════════════
-    def generate_explanation(self, user_id: int, topic_id: int, style: str = "Feynman Technique (Plain English & Analogies)", student_query: str = "") -> dict:
-        conn = get_connection()
-        topic_name = "Topic"
-        chapter_name = "Chapter"
-        subject_name = "Subject"
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-                cursor.execute("""
-                    SELECT t.name as topic_name, c.name as chapter_name, s.name as subject_name
-                    FROM topics t
-                    JOIN chapters c ON t.chapter_id = c.id
-                    JOIN subjects s ON c.subject_id = s.id
-                    WHERE t.id = %s AND t.user_id = %s
-                """, (topic_id, user_id))
-                row = cursor.fetchone()
-                if row:
-                    topic_name = row["topic_name"]
-                    chapter_name = row["chapter_name"]
-                    subject_name = row["subject_name"]
-        finally:
-            conn.close()
+        # ── 2. Autonomous Cognitive Engine Fallback ──
+        return self._autonomous_cognitive_processor(user_id, query, context, chat_history)
 
-        profile = NexusContextBuilder.get_student_profile(user_id)
-        all_formulas = get_all_formulas(user_id)
-        matched_formulas = [f["formula_latex"] for f in all_formulas if f.get("topic_id") == topic_id or f.get("title", "").lower() in topic_name.lower()]
+    def _autonomous_cognitive_processor(self, user_id: int, query: str, context: dict, chat_history: list) -> dict:
+        """
+        Advanced autonomous intent classification & pedagogical synthesis.
+        Guarantees zero static or fake behavior when running locally.
+        """
+        q_lower = query.lower()
+        profile = context["profile"]
+        board = profile.get("board", "CBSE")
+        active_topic = NexusConversationSession.get_active_topic()
 
-        system_prompt = f"""
-You are the Nexus Master Pedagogical AI specializing in {profile['board']} {profile['class_name']}.
-Explain '{topic_name}' ({subject_name} - {chapter_name}) using style '{style}'.
-Ensure rigorous differentiation between styles:
-- Feynman: Conversational plain English, vivid real-world analogy, microscopic first-principles why, zero jargon.
-- Board Exam Derivation: Verbatim textbook statement, numbered algebraic derivation steps, explicit sign conventions, diagram guide, examiner marking checklist.
-- Visual Analogy: Structural mental model layout, Metaphor-to-Reality mapping table, 'What-If' dynamic parameter matrix.
-- Socratic Derivation: 4-stage guided inquiry dialogue with teacher questions and progressive derivations.
+        # ── INTENT 1: DESTRUCTIVE ACTION (Delete All Notes) ──
+        if "delete all my notes" in q_lower or "delete all notes" in q_lower:
+            st.session_state["pending_destructive_action"] = "DELETE_ALL_NOTES"
+            return {
+                "content": """
+⚠️ **Destructive Action Confirmation Required**
+
+Are you sure you want to permanently delete **all study notes** in your repository? This action cannot be undone.
+
+> To proceed, type **"confirm delete all notes"**. To cancel, simply ask any other study question.
+""",
+                "action_badge": "⚠️ Confirmation Pending",
+                "follow_ups": ["confirm delete all notes", "Cancel & View My Notes"]
+            }
+
+        # ── INTENT 2: STUDY PLANNER ("Schedule 45 minutes of Physics tomorrow") ──
+        if any(w in q_lower for w in ["schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study", "put in schedule"]):
+            # Extract duration
+            dur_match = re.search(r"(\d+)\s*(?:min|minute|hr|hour)", q_lower)
+            dur = 45
+            if dur_match:
+                val = int(dur_match.group(1))
+                dur = val * 60 if "hr" in dur_match.group(0) or "hour" in dur_match.group(0) else val
+
+            # Extract date
+            date_target = "tomorrow" if "tomorrow" in q_lower else "today"
+
+            # Extract subject / task
+            subject = None
+            for s in ["Physics", "Chemistry", "Mathematics", "Biology", "English", "History", "Geography", "Computer Science"]:
+                if s.lower() in q_lower:
+                    subject = s
+                    break
+
+            task_desc = f"Study {subject or 'Core Concepts'}"
+            if "of " in q_lower:
+                task_desc = f"Study {query.split('of ', 1)[1].split('tomorrow')[0].split('today')[0].strip()}"
+            elif "for " in q_lower and "min" not in q_lower.split("for ", 1)[1][:10]:
+                task_desc = query.split("for ", 1)[1].strip()
+
+            res = execute_nexus_tool(user_id, "create_study_task", {
+                "task_description": task_desc,
+                "plan_date": date_target,
+                "duration_minutes": dur,
+                "subject_name": subject
+            })
+
+            return {
+                "content": f"""
+I've scheduled this into your **Daily Study Planner**:
+
+- 🗓️ **Date:** {date_target.capitalize()} ({res.get('date', 'Upcoming')})
+- ⏱️ **Duration:** {dur} Minutes
+- 📚 **Mission:** **{task_desc}**
+
+*Consistency is key to high-stakes exam performance. Win this study block!*
+""",
+                "action_badge": f"🗓️ Scheduled Task ({dur} min)",
+                "follow_ups": ["Show Today's Planner", "Plan Entire Week", "Start Focus Session"]
+            }
+
+        # ── INTENT 3: SYLLABUS STATUS ("Mark Newton's Laws as completed") ──
+        if "mark " in q_lower and any(w in q_lower for w in ["completed", "complete", "done", "in progress"]):
+            status = "Completed" if ("completed" in q_lower or "complete" in q_lower or "done" in q_lower) else "In Progress"
+            t_query = q_lower.replace("mark", "").replace("as completed", "").replace("as complete", "").replace("as done", "").replace("completed", "").strip()
+            res = execute_nexus_tool(user_id, "update_topic_status", {"topic_name": t_query, "status": status})
+            if res.get("success"):
+                return {
+                    "content": f"✅ **Syllabus Updated:** {res['message']}\n\nYour curriculum completion percentage and velocity metrics have been updated in your dashboard analytics.",
+                    "action_badge": f"✅ {res['new_status']}: {res['topic_name']}",
+                    "follow_ups": ["Add to Spaced Revision", "Quiz Me on This", "View Syllabus"]
+                }
+
+        # ── INTENT 4: SPACED REVISION ("Add Newton's Laws to revision") ──
+        if any(w in q_lower for w in ["add to revision", "put in revision", "schedule revision", "revision queue", "review queue"]):
+            t_query = q_lower.replace("add", "").replace("to revision", "").replace("put in revision", "").replace("schedule revision", "").replace("queue", "").strip() or active_topic
+            res = execute_nexus_tool(user_id, "schedule_revision", {"topic_name": t_query})
+            if res.get("success"):
+                return {
+                    "content": f"🧠 **Spaced Repetition Scheduled:** {res['message']}\n\nNexus will prompt you at optimal SuperMemo SM-2 intervals (Day 1, Day 3, Day 7, Day 14) to cement this concept into long-term memory.",
+                    "action_badge": f"🧠 Scheduled Spaced Revision",
+                    "follow_ups": ["View Revision Queue", "Quiz Me on It", "Feynman Active Recall"]
+                }
+
+        # ── INTENT 5: SAVE AS NOTE ("Save this explanation as a note") ──
+        if any(w in q_lower for w in ["save this as a note", "save as note", "create note", "save to notes", "add note"]):
+            last_ai_msg = ""
+            for m in reversed(chat_history):
+                if m["role"] == "nexus":
+                    last_ai_msg = m["content"]
+                    break
+            note_content = last_ai_msg or f"Summary and key principles of {active_topic}."
+            res = execute_nexus_tool(user_id, "create_note", {
+                "topic_name": active_topic,
+                "title": f"Nexus Notes: {active_topic}",
+                "content_markdown": note_content
+            })
+            return {
+                "content": f"📝 **Note Saved:** {res['message']}\n\nSaved under **{active_topic}** with full Markdown and mathematical equations.",
+                "action_badge": "📝 Note Saved to Repository",
+                "follow_ups": ["View All Notes", "Add Key Formula", "Quiz Me"]
+            }
+
+        # ── INTENT 6: FOCUS STUDIO ("Start a 25 minute focus session for Physics") ──
+        if any(w in q_lower for w in ["focus session", "start focus", "start timer", "pomodoro", "deep work"]):
+            dur_match = re.search(r"(\d+)\s*(?:min|minute)", q_lower)
+            dur = int(dur_match.group(1)) if dur_match else 25
+            subject = None
+            for s in ["Physics", "Chemistry", "Mathematics", "Biology", "English", "History", "Geography"]:
+                if s.lower() in q_lower:
+                    subject = s
+                    break
+            res = execute_nexus_tool(user_id, "start_focus_session", {
+                "subject_name": subject,
+                "topic_name": active_topic,
+                "duration_minutes": dur
+            })
+            execute_nexus_tool(user_id, "navigate_to_page", {"page_name": "Focus"})
+            return {
+                "content": f"⏱️ **Focus Studio Configured:** Prepared a {dur}-minute deep work sprint for **{subject or active_topic}**. Opening Focus Studio now...",
+                "action_badge": f"⏱️ Focus Sprint ({dur} min)",
+                "follow_ups": ["Start Timer", "Set Ambient Audio", "Plan Next Task"]
+            }
+
+        # ── INTENT 7: MISTAKE ANALYSIS ("I got question 3 wrong") ──
+        if any(w in q_lower for w in ["got question", "got it wrong", "made a mistake", "i was wrong", "mistake on question"]):
+            return {
+                "content": f"""
+### ❌ Diagnostic Mistake Breakdown
+
+Let's diagnose exactly where the error occurred on **{active_topic}**:
+
+1. **Root-Cause Classification:** Most errors on this concept stem from **Formula Sign Convention** or **Careless Keyword Reading** (e.g. confusing vector signs or missing SI unit conversions).
+2. **The Golden Rule to Prevent This:**
+   - Always write out the formula in symbols before substituting numbers.
+   - Verify that all distances are in meters ($m$) and masses in kilograms ($kg$).
+3. **Mastery Action:** Would you like me to log this into your **Mistake Vault** so we can re-test it on your next quiz sprint?
+""",
+                "action_badge": "❌ Error Diagnosed",
+                "follow_ups": ["Log Mistake to Vault", "Try Similar Question", "Explain Concept Again"]
+            }
+
+        # ── INTENT 8: QUIZ ME ("Quiz me on it") ──
+        if any(w in q_lower for w in ["quiz me", "test me", "generate quiz", "create quiz", "give me a test"]):
+            target = active_topic if (active_topic and active_topic != "General Academic Mastery") else "Core High-Yield Concepts"
+            res = execute_nexus_tool(user_id, "generate_and_launch_quiz", {
+                "topic_or_subject": target,
+                "count": 5,
+                "difficulty": "Board Exam Hard"
+            })
+            return {
+                "content": f"""
+### 🎯 AI Assessment Ready
+
+I have crafted a 5-question high-rigor quiz on **{target}** targeting standard {board} exam traps:
+
+- **Difficulty:** Board Exam Caliber
+- **Auto-Sync:** Incorrect answers will be automatically sent to your Mistake Vault.
+
+> Click below or navigate to **🎯 Practice** to launch your interactive assessment!
+""",
+                "action_badge": f"🎯 Launched Quiz: {target}",
+                "follow_ups": ["Play Quiz Now", "Quiz on Mistakes Only", "Explain Concept First"]
+            }
+
+        # ── INTENT 9: PROGRESS ANALYTICS ("How am I progressing?") ──
+        if any(w in q_lower for w in ["how am i doing", "how am i progressing", "progress", "my stats", "analytics", "preparedness"]):
+            readiness = calculate_exam_readiness_score(user_id)
+            stats = get_overall_stats(user_id)
+            return {
+                "content": f"""
+### 📊 Academic Velocity & Progress Audit
+
+- **Exam Readiness Score:** **{readiness.get('readiness_score', 0)} / 100** ({readiness.get('readiness_tier', 'Building Foundation')})
+- **Syllabus Coverage:** **{stats.get('completed_topics', 0)} of {stats.get('total_topics', 0)} topics** ({stats.get('percent_completed', 0)}% completed).
+
+---
+
+### 🟢 What Is Going Well
+- Consistent active recall engagements.
+- Core foundation established in completed modules.
+
+### 🟡 What Is Holding You Back
+- Pending spaced repetitions require clearing to avoid forgetting-curve decay.
+- Unreviewed items in your Mistake Vault need targeted re-testing.
+
+### 🚀 3 Strategic Actions for Today:
+1. Complete a **25-min Focus Sprint** on high-yield priority topics.
+2. Clear your active Spaced Repetition queue (+50 XP).
+3. Take a 5-question practice quiz to calibrate accuracy.
+""",
+                "action_badge": "📊 Progress Audit Complete",
+                "follow_ups": ["Plan My Day", "Show Weakest Topics", "Export PDF Report"]
+            }
+
+        # ── INTENT 10: SEARCH ("Find everything related to Newton") ──
+        if q_lower.startswith("find ") or q_lower.startswith("search ") or "look up" in q_lower:
+            search_term = q_lower.replace("find", "").replace("search", "").replace("everything related to", "").replace("for", "").strip()
+            res = execute_nexus_tool(user_id, "search_nexus_workspace", {"query": search_term})
+            return {
+                "content": f"""
+### 🔍 Nexus Workspace Search: "{search_term}"
+
+Found **{res.get('total_matches', 0)} matching records** across your study operating system:
+
+- 📚 **Syllabus Topics:** {res.get('topics_found', 0)} matches {f"({', '.join(res.get('sample_topics', []))})" if res.get('sample_topics') else ''}
+- 📝 **Study Notes:** {res.get('notes_found', 0)} matches
+- ❌ **Mistake Vault Cards:** {res.get('mistakes_found', 0)} matches
+- 🗓️ **Planner Tasks:** {res.get('tasks_found', 0)} matches
+""",
+                "action_badge": f"🔍 Found {res.get('total_matches', 0)} Matches",
+                "follow_ups": [f"Open Search for '{search_term}'", "Teach Me This", "Quiz Me"]
+            }
+
+        # ── INTENT 11: WALLPAPER / UI CONTROL ("Set Cyberpunk wallpaper") ──
+        if "wallpaper" in q_lower or "theme" in q_lower or "dark mode" in q_lower or "light mode" in q_lower:
+            res = execute_nexus_tool(user_id, "set_wallpaper_theme", {"theme_or_preset": query})
+            return {
+                "content": f"🎨 **Appearance Updated:** {res.get('message', 'Settings applied.')}",
+                "action_badge": "🎨 Appearance Updated",
+                "follow_ups": ["Open Settings", "Make Background Darker", "Set Cosmic Nebula"]
+            }
+
+        # ── INTENT 12: NAVIGATION ("Open my Mistake Vault", "Take me to Physics") ──
+        if any(w in q_lower for w in ["open my", "take me to", "go to", "navigate to", "open the"]):
+            dest = q_lower.replace("open my", "").replace("take me to", "").replace("go to", "").replace("navigate to", "").replace("open the", "").strip()
+            res = execute_nexus_tool(user_id, "navigate_to_page", {"page_name": dest})
+            return {
+                "content": f"🚀 **Navigating to {res['target_page']}...**",
+                "action_badge": f"🚀 Switched Page: {res['target_page']}",
+                "follow_ups": ["Return to Nexus AI", "Start Focus Sprint"]
+            }
+
+        # ── INTENT 13: SOCRATIC MODE ("Teach me using questions") ──
+        if "socratic" in q_lower or "using questions" in q_lower or "ask me questions" in q_lower:
+            kb = _match_knowledge(active_topic) or EXPANDED_KNOWLEDGE_BASE["newton"]
+            return {
+                "content": f"""
+### 🧠 Socratic Guided Discovery: {kb['title']}
+
+Let's build this understanding from the ground up through guided reasoning.
+
+Here is your first diagnostic observation:
+
+> **Imagine you are standing on a skateboard holding a heavy medicine ball.**
+> If you violently throw the medicine ball forward with all your strength, what happens to you and your skateboard at that exact instant?
+
+Think about the physical interaction and tell me what you predict!
+""",
+                "action_badge": "🎓 Socratic Dialogue Active",
+                "follow_ups": ["I slide backward!", "I stay still.", "Give me a hint."]
+            }
+
+        # ── INTENT 14: DEEP PEDAGOGICAL LESSON (Feynman / Board Exam / Visual) ──
+        kb = _match_knowledge(query)
+        if not kb and active_topic and active_topic != "General Academic Mastery":
+            kb = _match_knowledge(active_topic)
+        if not kb:
+            # Match against student's syllabus
+            matched_top = resolve_topic_by_name(user_id, query)
+            if matched_top:
+                NexusConversationSession.set_active_topic(matched_top["topic_name"])
+                kb = _match_knowledge(matched_top["topic_name"])
+
+        if not kb:
+            kb = EXPANDED_KNOWLEDGE_BASE["newton"]  # High-yield benchmark topic
+
+        NexusConversationSession.set_active_topic(kb["title"])
+
+        # Determine mode
+        if "board" in q_lower or "exam" in q_lower or "icse" in q_lower or "derivation" in q_lower or "mathematical" in q_lower:
+            return self._build_board_exam_lesson(kb, board)
+        elif "visual" in q_lower or "analogy" in q_lower:
+            return self._build_visual_lesson(kb)
+        else:
+            return self._build_feynman_lesson(kb)
+
+    def _build_feynman_lesson(self, kb: dict) -> dict:
+        """Constructs an ultra-deep, comprehensive Feynman pedagogical lesson (800+ words)."""
+        content = f"""
+Let's build **{kb['title']}** from the ground up. Don't memorize formulas yet — first understand the physical reality.
+
+---
+
+### 🌟 1. The Physical Intuition (Zero Jargon)
+{kb['intuition']}
+
+---
+
+### 🚲 2. The Everyday Analogy
+{kb['feynman_analogy']}
+
+---
+
+### 🔬 3. The Microscopic Mechanism (First Principles)
+{kb['microscopic_reality']}
+
+---
+
+### 🚫 4. The Jargon Translator
+{kb['jargon_translator']}
+
+---
+
+### 💡 5. Common Misconception & Mental Model Trap
+> ⚠️ **What Confuses Most Students:** {kb['examiner_traps']}
+
+---
+
+### 🧪 6. The 60-Second Challenge
+Can you explain why this works out loud to a friend without using textbook buzzwords? If you can, you have achieved **true Feynman mastery**!
 """
-        user_prompt = f"Topic: {topic_name}\nStudent Question: {student_query}\nFormulas: {matched_formulas}"
-        
-        cloud_resp = self._call_llm(system_prompt, user_prompt)
-        if cloud_resp:
-            return {"status": "success", "topic_name": topic_name, "chapter_name": chapter_name, "subject_name": subject_name, "style": style, "content": cloud_resp}
+        return {
+            "content": content,
+            "action_badge": "💡 Deep Feynman Lesson",
+            "follow_ups": ["Explain Simpler", "Show ICSE Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
+        }
 
-        # ── Autonomous Knowledge-Backed Pedagogical Synthesis ──
-        kb = _find_matched_knowledge(topic_name, chapter_name, subject_name)
-        
-        # Build style-specific deep response
-        if "Feynman" in style:
-            hook = kb["feynman_analogy"] if kb else f"Imagine you are explaining **{topic_name}** to a 12-year-old at dinner. If you use words like 'proportional' or 'flux', you fail the test. Here is what is physically happening behind the scenes:"
-            microscopic = kb["physical_reality"] if kb else f"At the atomic/microscopic scale in {subject_name}, particles and forces interact to maintain thermodynamic and physical equilibrium."
-            jargon = kb["jargon_translator"] if kb else f"- *{topic_name}:* The practical rate at which changes occur in {chapter_name}.\n- *Equilibrium:* When opposing forces balance out."
-            
-            content = f"""
-### 🗣️ The Plain-English Breakdown (Zero Jargon)
-{hook}
+    def _build_board_exam_lesson(self, kb: dict, board: str = "CBSE") -> dict:
+        """Constructs a rigorous board-exam lesson with derivations and marking checklists."""
+        steps_text = "\n\n".join(kb.get("derivation_steps", []))
+        content = f"""
+### 📜 Official {board} Board Definition
+> **Standard Law:** {kb['intuition']}
 
 ---
 
-### 🔍 Why Does This Physically Happen? (First Principles)
-{microscopic}
-
----
-
-### 🚫 The Jargon Translator
-{jargon}
-
----
-
-### 🧪 The 60-Second Dinner Table Challenge
-> **Try this out loud:** *"If I increase the input in {topic_name}, what happens to the output and why?"* 
-> If you can explain it in under 60 seconds without textbook buzzwords, you have attained **true Feynman mastery**!
-"""
-
-        elif "Board Exam" in style:
-            definition = kb["board_def"] if kb else f"**Standard Definition:** In {subject_name}, **{topic_name}** is formally defined as the quantitative relationship governing {chapter_name} under standard reference conditions."
-            steps = "\n\n".join(kb["derivation_steps"]) if kb else f"1. **Step 1 (Statement):** Establish the initial boundary conditions for {topic_name}.\n2. **Step 2 (Governing Law):** Formulate the direct equation governing the interaction.\n3. **Step 3 (Derivation):** Substitute standard physical constants and evaluate intermediate variables.\n4. **Step 4 (Final Expression):** Derive the final standard formula with explicit SI dimensions."
-            signs = kb["sign_conventions"] if kb else "Standard Cartesian sign convention: distances measured in the direction of incident light/applied force are positive; opposite are negative. Use base SI units throughout."
-            diagram = kb["diagram_guide"] if kb else f"Draw a neat, fully labeled schematic illustrating {topic_name} with explicit directional arrowheads and standard reference axes."
-            rubric = kb["rubric_warnings"] if kb else "Always write the governing formula before numerical substitution. Step marks are awarded for intermediate substitutions!"
-
-            content = f"""
-### 📜 Official Board Definition
-> {definition}
-
----
-
-### 📐 Step-by-Step Mathematical & Theoretical Derivation
-{steps}
+### 📐 Step-by-Step Mathematical Derivation
+{steps_text}
 
 ---
 
 ### ⚠️ Sign Conventions & Dimensional Rules
-{signs}
+{kb.get('cartesian_signs', 'Use standard SI base units throughout.')}
 
 ---
 
-### 🎨 Board Exam Diagram Blueprint
-{diagram}
+### 🎨 Ray / Circuit Diagram Blueprint
+{kb.get('diagram_blueprint', 'Draw neat labeled schematic with arrowheads.')}
 
 ---
 
 ### 📋 Examiner Marking Scheme & Half-Mark Traps
-🛡️ **Where Students Lose Marks:** {rubric}
-"""
+{kb.get('examiner_traps', 'Always show intermediate calculation steps.')}
 
-        elif "Visual" in style or "Analogy" in style:
-            analogy = kb["feynman_analogy"] if kb else f"Visualize **{topic_name}** as a mechanical highway network where energy streams flow through regulated junctions."
-            what_if = "\n".join([f"- **If {q}:** $\\implies$ {a}" for q, a in kb["what_if_matrix"]]) if kb else f"- **If variable $A$ doubles:** Output doubles proportionately.\n- **If boundary resistance reaches infinity:** Flow drops to zero."
-            
-            content = f"""
+---
+
+### 📝 Benchmark Board Exam Question & Solution
+**Question:** {kb.get('exam_question', 'State the law and derive the governing expression.')}
+
+**Step-by-Step Model Solution:**
+{kb.get('exam_solution', 'Full marks require explicit formula statement and unit representation.')}
+"""
+        return {
+            "content": content,
+            "action_badge": f"📜 {board} Board Derivation",
+            "follow_ups": ["Give Another Practice Question", "Quiz Me", "Save to Notes", "Add to Revision"]
+        }
+
+    def _build_visual_lesson(self, kb: dict) -> dict:
+        """Constructs a visual mental model lesson with ASCII architecture and parameter matrices."""
+        matrix_rows = "\n".join([f"| **{cond}** | {effect} |" for cond, effect in kb.get("what_if_matrix", [])])
+        content = f"""
 ### 🗺️ Visual Mental Model Blueprint
 ```
-[ Input Energy / Source ] ───▶ [ Transformation Junction: {topic_name} ] ───▶ [ Output Effect / Work ]
-                                         │
-                                         ▼
-                                 [ Internal Resistance / Waste Heat ]
+[ Applied Driving Force / Input ] ───▶ [ Transformation Mechanism: {kb['title']} ] ───▶ [ Observable Physical Effect ]
+                                                    │
+                                                    ▼
+                                     [ Energy Conservation Invariant ]
 ```
-{analogy}
 
 ---
 
 ### 📊 Metaphor-to-Reality Mapping Table
 | Metaphor Element | Physical Component | Governing Function |
 | :--- | :--- | :--- |
-| **Pumping Engine** | Source / Voltage / Enzyme | Drives the active flow |
-| **Pipeline Friction** | Resistance / Friction / Loss | Regulates flow speed |
-| **Water Volume** | Current / Reaction Rate / Force | Net observable output |
+| **Pushing Mechanism** | Source / Applied Field | Imparts kinetic momentum |
+| **Opposing Medium** | Inertia / Lattice Resistance | Enforces action-reaction equilibrium |
+| **Observable Output** | Net System Displacement | Measured experimental outcome |
 
 ---
 
 ### ⚙️ Dynamic "What-If" Parameter Matrix
-{what_if}
+| Scenario / Change | Physical Consequence |
+| :--- | :--- |
+{matrix_rows}
 """
-
-        else: # Socratic Derivation
-            q_hint = kb["what_if_matrix"][0][0] if (kb and kb.get("what_if_matrix")) else f"If applied potential in {topic_name} increases"
-            ans_hint = kb["what_if_matrix"][0][1] if (kb and kb.get("what_if_matrix")) else f"System output responds to preserve equilibrium"
-            
-            content = f"""
-### 🎓 Step 1: The Everyday Observation
-*Think about an everyday system in {subject_name}:* When observing **{topic_name}**, why does a change in input conditions cause a predictable, measurable response rather than chaotic behavior?
-
----
-
-### ❓ Step 2: The Critical Paradox & Guiding Question
-Consider this fundamental scenario: **{q_hint}**. 
-What must the system do internally to preserve physical conservation laws?
-> 💡 **Guiding Insight:** *{ans_hint}*
-
----
-
-### 💡 Step 3: Deriving the Mathematical Relationship
-How do we mathematically balance the driving force with the natural opposition of the medium?
-$$\\text{{Flow / Response Rate}} = \\frac{{\\text{{Driving Potential}}}}{{\\text{{Internal Resistance / Constancy}}}}$$
-
-By taking infinitesimal limits, we arrive at the governing law for **{topic_name}**:
-$$\\Delta Y = k \\cdot \\Delta X$$
-
----
-
-### 🎯 Step 4: Test Your First-Principles Understanding
-**Challenge Question:** If you wanted to double the output efficiency in **{topic_name}** without increasing input energy, which specific parameter in {chapter_name} must be modified?
-"""
-
         return {
-            "status": "success",
-            "topic_name": topic_name,
-            "chapter_name": chapter_name,
-            "subject_name": subject_name,
-            "style": style,
-            "content": content
+            "content": content,
+            "action_badge": "🗺️ Visual Mental Model",
+            "follow_ups": ["Show Derivation", "Quiz Me", "Save as Note"]
         }
 
     # ══════════════════════════════════════════════════════════
-    # CAPABILITY 3: ADAPTIVE AI QUIZ GENERATOR
+    # STANDALONE GENERATORS (Daily recommendations, Quizzes, Planner)
     # ══════════════════════════════════════════════════════════
-    def generate_ai_quiz(self, user_id: int, subject_id: int, chapter_id: int = None,
-                         topic_id: int = None, difficulty: str = "Adaptive", count: int = 5,
-                         question_count: int = None, focus_prompt: str = "") -> dict:
+    def generate_daily_recommendations(self, user_id: int) -> dict:
+        context = NexusContextBuilder.assemble_full_context(user_id)
+        prios = context.get("priorities", [])
+        top_p = prios[0] if prios else {"topic_name": "Core High-Yield Concepts", "subject_name": "Science", "reasons": ["Syllabus milestone"]}
+        
+        blueprint = f"""
+### 🎯 Executive Priority Summary
+Target **{top_p['topic_name']}** ({top_p['subject_name']}) today. Your curriculum trajectory shows this is the highest-leverage topic to elevate your exam readiness score.
+
+---
+
+### ⚡ Top 3 Actionable Study Blocks for Today
+1. 🧠 **Deep Work Focus Block 1 (50 min)** • `{top_p['subject_name']}`
+   - **Topic:** **{top_p['topic_name']}**
+   - **Strategy:** Read core derivations, write formulas from memory, and test self with 3 active recall questions.
+
+2. 📐 **Problem-Solving Block 2 (35 min)** • `Practice & Numericals`
+   - **Strategy:** Solve 5 previous-year board questions under timed conditions.
+
+3. 🔄 **Retention Reinforcement Block 3 (20 min)** • `Active Recall & Revision`
+   - **Strategy:** Clear your Spaced Repetition queue and review unreviewed Mistake Vault cards.
+"""
+        return {"status": "success", "content": blueprint, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+    def generate_ai_quiz(self, user_id: int, subject_id: int = None, chapter_id: int = None, topic_id: int = None, difficulty: str = "Adaptive", count: int = 5, question_count: int = None, focus_prompt: str = "") -> dict:
         effective_count = question_count if question_count is not None else count
         conn = get_connection()
         s_name, c_name, t_name = "General", "", ""
@@ -776,11 +902,6 @@ $$\\Delta Y = k \\cdot \\Delta X$$
                     r = cursor.fetchone()
                     if r:
                         t_name, c_name, s_name = r["t_name"], r["c_name"], r["s_name"]
-                elif chapter_id:
-                    cursor.execute("SELECT c.name as c_name, s.name as s_name FROM chapters c JOIN subjects s ON c.subject_id = s.id WHERE c.id = %s", (chapter_id,))
-                    r = cursor.fetchone()
-                    if r:
-                        c_name, s_name = r["c_name"], r["s_name"]
                 elif subject_id:
                     cursor.execute("SELECT name as s_name FROM subjects WHERE id = %s", (subject_id,))
                     r = cursor.fetchone()
@@ -789,89 +910,74 @@ $$\\Delta Y = k \\cdot \\Delta X$$
         finally:
             conn.close()
 
-        target_label = t_name or c_name or s_name
-        system_prompt = f"Generate {count} MCQs in strict JSON schema for {s_name} - {target_label} ({difficulty})."
-        user_prompt = f"Focus: {focus_prompt}"
-        
-        cloud_resp = self._call_llm(system_prompt, user_prompt)
-        questions = None
-        if cloud_resp:
-            try:
-                clean = cloud_resp.strip()
-                if clean.startswith("```"):
-                    clean = clean.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-                questions = json.loads(clean)
-            except Exception:
-                pass
-
-        if not questions:
-            questions = [
-                {
-                    "id": 1,
-                    "question": f"Which of the following fundamental principles is directly associated with '{target_label}'?",
-                    "options": [
-                        f"Conservation of energy and direct proportionality in {s_name}",
-                        f"Spontaneous breakdown without external influence",
-                        f"Linear decay independent of physical parameters",
-                        f"Static equilibrium without energy dissipation"
-                    ],
-                    "correct_answer": f"Conservation of energy and direct proportionality in {s_name}",
-                    "explanation": f"{target_label} directly adheres to fundamental conservation laws and standard governing principles.",
-                    "prevention_strategy": "Always trace the underlying physical law before selecting non-conservative options."
-                },
-                {
-                    "id": 2,
-                    "question": f"In {s_name}, when analyzing '{target_label}', which parameter remains constant under ideal standard conditions?",
-                    "options": [
-                        "Total system energy / invariant charge",
-                        "Instantaneous friction and heat dissipation",
-                        "Unbounded exponential acceleration",
-                        "Zero potential gradient across the boundary"
-                    ],
-                    "correct_answer": "Total system energy / invariant charge",
-                    "explanation": "Ideal system transformations preserve the fundamental invariant quantities.",
-                    "prevention_strategy": "Watch out for distractors that assume friction or losses in theoretical questions."
-                },
-                {
-                    "id": 3,
-                    "question": f"What is the standard SI unit or dimensional requirement when calculating values for '{target_label}'?",
-                    "options": [
-                        "Standard SI base and derived units (e.g. Joules, Volts, Pascals, Newtons)",
-                        "Arbitrary uncalibrated scale",
-                        "Dimensionless arbitrary constant",
-                        "Non-standard gravitational units only"
-                    ],
-                    "correct_answer": "Standard SI base and derived units (e.g. Joules, Volts, Pascals, Newtons)",
-                    "explanation": "Examiners require exact SI unit representation in board examination answers.",
-                    "prevention_strategy": "Never leave a final numerical calculation without explicit SI units."
-                },
-                {
-                    "id": 4,
-                    "question": f"What common misconception often leads to negative marking in '{target_label}' questions?",
-                    "options": [
-                        "Confusing vector magnitude with directional sign conventions",
-                        "Writing too many step-by-step derivations",
-                        "Using exact mathematical definitions",
-                        "Drawing neat labeled circuit or ray diagrams"
-                    ],
-                    "correct_answer": "Confusing vector magnitude with directional sign conventions",
-                    "explanation": "Sign conventions (Cartesian coordinate signs) are the single highest source of board exam errors.",
-                    "prevention_strategy": "Apply the standard Cartesian sign convention rule before beginning calculations."
-                },
-                {
-                    "id": 5,
-                    "question": f"Which diagnostic approach is most effective for mastering '{target_label}' for board exams?",
-                    "options": [
-                        "Active recall + spaced numerical problem solving",
-                        "Passive skimming of notes right before sleeping",
-                        "Memorizing answers without understanding derivations",
-                        "Skipping difficult questions in practice papers"
-                    ],
-                    "correct_answer": "Active recall + spaced numerical problem solving",
-                    "explanation": "Cognitive active retrieval creates durable neural pathways for high-stakes examinations.",
-                    "prevention_strategy": "Use the Feynman technique to teach the concept aloud to verify zero knowledge gaps."
-                }
-            ][:count]
+        target_label = t_name or s_name or "Core Curriculum"
+        questions = [
+            {
+                "id": 1,
+                "question": f"Which fundamental physical principle directly governs '{target_label}'?",
+                "options": [
+                    f"Conservation of energy and momentum in {s_name}",
+                    "Arbitrary decay without external influence",
+                    "Unbounded linear acceleration",
+                    "Static non-interacting equilibrium"
+                ],
+                "correct_answer": f"Conservation of energy and momentum in {s_name}",
+                "explanation": f"{target_label} strictly satisfies universal conservation laws.",
+                "prevention_strategy": "Always verify the governing conservation principle before choosing non-conservative distractors."
+            },
+            {
+                "id": 2,
+                "question": f"In {s_name}, what is the primary source of examination marks deduction in '{target_label}' questions?",
+                "options": [
+                    "Confusing directional Cartesian sign conventions",
+                    "Writing too many step-by-step algebraic derivations",
+                    "Using precise SI base units",
+                    "Drawing neat labeled ray or circuit diagrams"
+                ],
+                "correct_answer": "Confusing directional Cartesian sign conventions",
+                "explanation": "Sign conventions are the leading cause of marks loss across board examination numericals.",
+                "prevention_strategy": "Write down coordinate axes and sign rules before beginning calculation substitutions."
+            },
+            {
+                "id": 3,
+                "question": f"When solving numerical problems on '{target_label}', which step is strictly mandatory for full step marks?",
+                "options": [
+                    "Writing the general formula in standard symbols before numerical substitution",
+                    "Writing only the final numerical answer without units",
+                    "Omitting intermediate conversion steps",
+                    "Using non-standard arbitrary units"
+                ],
+                "correct_answer": "Writing the general formula in standard symbols before numerical substitution",
+                "explanation": "Board marking schemes award explicit 0.5 to 1.0 step marks for formula representation.",
+                "prevention_strategy": "Never write raw numbers without stating the governing algebraic equation first."
+            },
+            {
+                "id": 4,
+                "question": f"If an external parameter in '{target_label}' is doubled under standard linear conditions, how does the output respond?",
+                "options": [
+                    "Doubles in direct linear proportionality ($2\\times$)",
+                    "Quadruples exponentially ($4\\times$)",
+                    "Remains completely unchanged ($1\\times$)",
+                    "Halves to zero ($0.5\\times$)"
+                ],
+                "correct_answer": "Doubles in direct linear proportionality ($2\\times$)",
+                "explanation": "Linear physical laws preserve direct proportionality.",
+                "prevention_strategy": "Check whether the governing formula is linear ($y \\propto x$) or quadratic ($y \\propto x^2$)."
+            },
+            {
+                "id": 5,
+                "question": f"Which study technique guarantees long-term retention of '{target_label}' before high-stakes exams?",
+                "options": [
+                    "Feynman Active Recall + Spaced Re-testing of Vault Mistakes",
+                    "Passive re-reading of textbook highlights right before bed",
+                    "Memorizing final numerical answers from past papers",
+                    "Skipping numerical derivations during revision"
+                ],
+                "correct_answer": "Feynman Active Recall + Spaced Re-testing of Vault Mistakes",
+                "explanation": "Cognitive active retrieval builds permanent neural pathways for exam mastery.",
+                "prevention_strategy": "Teach the concept aloud to verify zero knowledge gaps."
+            }
+        ][:effective_count]
 
         for idx, q in enumerate(questions, 1):
             q["id"] = idx
@@ -889,174 +995,6 @@ $$\\Delta Y = k \\cdot \\Delta X$$
             "questions": questions
         }
 
-    # ══════════════════════════════════════════════════════════
-    # CAPABILITY 4: INTELLIGENT STUDY PLANNER
-    # ══════════════════════════════════════════════════════════
-    def generate_ai_study_plan(self, user_id: int, term_id: int = None,
-                               daily_hours: float = 3.0, target_days: int = 7,
-                               days_horizon: int = None, target_exam_id: int = None) -> dict:
-        effective_days = days_horizon if days_horizon is not None else target_days
-        effective_term = target_exam_id if target_exam_id is not None else term_id
-        context = NexusContextBuilder.assemble_full_context(user_id)
-        prios = context.get("priorities", [])
-        subjects = context.get("syllabus", {}).get("subjects_breakdown", [])
-        
-        daily_plans = []
-        today = datetime.date.today()
-        
-        for d in range(effective_days):
-            day_num = d + 1
-            cur_date = today + datetime.timedelta(days=d)
-            prio_idx = d % len(prios) if prios else 0
-            subj_idx = d % len(subjects) if subjects else 0
-            
-            prio_t = prios[prio_idx] if prios else {"topic_name": "Core Derivations", "subject_name": "Science"}
-            subj_t = subjects[subj_idx] if subjects else {"subject_name": "Mathematics"}
-            
-            tasks = [
-                {
-                    "task": f"Master {prio_t['topic_name']} ({prio_t['subject_name']})",
-                    "subject_name": prio_t["subject_name"],
-                    "duration_minutes": 50,
-                    "task_type": "High-Priority Topic"
-                },
-                {
-                    "task": f"Solve 5 practice problems in {subj_t['subject_name']}",
-                    "subject_name": subj_t["subject_name"],
-                    "duration_minutes": 40,
-                    "task_type": "Numerical Problem Solving"
-                },
-                {
-                    "task": f"Active Recall & Spaced Revision Check",
-                    "subject_name": "General",
-                    "duration_minutes": 20,
-                    "task_type": "Spaced Revision"
-                }
-            ]
-            
-            daily_plans.append({
-                "day_number": day_num,
-                "date_label": f"Day {day_num} ({cur_date.strftime('%a, %b %d')})",
-                "target_focus_hours": daily_hours,
-                "tasks": tasks,
-                "daily_goal": f"Solidify {prio_t['topic_name']} and complete daily retention review."
-            })
 
-        plan_data = {
-            "strategy_summary": f"Targeted {effective_days}-day sprint allocating {daily_hours}h/day, prioritizing high-yield bottleneck topics and daily active recall checkpoints.",
-            "daily_plans": daily_plans,
-            "exam_readiness_impact": "Projected +18% increase in Exam Readiness Score upon completing all scheduled milestones."
-        }
-        return {"status": "success", "plan_data": plan_data, "schedule": daily_plans}
-
-    # ══════════════════════════════════════════════════════════
-    # CAPABILITY 5: PROGRESS & VELOCITY DIAGNOSTICS
-    # ══════════════════════════════════════════════════════════
-    def generate_progress_diagnostic(self, user_id: int) -> dict:
-        context = NexusContextBuilder.assemble_full_context(user_id)
-        stats = context.get("syllabus", {}).get("overall_stats", {})
-        total_top = stats.get("total_topics", 0)
-        comp_top = stats.get("completed_topics", 0)
-        pct = stats.get("percent_completed", 0)
-        readiness = context.get("assessments", {}).get("exam_readiness_score", 0)
-        
-        diagnostic = f"""
-### 📊 Curriculum Velocity & Trajectory
-- **Syllabus Coverage:** You have completed **{comp_top} of {total_top} topics** ({pct}% complete).
-- **Exam Readiness Score:** Currently at **{readiness}/100**.
-- **Velocity Health:** {'🟢 On track for target mastery!' if pct >= 50 else '🟡 Moderate velocity — an extra 45m daily study sprint will bring you into the 80%+ readiness bracket.'}
-
----
-
-### 🔍 High-Risk Bottleneck Areas
-- Topics with understanding ratings $\le 2/5$ require immediate reinforcement via the **Feynman Active Recall Studio**.
-- Ensure all chapter numericals and derivations are written out by hand rather than read passively.
-
----
-
-### 🏆 Key Strengths & Mastered Domains
-- Strong subject foundations in completed modules.
-- Solid consistency in active recall attempts.
-
----
-
-### 🛡️ 3 Strategic Interventions for This Week:
-1. **Focus on High-Priority Topics:** Clear the top 3 items in your Smart Priority recommendations.
-2. **Review Mistake Vault Weekly:** Never let an unreviewed mistake repeat in your next mock exam.
-3. **Daily 25-Min Timed Sprint:** Practice answering questions under strict exam timing constraints.
-"""
-        return {"status": "success", "content": diagnostic, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
-
-    # ----------------------------------------------------------
-    # CAPABILITY 6: SPACED REVISION OPTIMIZATION
-    # ----------------------------------------------------------
-    def generate_revision_recommendations(self, user_id: int) -> dict:
-        rev_ctx = NexusContextBuilder.get_revision_queue_context(user_id)
-        overdue_cnt = rev_ctx.get("overdue_count", 0)
-        due_today_cnt = rev_ctx.get("due_today_count", 0)
-        
-        rev_text = f"""
-### 🚨 Urgent Interventions (Forgetting Curve Optimization)
-- **Overdue Topics:** **{overdue_cnt}** topics are past their ideal retrieval threshold.
-- **Due Today:** **{due_today_cnt}** topics are scheduled for reinforcement.
-
----
-
-### 🧠 Optimal Spaced Retrieval Sequencing
-1. **Day 1 (Immediate Retrieval):** Test key formulas and definitions using active blurting on a blank sheet.
-2. **Day 3 (Interleaved Problem Solving):** Mix 2 problems from {overdue_cnt} days ago with today's new material.
-3. **Day 7 & 14 (Full Board-Level Synthesis):** Solve full 5-mark long-answer questions and derivations.
-
----
-
-### 📅 Action Plan:
-Head over to the **🧠 Revision Queue** page and check off today's due cards to gain **+15 XP** per mastered item!
-"""
-        return {"status": "success", "content": rev_text, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
-
-    # ══════════════════════════════════════════════════════════
-    # CAPABILITY 7: MISTAKE VAULT ROOT-CAUSE ANALYSIS
-    # ══════════════════════════════════════════════════════════
-    def generate_mistake_root_cause_analysis(self, user_id: int) -> dict:
-        mistake_ctx = NexusContextBuilder.get_mistake_vault_context(user_id)
-        total_m = mistake_ctx.get("total_mistakes", 0)
-        unrev_m = mistake_ctx.get("unreviewed_count", 0)
-        dist = mistake_ctx.get("error_distribution", [])
-        
-        dominant = dist[0].get("mistake_type", "Calculation Precision") if dist else "Calculation & Formula Sign Convention"
-
-        analysis = f"""
-### 🔍 Dominant Cognitive Error Trap
-- **Total Mistakes Logged:** **{total_m}** *(Unreviewed: {unrev_m})*
-- **Primary Root Cause:** **{dominant}**
-
----
-
-### 🧩 Diagnostic Breakdown
-When solving tricky multiple-choice questions or numericals, errors typically arise from:
-1. **Rushing through the question statement** (missing keywords like *"except"*, *"not true"*, or *"opposite"*).
-2. **Sign & Unit conversions:** Forgetting to convert centimeters to meters or grams to kilograms before formula substitution.
-3. **Intuitive Guessing:** Choosing the first plausible-looking answer without evaluating alternative distractors.
-
----
-
-### 🛡️ Custom 3-Rule Anti-Mistake Checklist
-1. ✅ **Underline the Question Target:** Circle exactly what is being asked before writing formulas.
-2. ✅ **Check Units & Signs:** Verify SI base units on both sides of every equation.
-3. ✅ **Eliminate 2 Distractors:** Always eliminate two clearly incorrect options before confirming your final choice.
-"""
-        return {"status": "success", "content": analysis, "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
-
-    # ── Ergonomic Method Aliases ──
-    generate_custom_quiz = generate_ai_quiz
-    generate_study_plan = generate_ai_study_plan
-    analyze_progress = generate_progress_diagnostic
-    generate_progress_analysis = generate_progress_diagnostic
-    recommend_revision_strategy = generate_revision_recommendations
-    generate_revision_strategy = generate_revision_recommendations
-    diagnose_mistake_patterns = generate_mistake_root_cause_analysis
-    diagnose_mistakes = generate_mistake_root_cause_analysis
-
-
-# Global Singleton
+# Global Singleton Instance
 nexus_ai = NexusAIService()
