@@ -441,24 +441,43 @@ class NexusAIService:
                     "follow_ups": ["View Syllabus", "Create New Note", "Plan Today's Study"]
                 }
 
-        # ── 1. Try Cloud LLM ──
-        system_instruction = f"""
+        # ── 1. Check Explicit Workspace Commands & Destructive Actions ──
+        action_keywords = [
+            "schedule", "plan tomorrow", "add to schedule", "add to planner", "remind me to study",
+            "mark ", "as completed", "as complete", "as done",
+            "add to revision", "put in revision", "schedule revision", "revision queue",
+            "save this as a note", "save as note", "create note", "save to notes", "add note",
+            "focus session", "start focus", "start timer", "pomodoro",
+            "quiz me", "test me", "generate quiz", "create quiz",
+            "got question", "got it wrong", "made a mistake", "i was wrong",
+            "find ", "search ", "look up",
+            "wallpaper", "theme", "dark mode", "light mode",
+            "open my", "take me to", "go to", "navigate to", "open the",
+            "delete all my notes", "delete all notes",
+            "how am i doing", "how am i progressing", "progress", "my stats", "analytics", "preparedness",
+            "socratic", "using questions", "ask me questions"
+        ]
+
+        is_action_command = any(kw in query.lower() for kw in action_keywords)
+
+        if not is_action_command:
+            # ── 2. Try Cloud LLM for General Concept Questions ──
+            system_instruction = f"""
 You are Nexus AI, an intelligent, patient, academically rigorous private tutor and academic copilot for {profile['name']} ({profile['class_name']} • {profile['board']}).
 Guidelines:
 1. Always teach conversationally with deep pedagogical substance (500-1000+ words for explanations).
 2. Avoid generic summaries or bullet-point shortcuts. Use natural teaching transitions.
-3. If the user asks you to perform an action (schedule a task, create a note, log a mistake, generate a quiz, change wallpaper, navigate, update syllabus), invoke the appropriate tool from the tool schema.
-4. Confine your answers strictly to the academic/study domain.
+3. Confine your answers strictly to the academic/study domain.
 """
-        cloud_result = self._call_llm_with_tools(user_id, system_instruction, query, chat_history)
-        if cloud_result and cloud_result.get("content"):
-            return {
-                "content": cloud_result["content"],
-                "action_badge": cloud_result.get("action_badge"),
-                "follow_ups": ["Explain Simpler", "Show Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
-            }
+            cloud_result = self._call_llm_with_tools(user_id, system_instruction, query, chat_history)
+            if cloud_result and cloud_result.get("content"):
+                return {
+                    "content": cloud_result["content"],
+                    "action_badge": cloud_result.get("action_badge") or "💡 Deep Pedagogical Lesson",
+                    "follow_ups": ["Explain Simpler", "Show Board Derivation", "Quiz Me on This", "Save as Note", "Add to Revision"]
+                }
 
-        # ── 2. Autonomous Cognitive Engine Fallback ──
+        # ── 3. Autonomous Cognitive Engine Dispatcher ──
         return self._autonomous_cognitive_processor(user_id, query, context, chat_history)
 
     def _autonomous_cognitive_processor(self, user_id: int, query: str, context: dict, chat_history: list) -> dict:
