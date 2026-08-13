@@ -22,6 +22,13 @@ from models import (
     auto_generate_study_plan, get_top_nexus_priorities
 )
 from styles import render_top_header_bar, render_metric_card, render_breadcrumbs, render_empty_state
+from ui_optimistic import (
+    get_optimistic_plan_status,
+    set_optimistic_plan_status,
+    render_animated_progress_bar,
+    render_floating_xp_toast
+)
+
 
 
 def render_planner_page(user_id: int):

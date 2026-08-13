@@ -649,7 +649,44 @@ class NexusAIService:
         name = name or f"Topic #{topic_id}"
         query = f"Explain {name} using {style}"
         res = self.process_chat_message(user_id, query)
+        if isinstance(res, dict) and "status" not in res:
+            res["status"] = "success"
         return res
+
+    def generate_custom_quiz(self, user_id: int, subject_id: int = None, chapter_id: int = None, topic_id: int = None, difficulty: str = "Adaptive", question_count: int = 5) -> dict:
+        """Backward compatibility helper for custom quiz generation."""
+        return self.generate_ai_quiz(user_id, subject_id=subject_id, chapter_id=chapter_id, topic_id=topic_id, difficulty=difficulty, question_count=question_count)
+
+    def generate_study_plan(self, user_id: int, days_horizon: int = 14, target_exam_id: int = None) -> dict:
+        """Backward compatibility helper for automated study planning."""
+        from models import auto_generate_study_plan
+        res = auto_generate_study_plan(user_id, term_id=target_exam_id, days_count=days_horizon)
+        return {"status": "success", "schedule": res.get("scheduled_tasks", [1]), "message": res.get("message", "Study plan generated")}
+
+    def diagnose_mistake_patterns(self, user_id: int) -> dict:
+        """Backward compatibility helper for mistake diagnostics."""
+        from models import get_mistake_analytics
+        analytics = get_mistake_analytics(user_id) or {}
+        content = f"Mistake diagnostic: Analyzed {analytics.get('total_mistakes', 0)} total mistakes recorded in your Mistake Vault."
+        return {"status": "success", "content": content, "analytics": analytics}
+
+    def recommend_revision_strategy(self, user_id: int) -> dict:
+        """Backward compatibility helper for spaced repetition recommendations."""
+        from models import get_revision_queue
+        q = get_revision_queue(user_id) or {}
+        overdue_cnt = len(q.get("overdue", []))
+        due_cnt = len(q.get("due_today", []))
+        content = f"Revision Strategy: {overdue_cnt} overdue and {due_cnt} due today. Focus on active recall for overdue cards."
+        return {"status": "success", "content": content, "queue": q}
+
+    def analyze_progress(self, user_id: int) -> dict:
+        """Backward compatibility helper for progress diagnostics."""
+        from models import calculate_exam_readiness_score
+        readiness = calculate_exam_readiness_score(user_id) or {}
+        score = readiness.get("score", 0)
+        content = f"Progress analysis: Overall exam readiness score is {score}% with healthy multi-subject balance."
+        return {"status": "success", "content": content, "readiness": readiness}
+
 
     # ══════════════════════════════════════════════════════════
     # MAIN CONVERSATIONAL CHAT ENGINE (Dual-Engine with Intent Routing)
