@@ -1024,7 +1024,14 @@ def preload_standard_syllabus(user_id: int, board: str, class_name: str) -> bool
     if not syllabus_list:
         return False
 
-    return bulk_create_syllabus(user_id, syllabus_list)
+    success = bulk_create_syllabus(user_id, syllabus_list)
+    if success:
+        try:
+            from preloaded_formulas import seed_user_canonical_formulas
+            seed_user_canonical_formulas(user_id)
+        except Exception:
+            pass
+    return success
 
 
 def reload_and_replace_syllabus(user_id: int, board: str, class_name: str) -> bool:
@@ -1035,5 +1042,6 @@ def reload_and_replace_syllabus(user_id: int, board: str, class_name: str) -> bo
     from models import clear_user_syllabus
     clear_user_syllabus(user_id)
     return preload_standard_syllabus(user_id, board, class_name)
+
 
 

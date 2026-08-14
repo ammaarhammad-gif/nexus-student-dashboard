@@ -2090,16 +2090,66 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
         .nexus-formula-card {
             background: var(--nexus-card-bg);
             border: 1px solid var(--nexus-card-border);
-            border-radius: 16px;
-            padding: 18px 22px;
+            border-radius: 14px;
+            padding: 16px 20px;
             margin-bottom: 14px;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             backdrop-filter: blur(14px);
+            position: relative;
         }
         .nexus-formula-card:hover {
-            border-color: var(--nexus-accent);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+            transform: translateY(-1px);
         }
+        .formula-math-display {
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 10px 0;
+            text-align: center;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+        .formula-category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 0 12px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .formula-category-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--nexus-text-title);
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .formula-custom-badge {
+            background: rgba(245, 158, 11, 0.15);
+            color: #F59E0B;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .formula-core-badge {
+            background: rgba(56, 189, 248, 0.12);
+            color: #38BDF8;
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
 
         /* ── Standardized AI Action Card ── */
         .nexus-ai-action-card {

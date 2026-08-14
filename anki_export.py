@@ -162,13 +162,16 @@ def export_active_recall_to_anki(user_id: int, subject_id: int = None, format_ty
     return _format_cards_output(cards, format_type, deck_default="Nexus::Active_Recall")
 
 
-def export_formulas_to_anki(user_id: int, subject_id: int = None, format_type: str = "tsv") -> str:
+def export_formulas_to_anki(user_id: int, subject_id: int = None, chapter_id: int = None, is_favorite_only: bool = False, format_type: str = "tsv") -> str:
     """
-    Exports Formula Vault items into Anki flashcards with KaTeX / MathJax formatting.
+    Exports Formula Vault items into Anki flashcards with KaTeX / MathJax formatting and academic metadata.
     """
-    formulas = get_all_formulas(user_id) or []
-    if subject_id:
-        formulas = [f for f in formulas if f.get("subject_id") == subject_id]
+    formulas = get_all_formulas(
+        user_id=user_id,
+        subject_id=subject_id,
+        chapter_id=chapter_id,
+        is_favorite_only=is_favorite_only
+    ) or []
 
     cards = []
     for f in formulas:
@@ -177,10 +180,24 @@ def export_formulas_to_anki(user_id: int, subject_id: int = None, format_type: s
         title = f.get("title", "Formula")
         latex = f.get("formula_latex", "") or f.get("latex_code", "")
         desc = f.get("description", "")
+        units = f.get("units", "")
+        conditions = f.get("conditions", "")
+        category = f.get("category", "Formula")
+        vars_raw = f.get("variables_json", "{}")
+
+        # Parse variables if json
+        vars_dict = {}
+        if isinstance(vars_raw, dict):
+            vars_dict = vars_raw
+        elif isinstance(vars_raw, str) and vars_raw.startswith("{"):
+            try:
+                vars_dict = json.loads(vars_raw)
+            except Exception:
+                vars_dict = {}
 
         front_html = f"""<div style="font-family: -apple-system, sans-serif; font-size: 16px; color: #1E293B;">
 <div style="display: inline-block; background: #E0F2FE; color: #0284C7; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;">
-📐 FORMULA VAULT • {f.get('subject_name', '')}
+📐 FORMULA VAULT • {f.get('subject_name', '')} • {category}
 </div>
 <div style="font-size: 13px; color: #64748B; margin-bottom: 6px;">{f.get('chapter_name', '')}</div>
 <div style="font-size: 18px; font-weight: 700; color: #0369A1;">{_clean_html_text(title)}</div>
@@ -191,14 +208,32 @@ def export_formulas_to_anki(user_id: int, subject_id: int = None, format_type: s
 <div style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; padding: 14px; text-align: center; margin-bottom: 10px; font-size: 18px;">
 {math_display}
 </div>"""
+
         if desc:
-            back_html += f"""<div style="font-size: 13px; color: #475569;">
-<b>Notes & Conditions:</b> {_clean_html_text(desc)}
+            back_html += f"""<div style="font-size: 13px; color: #334155; margin-bottom: 8px;">
+<b>Meaning:</b> {_clean_html_text(desc)}
 </div>"""
+
+        if vars_dict:
+            var_lines = "<br/>".join([f"• <b>{k}</b>: {_clean_html_text(str(v))}" for k, v in vars_dict.items()])
+            back_html += f"""<div style="background: #F8FAFC; border-left: 3px solid #38BDF8; padding: 6px 10px; font-size: 12px; margin-bottom: 8px;">
+<b>Variables:</b><br/>{var_lines}
+</div>"""
+
+        if units:
+            back_html += f"""<div style="font-size: 12px; color: #475569; margin-bottom: 4px;">
+<b>SI Units:</b> {_clean_html_text(units)}
+</div>"""
+
+        if conditions:
+            back_html += f"""<div style="font-size: 12px; color: #64748B;">
+<b>Conditions & Sign Convention:</b> {_clean_html_text(conditions)}
+</div>"""
+
         back_html += "</div>"
 
         deck_name = f"Nexus::Formulas::{s_name}"
-        tags = f"Nexus Formulas {s_name} {c_name}".strip()
+        tags = f"Nexus Formulas {s_name} {c_name} {category.replace(' ', '_')}".strip()
         tags = re.sub(r'\s+', ' ', tags)
 
         cards.append({
@@ -211,6 +246,7 @@ def export_formulas_to_anki(user_id: int, subject_id: int = None, format_type: s
         })
 
     return _format_cards_output(cards, format_type, deck_default="Nexus::Formulas")
+
 
 
 def export_all_to_anki(user_id: int, format_type: str = "tsv") -> str:

@@ -2969,16 +2969,29 @@ def delete_note(user_id: int, note_id: int):
 # ══════════════════════════════════════════════
 
 def add_formula(user_id: int, subject_id: int, chapter_id: int, title: str,
-                formula_latex: str, topic_id: int = None, description: str = "") -> int:
-    """Adds a mathematical/scientific formula with LaTeX rendering to the vault."""
+                formula_latex: str, topic_id: int = None, description: str = "",
+                variables_json: str = "{}", units: str = "", conditions: str = "",
+                category: str = "Core Formulas", is_core: int = 1, is_custom: int = 0,
+                common_mistake: str = "", example_application: str = "") -> int:
+    """Adds a mathematical/scientific formula with LaTeX rendering and metadata to the vault."""
     conn = get_connection()
     try:
+        if isinstance(variables_json, dict):
+            variables_json = json.dumps(variables_json)
         with conn.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO formulas (user_id, subject_id, chapter_id, topic_id, title, formula_latex, description)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO formulas (
+                    user_id, subject_id, chapter_id, topic_id, title, formula_latex, description,
+                    variables_json, units, conditions, category, is_core, is_custom, common_mistake, example_application
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (user_id, subject_id, chapter_id, topic_id, title.strip(), formula_latex.strip(), description.strip()))
+            """, (
+                user_id, subject_id, chapter_id, topic_id, title.strip(), formula_latex.strip(), (description or "").strip(),
+                variables_json or "{}", (units or "").strip(), (conditions or "").strip(),
+                category or "Core Formulas", int(is_core), int(is_custom),
+                (common_mistake or "").strip(), (example_application or "").strip()
+            ))
             formula_id = cursor.fetchone()[0]
             conn.commit()
             st.cache_data.clear()
@@ -2991,27 +3004,202 @@ def add_formula(user_id: int, subject_id: int, chapter_id: int, title: str,
 
 
 @st.cache_data(ttl=20, show_spinner=False)
-def get_all_formulas(user_id: int, subject_id: int = None) -> list:
-    """Retrieves all formulas with optional subject filtering."""
+def get_all_formulas(user_id: int, subject_id: int = None, chapter_id: int = None,
+                     is_favorite_only: bool = False, search_query: str = None) -> list:
+    """Retrieves formulas with multi-parameter filtering, searching, and sorting."""
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             query = """
-                SELECT f.*, s.name as subject_name, s.color as subject_color, c.name as chapter_name
+                SELECT f.*, s.name as subject_name, s.color as subject_color, c.name as chapter_name, t.name as topic_name
                 FROM formulas f
                 JOIN subjects s ON f.subject_id = s.id
                 JOIN chapters c ON f.chapter_id = c.id
+                LEFT JOIN topics t ON f.topic_id = t.id
                 WHERE f.user_id = %s
             """
             params = [user_id]
             if subject_id:
                 query += " AND f.subject_id = %s"
                 params.append(subject_id)
-            query += " ORDER BY f.is_favorite DESC, s.name, c.name, f.title"
+            if chapter_id:
+                query += " AND f.chapter_id = %s"
+                params.append(chapter_id)
+            if is_favorite_only:
+                query += " AND f.is_favorite = 1"
+            if search_query and search_query.strip():
+                q = f"%{search_query.strip().lower()}%"
+                query += """ AND (
+                    LOWER(f.title) LIKE %s OR 
+                    LOWER(f.formula_latex) LIKE %s OR 
+                    LOWER(f.description) LIKE %s OR 
+                    LOWER(f.variables_json) LIKE %s OR
+                    LOWER(s.name) LIKE %s OR
+                    LOWER(c.name) LIKE %s
+                )"""
+                params.extend([q, q, q, q, q, q])
+            query += " ORDER BY f.is_favorite DESC, f.is_core DESC, f.is_custom ASC, s.display_order, c.display_order, f.id ASC"
             cursor.execute(query, params)
             return [dict(r) for r in cursor.fetchall()]
     finally:
         conn.close()
+
+
+def get_formula_by_id(user_id: int, formula_id: int) -> dict:
+    """Retrieves a single formula record with joined subject/chapter/topic metadata."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT f.*, s.name as subject_name, s.color as subject_color, c.name as chapter_name, t.name as topic_name
+                FROM formulas f
+                JOIN subjects s ON f.subject_id = s.id
+                JOIN chapters c ON f.chapter_id = c.id
+                LEFT JOIN topics t ON f.topic_id = t.id
+                WHERE f.id = %s AND f.user_id = %s
+            """, (formula_id, user_id))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def bulk_seed_canonical_formulas(user_id: int, formulas_list: list) -> int:
+    """
+    High-speed transactional bulk seeder for canonical syllabus formulas.
+    Inserts formulas only if a formula with the same user_id, chapter_id, and title doesn't already exist.
+    """
+    if not formulas_list:
+        return 0
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Fetch existing formula titles for this user to avoid duplicates
+            cursor.execute("SELECT chapter_id, LOWER(title) FROM formulas WHERE user_id = %s", (user_id,))
+            existing = set((r[0], r[1]) for r in cursor.fetchall())
+
+            tuples_to_insert = []
+            for f in formulas_list:
+                c_id = f.get("chapter_id")
+                t_lower = str(f.get("title", "")).strip().lower()
+                if (c_id, t_lower) in existing:
+                    continue
+
+                v_json = f.get("variables_json", "{}")
+                if isinstance(v_json, dict):
+                    v_json = json.dumps(v_json)
+
+                tuples_to_insert.append((
+                    user_id,
+                    f.get("subject_id"),
+                    c_id,
+                    f.get("topic_id"),
+                    f.get("title", "").strip(),
+                    f.get("formula_latex", "").strip(),
+                    (f.get("description") or "").strip(),
+                    v_json or "{}",
+                    (f.get("units") or "").strip(),
+                    (f.get("conditions") or "").strip(),
+                    f.get("category") or "Core Formulas",
+                    int(f.get("is_core", 1)),
+                    int(f.get("is_custom", 0)),
+                    (f.get("common_mistake") or "").strip(),
+                    (f.get("example_application") or "").strip()
+                ))
+
+            if tuples_to_insert:
+                psycopg2.extras.execute_values(
+                    cursor,
+                    """
+                    INSERT INTO formulas (
+                        user_id, subject_id, chapter_id, topic_id, title, formula_latex, description,
+                        variables_json, units, conditions, category, is_core, is_custom, common_mistake, example_application
+                    )
+                    VALUES %s
+                    """,
+                    tuples_to_insert
+                )
+                conn.commit()
+                st.cache_data.clear()
+                return len(tuples_to_insert)
+            return 0
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def get_chapter_formula_count_summary(user_id: int, subject_id: int = None) -> list:
+    """Returns aggregated formula stats grouped by subject and chapter."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            query = """
+                SELECT 
+                    s.id as subject_id, s.name as subject_name, s.color as subject_color,
+                    c.id as chapter_id, c.name as chapter_name, c.display_order as chapter_order,
+                    COUNT(f.id) as total_formulas,
+                    SUM(CASE WHEN f.is_core = 1 THEN 1 ELSE 0 END) as core_count,
+                    SUM(CASE WHEN f.is_favorite = 1 THEN 1 ELSE 0 END) as fav_count,
+                    SUM(CASE WHEN f.is_custom = 1 THEN 1 ELSE 0 END) as custom_count
+                FROM chapters c
+                JOIN subjects s ON c.subject_id = s.id
+                LEFT JOIN formulas f ON f.chapter_id = c.id AND f.user_id = %s
+                WHERE c.user_id = %s
+            """
+            params = [user_id, user_id]
+            if subject_id:
+                query += " AND s.id = %s"
+                params.append(subject_id)
+            query += " GROUP BY s.id, s.name, s.color, c.id, c.name, c.display_order ORDER BY s.display_order, c.display_order"
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_formulas_grouped_by_category(user_id: int, chapter_id: int = None, subject_id: int = None,
+                                     is_favorite_only: bool = False, search_query: str = None) -> dict:
+    """
+    Returns formulas categorized into clean academic groups:
+    - 'Core Formulas'
+    - 'Derived / Useful Relations'
+    - 'Definitions & Relations'
+    - 'Constants / Values'
+    - 'Custom Formulas'
+    Only categories with items are populated.
+    """
+    all_f = get_all_formulas(
+        user_id=user_id,
+        subject_id=subject_id,
+        chapter_id=chapter_id,
+        is_favorite_only=is_favorite_only,
+        search_query=search_query
+    )
+    
+    STANDARD_CATEGORIES = [
+        "Core Formulas",
+        "Derived / Useful Relations",
+        "Definitions & Relations",
+        "Constants / Values",
+        "Custom Formulas"
+    ]
+    
+    grouped = {cat: [] for cat in STANDARD_CATEGORIES}
+    
+    for f in all_f:
+        if f.get("is_custom"):
+            grouped["Custom Formulas"].append(f)
+        else:
+            cat = f.get("category") or "Core Formulas"
+            if cat not in grouped:
+                grouped[cat] = []
+            grouped[cat].append(f)
+            
+    # Filter out empty categories
+    return {k: v for k, v in grouped.items() if len(v) > 0}
 
 
 def toggle_formula_favorite(user_id: int, formula_id: int, is_fav: int):

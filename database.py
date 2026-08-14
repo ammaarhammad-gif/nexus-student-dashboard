@@ -406,6 +406,15 @@ def init_db():
         ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_date VARCHAR(20);
+
+        -- Formula Vault enhanced metadata
+        ALTER TABLE formulas ADD COLUMN IF NOT EXISTS units TEXT DEFAULT '';
+        ALTER TABLE formulas ADD COLUMN IF NOT EXISTS conditions TEXT DEFAULT '';
+        ALTER TABLE formulas ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Core Formulas';
+        ALTER TABLE formulas ADD COLUMN IF NOT EXISTS is_core INTEGER DEFAULT 1;
+        ALTER TABLE formulas ADD COLUMN IF NOT EXISTS is_custom INTEGER DEFAULT 0;
+        ALTER TABLE formulas ADD COLUMN IF NOT EXISTS common_mistake TEXT DEFAULT '';
+        ALTER TABLE formulas ADD COLUMN IF NOT EXISTS example_application TEXT DEFAULT '';
         """)
 
         # ── 21. Performance Indexes for Instant Screen Transitions (<100ms) ──
@@ -423,6 +432,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_mistakes_user ON mistakes (user_id, mistake_type);
         CREATE INDEX IF NOT EXISTS idx_notes_user_topic ON notes (user_id, topic_id);
         CREATE INDEX IF NOT EXISTS idx_formulas_user ON formulas (user_id, subject_id);
+        CREATE INDEX IF NOT EXISTS idx_formulas_user_chap ON formulas (user_id, chapter_id);
+        CREATE INDEX IF NOT EXISTS idx_formulas_user_fav ON formulas (user_id, is_favorite);
         CREATE INDEX IF NOT EXISTS idx_quiz_user ON quizzes (user_id);
         CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts (user_id);
         CREATE INDEX IF NOT EXISTS idx_recall_user ON recall_responses (user_id, topic_id);
