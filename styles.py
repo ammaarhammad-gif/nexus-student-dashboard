@@ -2048,6 +2048,95 @@ def apply_custom_css(theme: str = "Dark", wallpaper_url: str = None, wallpaper_b
             display: inline-block;
             animation: nexus-pulse-glow 1.2s infinite;
         }
+
+        /* ── Standardized Topic Row Component ── */
+        .nexus-topic-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: var(--nexus-card-bg);
+            border: 1px solid var(--nexus-card-border);
+            border-radius: 12px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(12px);
+        }
+        .nexus-topic-row:hover {
+            border-color: var(--nexus-accent);
+            background: rgba(56, 189, 248, 0.06);
+            transform: translateX(3px);
+        }
+
+        /* ── Standardized Task Card Component ── */
+        .nexus-task-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: var(--nexus-card-bg);
+            border: 1px solid var(--nexus-card-border);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+        .nexus-task-card.is-completed {
+            opacity: 0.65;
+            background: rgba(255, 255, 255, 0.02);
+            text-decoration: line-through;
+        }
+
+        /* ── Standardized Formula Card Component ── */
+        .nexus-formula-card {
+            background: var(--nexus-card-bg);
+            border: 1px solid var(--nexus-card-border);
+            border-radius: 16px;
+            padding: 18px 22px;
+            margin-bottom: 14px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(14px);
+        }
+        .nexus-formula-card:hover {
+            border-color: var(--nexus-accent);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        }
+
+        /* ── Standardized AI Action Card ── */
+        .nexus-ai-action-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(34, 197, 94, 0.12);
+            border: 1px solid rgba(34, 197, 94, 0.35);
+            border-radius: 12px;
+            color: #22C55E;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        /* ── Standardized Glass Card ── */
+        .nexus-glass-card {
+            background: var(--nexus-card-bg) !important;
+            border: 1px solid var(--nexus-card-border) !important;
+            border-radius: 16px;
+            padding: 20px 24px;
+            backdrop-filter: blur(16px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ── Standardized Action Panel ── */
+        .nexus-action-panel {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--nexus-card-border);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
     """
 
     st.markdown(f"<style>{theme_vars}\n{wallpaper_css}\n{theme_rules}\n{shared_css}</style>", unsafe_allow_html=True)

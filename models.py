@@ -1380,17 +1380,25 @@ def delete_daily_plan(user_id: int, plan_id: int):
 
 
 def auto_generate_study_plan(user_id: int, term_id: int = None, days_count: int = 14,
-                             topics_per_day: int = 3, start_date: str = None) -> dict:
+                             topics_per_day: int = 3, start_date: str = None,
+                             start_date_str: str = None, daily_topic_cap: int = None,
+                             default_duration: int = 30, dry_run: bool = False) -> dict:
     """
     Intelligent Auto-Scheduler:
     - Finds all unfinished/in-progress topics (or topics belonging to chapters mapped to a specific term).
     - Sorts topics using Priority Engine (weak understanding, high importance, exam proximity).
     - Distributes topics across upcoming days starting from start_date (default today), balancing subjects.
-    - Adds tasks to daily_plans avoiding duplicates.
-    - Returns summary dictionary.
+    - If dry_run=True, returns non-destructive proposal dict with 'planned_tasks'.
+    - If dry_run=False, commits tasks to daily_plans avoiding duplicates.
     """
     import datetime
-    start = datetime.datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else datetime.date.today()
+    
+    # Resolve aliases
+    actual_start_str = start_date_str or start_date
+    actual_topics_per_day = daily_topic_cap or topics_per_day or 3
+    actual_duration = default_duration or 30
+    
+    start = datetime.datetime.strptime(actual_start_str, "%Y-%m-%d").date() if actual_start_str else datetime.date.today()
     
     conn = get_connection()
     try:
@@ -1429,7 +1437,13 @@ def auto_generate_study_plan(user_id: int, term_id: int = None, days_count: int 
             topics = [dict(r) for r in cursor.fetchall()]
             
             if not topics:
-                return {"scheduled_count": 0, "days_used": 0, "message": "All topics in this scope are already completed! 🎉"}
+                return {
+                    "scheduled_count": 0,
+                    "days_count": 0,
+                    "days_used": 0,
+                    "planned_tasks": [],
+                    "message": "All topics in this scope are already completed! 🎉"
+                }
             
             # Fetch existing planned topic IDs to avoid duplicate planning
             cursor.execute("""
@@ -1441,7 +1455,13 @@ def auto_generate_study_plan(user_id: int, term_id: int = None, days_count: int 
             # Filter out already planned topics
             unplanned_topics = [t for t in topics if t["topic_id"] not in already_planned]
             if not unplanned_topics:
-                return {"scheduled_count": 0, "days_used": 0, "message": "All remaining topics are already scheduled in your planner!"}
+                return {
+                    "scheduled_count": 0,
+                    "days_count": 0,
+                    "days_used": 0,
+                    "planned_tasks": [],
+                    "message": "All remaining topics are already scheduled in your planner!"
+                }
             
             # 2. Sort by intelligent priority (low understanding first, high importance first, difficult first)
             def topic_sort_key(t):
@@ -1463,41 +1483,56 @@ def auto_generate_study_plan(user_id: int, term_id: int = None, days_count: int 
                     if by_subject[sub_name]:
                         interleaved.append(by_subject[sub_name].pop(0))
             
-            scheduled_count = 0
+            planned_tasks = []
             curr_day_offset = 0
             day_topic_count = 0
+            used_days = set()
             
             for t in interleaved:
                 target_date = start + datetime.timedelta(days=curr_day_offset)
                 date_str = target_date.strftime("%Y-%m-%d")
+                used_days.add(date_str)
                 
-                cursor.execute(
-                    "SELECT COALESCE(MAX(display_order), 0) FROM daily_plans WHERE user_id = %s AND plan_date = %s",
-                    (user_id, date_str)
-                )
-                max_order = cursor.fetchone()[0]
+                planned_tasks.append({
+                    "date": date_str,
+                    "topic_id": t["topic_id"],
+                    "topic_name": t["topic_name"],
+                    "subject_id": t["subject_id"],
+                    "subject_name": t["subject_name"],
+                    "chapter_id": t["chapter_id"],
+                    "duration": actual_duration
+                })
                 
-                desc = f"Study: {t['topic_name']} ({t['subject_name']})"
-                cursor.execute("""
-                    INSERT INTO daily_plans (user_id, plan_date, subject_id, chapter_id, topic_id, description, duration_minutes, display_order)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (user_id, date_str, t["subject_id"], t["chapter_id"], t["topic_id"], desc, 45, max_order + 1))
+                if not dry_run:
+                    cursor.execute(
+                        "SELECT COALESCE(MAX(display_order), 0) FROM daily_plans WHERE user_id = %s AND plan_date = %s",
+                        (user_id, date_str)
+                    )
+                    max_order = cursor.fetchone()[0]
+                    
+                    desc = f"Study: {t['topic_name']} ({t['subject_name']})"
+                    cursor.execute("""
+                        INSERT INTO daily_plans (user_id, plan_date, subject_id, chapter_id, topic_id, description, duration_minutes, display_order)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (user_id, date_str, t["subject_id"], t["chapter_id"], t["topic_id"], desc, actual_duration, max_order + 1))
                 
-                scheduled_count += 1
                 day_topic_count += 1
-                
-                if day_topic_count >= topics_per_day:
+                if day_topic_count >= actual_topics_per_day:
                     day_topic_count = 0
                     curr_day_offset += 1
-                    if curr_day_offset >= days_count:
+                    if curr_day_offset >= days_count and not dry_run:
                         curr_day_offset = days_count - 1
             
-            conn.commit()
-            st.cache_data.clear()
+            if not dry_run:
+                conn.commit()
+                st.cache_data.clear()
+                
             return {
-                "scheduled_count": scheduled_count,
-                "days_used": min(days_count, curr_day_offset + 1),
-                "message": f"Successfully scheduled {scheduled_count} topics across {min(days_count, curr_day_offset + 1)} days!"
+                "scheduled_count": len(planned_tasks),
+                "days_count": len(used_days),
+                "days_used": len(used_days),
+                "planned_tasks": planned_tasks,
+                "message": f"Successfully {'prepared proposal for' if dry_run else 'scheduled'} {len(planned_tasks)} topics across {len(used_days)} days!"
             }
     except Exception:
         conn.rollback()
@@ -1592,20 +1627,32 @@ def get_all_goals(user_id: int):
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             cursor.execute("SELECT * FROM goals WHERE user_id = %s ORDER BY is_completed ASC, deadline ASC, id DESC", (user_id,))
             rows = cursor.fetchall()
-            return [dict(r) for r in rows]
+            goals = []
+            for r in rows:
+                d = dict(r)
+                # Cross-compatibility aliases for UI rendering
+                d["current_value"] = d.get("progress", 0)
+                d["target_value"] = d.get("target", 1)
+                d["unit"] = d.get("goal_type", "Target")
+                goals.append(d)
+            return goals
     finally:
         conn.close()
 
 
-def add_goal(user_id: int, title: str, goal_type: str = "Daily", target: int = 1, deadline: str = None):
-    """Add a new goal."""
+def add_goal(user_id: int, title: str, goal_type: str = "Daily", target: int = 1,
+             deadline: str = None, target_value: int = None, unit: str = None):
+    """Add a new goal with support for unit/target_value aliases."""
+    actual_target = target_value if target_value is not None else target
+    actual_type = unit if unit is not None else goal_type
+    
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO goals (user_id, title, goal_type, target, progress, deadline, is_completed)
                 VALUES (%s, %s, %s, %s, 0, %s, 0) RETURNING id
-            """, (user_id, title.strip(), goal_type, target, deadline))
+            """, (user_id, title.strip(), actual_type, actual_target, deadline))
             goal_id = cursor.fetchone()[0]
             conn.commit()
             st.cache_data.clear()
@@ -1617,14 +1664,22 @@ def add_goal(user_id: int, title: str, goal_type: str = "Daily", target: int = 1
         conn.close()
 
 
-def update_goal_progress(user_id: int, goal_id: int, progress: int, is_completed: bool = False):
-    """Update goal progress."""
+def update_goal_progress(user_id: int, goal_id: int, progress: int, is_completed: bool = None):
+    """Update goal progress and auto-detect completion if target reached."""
     conn = get_connection()
     try:
-        with conn.cursor() as cursor:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            if is_completed is None:
+                cursor.execute("SELECT target FROM goals WHERE user_id = %s AND id = %s", (user_id, goal_id))
+                row = cursor.fetchone()
+                target_val = row[0] if row else 1
+                completed_flag = 1 if progress >= target_val else 0
+            else:
+                completed_flag = 1 if is_completed else 0
+                
             cursor.execute("""
                 UPDATE goals SET progress = %s, is_completed = %s WHERE user_id = %s AND id = %s
-            """, (progress, 1 if is_completed else 0, user_id, goal_id))
+            """, (progress, completed_flag, user_id, goal_id))
             conn.commit()
             st.cache_data.clear()
     except Exception:

@@ -160,8 +160,12 @@ class NexusIntentRouter:
         if any(w in q for w in ["make it easier", "make that easier", "explain like a normal person", "too complicated", "simpler please", "explain simpler", "simplify"]):
             return "CONTEXT_SIMPLIFICATION"
 
+        if any(w in q for w in ["socratic", "using questions", "ask me questions", "guide me with questions", "quiz me through questions"]):
+            return "SOCRATIC_MODE"
+
         if any(w in q for w in ["icse exam", "icse version", "board version", "derivation", "mathematical version", "for my exam"]):
             return "CONTEXT_EXAM_MODE"
+
 
         if any(w in q for w in ["quiz me on this", "give me questions on this", "test me on this", "quiz me on it", "test me on it"]):
             return "CONTEXT_QUIZ_ME"
@@ -286,21 +290,23 @@ class NexusContextBuilder:
         try:
             stats = get_overall_stats(user_id) or {}
             subjects = get_all_subjects_with_stats(user_id) or []
+            subj_list = [{
+                "name": s["name"],
+                "completed": s.get("completed", 0),
+                "total": s.get("total_topics", 0),
+                "pct": s.get("percent_completed", 0),
+                "avg_understanding": s.get("avg_understanding", 3)
+            } for s in subjects]
             return {
                 "total_topics": stats.get("total_topics", 0),
                 "completed_topics": stats.get("completed_topics", 0),
                 "percent_completed": stats.get("percent_completed", 0),
-                "subjects": [{
-                    "name": s["name"],
-                    "completed": s.get("completed", 0),
-                    "total": s.get("total_topics", 0),
-                    "pct": s.get("percent_completed", 0),
-                    "avg_understanding": s.get("avg_understanding", 3)
-                } for s in subjects]
+                "subjects": subj_list,
+                "subjects_breakdown": subj_list
             }
         except Exception as e:
             logger.error(f"Error fetching syllabus summary for user {user_id}: {e}")
-            return {"total_topics": 0, "completed_topics": 0, "percent_completed": 0, "subjects": []}
+            return {"total_topics": 0, "completed_topics": 0, "percent_completed": 0, "subjects": [], "subjects_breakdown": []}
 
     @staticmethod
     def get_priorities(user_id: int) -> list:
@@ -318,11 +324,66 @@ class NexusContextBuilder:
 
     @staticmethod
     def assemble_full_context(user_id: int) -> dict:
+        try:
+            terms = get_active_upcoming_terms(user_id) or []
+        except Exception:
+            terms = []
+
+        try:
+            mistakes_data = get_mistake_analytics(user_id) or {}
+            total_m = mistakes_data.get("total", mistakes_data.get("total_mistakes", 0))
+            reviewed_m = mistakes_data.get("reviewed", 0)
+            unreviewed_m = max(0, total_m - reviewed_m)
+            mistakes_info = {
+                "total_mistakes": total_m,
+                "unreviewed_count": unreviewed_m,
+                "reviewed_count": reviewed_m
+            }
+        except Exception:
+            mistakes_info = {"total_mistakes": 0, "unreviewed_count": 0, "reviewed_count": 0}
+
+        try:
+            rev_queue = get_revision_queue(user_id) or {}
+            total_revs = len(rev_queue.get("overdue", [])) + len(rev_queue.get("due_today", [])) + len(rev_queue.get("upcoming", []))
+            revisions_info = {
+                "total_active_revisions": total_revs,
+                "overdue_count": len(rev_queue.get("overdue", [])),
+                "due_today_count": len(rev_queue.get("due_today", []))
+            }
+        except Exception:
+            revisions_info = {"total_active_revisions": 0, "overdue_count": 0, "due_today_count": 0}
+
+        try:
+            readiness = calculate_exam_readiness_score(user_id) or {}
+            readiness_score = readiness.get("score", readiness.get("readiness_score", readiness.get("composite_score", 70)))
+            assessments_info = {
+                "exam_readiness_score": readiness_score,
+                "readiness": readiness
+            }
+        except Exception:
+            assessments_info = {"exam_readiness_score": 70, "readiness": {}}
+
+        try:
+            today_str = datetime.date.today().isoformat()
+            plans = get_daily_plans(user_id, date_str=today_str) or []
+            habits_info = {
+                "today_tasks": plans,
+                "tasks_count": len(plans)
+            }
+        except Exception:
+            habits_info = {"today_tasks": [], "tasks_count": 0}
+
         return {
             "profile": NexusContextBuilder.get_student_profile(user_id),
             "syllabus": NexusContextBuilder.get_syllabus_summary(user_id),
-            "priorities": NexusContextBuilder.get_priorities(user_id)
+            "exams": terms,
+            "priorities": NexusContextBuilder.get_priorities(user_id),
+            "mistakes": mistakes_info,
+            "revisions": revisions_info,
+            "assessments": assessments_info,
+            "habits": habits_info
         }
+
 
 
 # ══════════════════════════════════════════════════════════
@@ -548,7 +609,6 @@ class NexusAIService:
         return defaults.get(provider.lower(), "gemini-2.5-flash")
 
     def get_status(self) -> dict:
-        self._detect_provider_and_key()
         is_cloud = bool(self.api_key and self.provider)
         masked_key = f"{self.api_key[:4]}...{self.api_key[-4:]}" if (self.api_key and len(self.api_key) > 8) else ("****" if self.api_key else "")
         return {
@@ -557,8 +617,10 @@ class NexusAIService:
             "engine_mode": f"Cloud LLM ({self.provider.upper()})" if is_cloud else "Autonomous Cognitive Engine",
             "provider": self.provider or "Autonomous Engine",
             "model": self.model_name or "Nexus Cognitive v4.0",
-            "masked_key": masked_key
+            "masked_key": masked_key,
+            "setup_guide": "Add a GEMINI_API_KEY, OPENAI_API_KEY, or GROQ_API_KEY in .streamlit/secrets.toml for cloud LLMs."
         }
+
 
     def _call_llm_with_tools(self, user_id: int, system_prompt: str, user_query: str, chat_history: list) -> dict:
         """Invokes Cloud LLM with full student context and tool execution support."""
@@ -635,6 +697,7 @@ class NexusAIService:
     def generate_explanation(self, user_id: int, topic_id: int = None, topic_name: str = "", style: str = "Intuitive & Practical") -> dict:
         """Backward compatibility helper for test suites and legacy callers."""
         name = topic_name
+        sub_name = "Curriculum"
         if topic_id and not name:
             try:
                 from models import get_all_subjects_with_stats
@@ -643,15 +706,22 @@ class NexusAIService:
                         for top in ch.get("topics", []):
                             if top.get("id") == topic_id:
                                 name = top.get("name")
+                                sub_name = sub.get("name", "Curriculum")
                                 break
             except Exception:
                 pass
         name = name or f"Topic #{topic_id}"
         query = f"Explain {name} using {style}"
         res = self.process_chat_message(user_id, query)
-        if isinstance(res, dict) and "status" not in res:
-            res["status"] = "success"
+        if isinstance(res, dict):
+            if "status" not in res:
+                res["status"] = "success"
+            if "topic_name" not in res:
+                res["topic_name"] = name
+            if "subject_name" not in res:
+                res["subject_name"] = sub_name
         return res
+
 
     def generate_custom_quiz(self, user_id: int, subject_id: int = None, chapter_id: int = None, topic_id: int = None, difficulty: str = "Adaptive", question_count: int = 5) -> dict:
         """Backward compatibility helper for custom quiz generation."""
@@ -686,6 +756,11 @@ class NexusAIService:
         score = readiness.get("score", 0)
         content = f"Progress analysis: Overall exam readiness score is {score}% with healthy multi-subject balance."
         return {"status": "success", "content": content, "readiness": readiness}
+
+    def generate_progress_diagnostic(self, user_id: int) -> dict:
+        """Backward compatibility helper for progress diagnostics."""
+        return self.analyze_progress(user_id)
+
 
 
     # ══════════════════════════════════════════════════════════
@@ -1743,12 +1818,15 @@ $$\vec{{F}} = \frac{{d\vec{{p}}}}{{dt}} \quad \text{{where}} \quad \vec{{p}} = \
 
         is_detailed = any(w in q_lower for w in ["in detail", "detailed", "teach me", "masterclass", "thoroughly", "deeply", "everything about"])
 
-        if "board" in q_lower or "exam" in q_lower or "icse" in q_lower or "derivation" in q_lower or "mathematical" in q_lower:
+        if "socratic" in q_lower:
+            res = self._handle_socratic_mode(query)
+        elif "board" in q_lower or "exam" in q_lower or "icse" in q_lower or "derivation" in q_lower or "mathematical" in q_lower:
             res = self._build_board_exam_lesson(kb, board)
         elif "visual" in q_lower or "analogy" in q_lower:
             res = self._build_visual_lesson(kb)
         else:
             res = self._build_feynman_lesson(kb, is_detailed=is_detailed)
+
 
         NexusConversationSession.set_active_topic(kb["title"], kb.get("subject", "Physics"), last_explanation=res["content"])
         return res

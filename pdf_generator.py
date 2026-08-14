@@ -38,7 +38,10 @@ from models import (
     get_recall_stats,
     get_quiz_history
 )
+import logging
 from ai_service import nexus_ai
+
+logger = logging.getLogger(__name__)
 
 
 class NumberedCanvas(canvas.Canvas):
@@ -124,8 +127,16 @@ def generate_weekly_progress_pdf(user_id: int, days: int = 7) -> bytes:
     total_quizzes = len(quizzes)
 
     # AI Pedagogical Strategic Advice
-    ai_diag = nexus_ai.generate_progress_diagnostic(user_id)
-    ai_text = ai_diag.get("content", "Maintain daily spaced retrieval and focus on high-yield derivations.")
+    ai_text = "Maintain daily spaced retrieval and focus on high-yield derivations."
+    try:
+        if hasattr(nexus_ai, "generate_progress_diagnostic"):
+            ai_diag = nexus_ai.generate_progress_diagnostic(user_id) or {}
+            ai_text = ai_diag.get("content", ai_text)
+        elif hasattr(nexus_ai, "analyze_progress"):
+            ai_diag = nexus_ai.analyze_progress(user_id) or {}
+            ai_text = ai_diag.get("content", ai_text)
+    except Exception as e:
+        logger.warning(f"Error fetching AI progress diagnostic for PDF: {e}")
 
     # ── ReportLab Document Setup ──
     buffer = io.BytesIO()

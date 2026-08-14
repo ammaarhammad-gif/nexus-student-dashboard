@@ -400,15 +400,18 @@ def _render_export_tab(user_id: int):
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        master_tsv = export_all_to_anki(user_id, format_type="tsv")
-        st.download_button(
-            label="📥 Download Anki (.tsv)",
-            data=master_tsv,
-            file_name="Nexus_Master_Flashcards.tsv",
-            mime="text/tab-separated-values",
-            use_container_width=True,
-            key="sett_dl_master_anki_tsv"
-        )
+        try:
+            master_tsv = export_all_to_anki(user_id, format_type="tsv")
+            st.download_button(
+                label="📥 Download Anki (.tsv)",
+                data=master_tsv,
+                file_name="Nexus_Master_Flashcards.tsv",
+                mime="text/tab-separated-values",
+                use_container_width=True,
+                key="sett_dl_master_anki_tsv"
+            )
+        except Exception as e:
+            st.button("📥 Download Anki (.tsv)", disabled=True, use_container_width=True, key="sett_dl_master_anki_tsv_err")
     with c_exp_b:
         st.markdown("""
             <div class="metric-box" style="border-left: 4px solid #38BDF8; padding: 16px;">
@@ -418,15 +421,18 @@ def _render_export_tab(user_id: int):
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        master_csv = export_all_to_anki(user_id, format_type="csv")
-        st.download_button(
-            label="📊 Download CSV (.csv)",
-            data=master_csv,
-            file_name="Nexus_Master_Flashcards.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key="sett_dl_master_anki_csv"
-        )
+        try:
+            master_csv = export_all_to_anki(user_id, format_type="csv")
+            st.download_button(
+                label="📊 Download CSV (.csv)",
+                data=master_csv,
+                file_name="Nexus_Master_Flashcards.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="sett_dl_master_anki_csv"
+            )
+        except Exception as e:
+            st.button("📊 Download CSV (.csv)", disabled=True, use_container_width=True, key="sett_dl_master_anki_csv_err")
     with c_exp_c:
         st.markdown("""
             <div class="metric-box" style="border-left: 4px solid #10B981; padding: 16px;">
@@ -436,16 +442,20 @@ def _render_export_tab(user_id: int):
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        pdf_rep = generate_weekly_progress_pdf(user_id, days=7)
-        st.download_button(
-            label="📄 Export 7-Day PDF Report",
-            data=pdf_rep,
-            file_name="Nexus_Academic_Report_7Days.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True,
-            key="sett_dl_pdf_btn"
-        )
+        try:
+            pdf_rep = generate_weekly_progress_pdf(user_id, days=7)
+            st.download_button(
+                label="📄 Export 7-Day PDF Report",
+                data=pdf_rep,
+                file_name="Nexus_Academic_Report_7Days.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True,
+                key="sett_dl_pdf_btn"
+            )
+        except Exception as e:
+            st.button("📄 Export 7-Day PDF Report", disabled=True, use_container_width=True, key="sett_dl_pdf_btn_err")
+
 
 
 # ══════════════════════════════════════════════════════════════════════════
