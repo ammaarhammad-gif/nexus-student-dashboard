@@ -1298,10 +1298,13 @@ def get_term_stats(user_id: int, term_id: int) -> dict:
 # ══════════════════════════════════════════════
 
 @st.cache_data(ttl=30, show_spinner=False)
-def get_daily_plans(user_id: int, plan_date: str = None):
+def get_daily_plans(user_id: int, plan_date: str = None, date_str: str = None):
     """Retrieve daily study plan tasks for a given date (YYYY-MM-DD). Defaults to today if not provided."""
-    if not plan_date:
-        plan_date = datetime.date.today().strftime("%Y-%m-%d")
+    target_date = plan_date or date_str
+    if not target_date:
+        target_date = datetime.date.today().strftime("%Y-%m-%d")
+    plan_date = target_date
+
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:

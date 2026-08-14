@@ -365,11 +365,12 @@ class NexusContextBuilder:
 
         try:
             today_str = datetime.date.today().isoformat()
-            plans = get_daily_plans(user_id, date_str=today_str) or []
+            plans = get_daily_plans(user_id, plan_date=today_str) or []
             habits_info = {
                 "today_tasks": plans,
                 "tasks_count": len(plans)
             }
+
         except Exception:
             habits_info = {"today_tasks": [], "tasks_count": 0}
 
